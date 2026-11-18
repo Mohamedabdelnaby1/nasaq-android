@@ -5,7 +5,7 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.10.0/Nasaq-v0.10.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-205449?style=for-the-badge" alt="تنزيل APK"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.11.0/Nasaq-v0.11.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-205449?style=for-the-badge" alt="تنزيل APK"></a>
   <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="كل الإصدارات"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
@@ -17,16 +17,16 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-1. [نزّل Nasaq-v0.10.0.apk مباشرة](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.10.0/Nasaq-v0.10.0.apk) من GitHub.
+1. [نزّل Nasaq-v0.11.0.apk مباشرة](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.11.0/Nasaq-v0.11.0.apk) من GitHub.
 2. ثبّت الملف أو افتحه كتحديث لو النسخة الحالية من إصدارات المشروع بنفس التوقيع.
 3. [أحدث إصدار](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/latest) فيه بصمة **SHA-256** للملف وكود الإصدار. الإصدارات القديمة متاحة في [الأرشيف](https://github.com/Mohamedabdelnaby1/nasaq-android/releases).
 
-### الجديد في 0.10.0
+### الجديد في 0.11.0
 
-- هوية جديدة لنَسَق. بنفسجي للسكر، وأزرق للمياه، وخوخي للأدوية، وذهبي للوجبات.
-- شريط تنقّل جديد، وزر تسجيل سريع، وتصميم جديد للسجل والأدوية والمتابعة والإعدادات.
-- الزجاجة والكوبايات بتتفاعل مع تسجيل المياه. حركة الانتقال بتربط بطاقة اليوم بتفاصيلها.
-- الويدجتس بتعرض المتوسط، وفي الاستوديو تقدر تشوف معاينة متحركة للقالب والمقاس قبل الإضافة.
+- زر تسجيل السكر وزر تسجيل الكوب في أول شاشة اليوم، في العرض المختصر والتفصيلي.
+- قائمة التسجيل بتبدأ بأنواع التسجيل. المساعد والكتابة الحرة وأدوات الرعاية داخل «أدوات إضافية».
+- البحث والفلترة بجوار بعض في السجل، والتعديل متاح مباشرة من كل تسجيل قابل للتعديل.
+- الإعدادات مقسمة حسب المهمة. معاينة الويدجت ثابتة فوق الخيارات أثناء التعديل.
 
 <a id="screens"></a>
 ## الشاشات والحركة
@@ -35,13 +35,13 @@
 
 | يومك | المياه | الإعدادات |
 | :---: | :---: | :---: |
-| <img src="docs/media/today.webp" alt="شاشة اليوم، تقويم وتوزيع مفصل" width="225"> | <img src="docs/media/hydration.webp" alt="زجاجة المياه وكوبايات التسجيل" width="225"> | <img src="docs/media/settings.webp" alt="الإعدادات الجديدة بألوان وأيقونات مميزة" width="225"> |
+| <img src="docs/media/today.webp" alt="شاشة اليوم مع تسجيل السكر والكوب مباشرة" width="225"> | <img src="docs/media/hydration.webp" alt="زجاجة المياه وكوبايات التسجيل" width="225"> | <img src="docs/media/settings.webp" alt="الإعدادات مرتبة حسب المهمة" width="225"> |
 
 | الويدجتس | تسجيل المياه |
 | :---: | :---: |
 | <img src="docs/media/widget-board.png" alt="ويدجت متوسط السكر والمياه والدواء" width="290"> | <img src="docs/media/widget-water.png" alt="ويدجت المياه الصغير بزرين للإضافة والتراجع" width="175"> |
 
-[الخط الزمني](docs/media/timeline.webp) · [معاينة التنقل بين الشاشات](docs/media/navigation.webp) · [معاينة حركة امتلاء الكوبايات](docs/media/water-motion.webp)
+[معاينة استوديو الويدجت](docs/media/widget-studio.webp) · [الخط الزمني](docs/media/timeline.webp) · [معاينة التنقل بين الشاشات](docs/media/navigation.webp) · [معاينة حركة امتلاء الكوبايات](docs/media/water-motion.webp)
 
 <a id="features"></a>
 ## المميزات

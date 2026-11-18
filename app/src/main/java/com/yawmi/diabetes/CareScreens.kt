@@ -29,6 +29,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     var filter by rememberSaveable(initialFilter) { mutableStateOf(initialFilter) }
     var query by rememberSaveable { mutableStateOf("") }
     var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
+    var showFilters by rememberSaveable { mutableStateOf(false) }
     val entries = remember(s.entries, s.medications, filter, query, w) {
         val search = query.trim()
         s.entries.filter {
@@ -42,13 +43,9 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     val motion = LocalMotion.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenGutters, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item("journal-heading") {
-            SectionBanner(if (initialFilter == "glucose") "glucose" else "log",
-                w[if (initialFilter == "glucose") "glucose" else "log"], action = {
-                if (onImport != null) IconAction(onClick = onImport,
-                    modifier = Modifier.semantics { contentDescription = w["csv_import"] }) {
-                    Glyph("backup", Modifier.size(21.dp))
-                }
-            })
+            ScreenTitle(w[if (initialFilter == "glucose") "glucose" else "log"]) {
+                if (onImport != null) OutlineAction(onImport) { Text(w["csv_import"]) }
+            }
         }
         if (initialFilter == "glucose" && onAddReading != null) item("daily-average") {
             ReadingHero(dayOverview(s, System.currentTimeMillis()), s.preferences, onAdd = onAddReading)
@@ -65,10 +62,18 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                     shape = CircleShape, modifier = Modifier.fillMaxWidth(), singleLine = true,
                     colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = c.surfaceContainerLow,
                         unfocusedBorderColor = c.outlineVariant))
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("all", "glucose", "dose", "water", "meal", "symptom", "weight", "pressure", "a1c").forEach { kind ->
-                        ChoiceChip(selected = filter == kind, onClick = { filter = kind; expandedId = null },
-                            label = { Text(w[if (kind == "dose") "medication" else kind]) })
+                val filters = listOf("all", "glucose", "water", "dose", "meal", "symptom", "weight", "pressure", "a1c")
+                fun filterLabel(kind: String) = w[if (kind == "dose") "medication" else kind]
+                SettingsRow("settings", w["filter_records"], filterLabel(filter), expanded = showFilters) { showFilters = !showFilters }
+                MotionExpand(showFilters) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        filters.forEach { kind ->
+                            ChoiceChip(selected = filter == kind, onClick = {
+                                filter = kind
+                                expandedId = null
+                                showFilters = false
+                            }, label = { Text(filterLabel(kind)) })
+                        }
                     }
                 }
             }
@@ -94,14 +99,19 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                     Column(Modifier.fillMaxWidth().clip(ControlShape).clickable {
                         expandedId = if (expanded) null else entry.id
                     }) {
-                        ActivityRow(entry, s, trailing = { Glyph(if (expanded) "up" else "down", Modifier.size(16.dp), c.onSurfaceVariant) })
+                        ActivityRow(entry, s, trailing = {
+                            if (entry.kind != "dose") IconAction(onClick = { onEdit(entry) },
+                                modifier = Modifier.semantics { contentDescription = w["edit"] + " " + w[kind] }) {
+                                Glyph("edit", Modifier.size(17.dp), tone.ink)
+                            }
+                            Glyph(if (expanded) "up" else "down", Modifier.size(16.dp), c.onSurfaceVariant)
+                        })
                     }
                     MotionExpand(expanded) {
                         Column(Modifier.fillMaxWidth().padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             if (entry.note.isNotBlank()) Text(entry.note, style = MaterialTheme.typography.bodyMedium)
                             if (entry.kind == "dose") Text(w[entry.status], style = MaterialTheme.typography.labelMedium)
                             Row {
-                                if (entry.kind != "dose") TextAction(onClick = { onEdit(entry) }) { Text(w["edit"]) }
                                 TextAction(onClick = { onDelete(entry) }, colors = ButtonDefaults.textButtonColors(contentColor = c.error)) {
                                     Text(w["delete"])
                                 }
@@ -123,11 +133,9 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     val motion = LocalMotion.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenGutters, verticalArrangement = Arrangement.spacedBy(15.dp)) {
         item("medicines-heading") {
-            SectionBanner("medications", w["medications"], action = {
-                IconAction(onClick = add, modifier = Modifier.semantics { contentDescription = w["add_med"] }) {
-                    Glyph("plus", Modifier.size(22.dp), domainColors("medications").ink)
-                }
-            })
+            ScreenTitle(w["medications"]) {
+                OutlineAction(add) { Text(w["add_med"]) }
+            }
         }
         item("medicines-next") {
             val next = upcoming.firstOrNull()
@@ -147,8 +155,8 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                                 style = MaterialTheme.typography.titleMedium)
                         } else Text(w["no_doses"], style = MaterialTheme.typography.bodyLarge)
                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            ActionButton(onClick = { if (next != null) dose(next) else add() }, modifier = Modifier.weight(1f)) {
-                                Text(w[if (next != null) "record_dose" else "add_med"])
+                            if (next != null) ActionButton(onClick = { dose(next) }, modifier = Modifier.weight(1f)) {
+                                Text(w["record_dose"])
                             }
                             if (s.medications.any { it.active }) TextAction(onClick = manual) { Text(w["manual_dose"]) }
                         }
@@ -214,6 +222,8 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
         SectionBanner("insights", w["insights"], dateText(periodStart(days), w) + " – " + dateText(System.currentTimeMillis(), w))
         val periods = listOf(1, 7, 14, 30)
         SegmentedRail(periods.map { w[if (it == 1) "today_only" else "last${it}"] }, periods.indexOf(days), { days = periods[it] })
+        NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
+            context, { w[it] }) { context = it } }
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             MetricTile(w["average_short"],if(glucose.isEmpty())"—"else number(com.yawmi.diabetes.core.Planner.fromMg(glucose.map{mg(it)}.average(),p.unit),w,1),Modifier.weight(1f),c.primaryContainer.copy(alpha=.6f))
             MetricTile(w["readings"],number(glucose.size.toDouble(),w),Modifier.weight(1f))
@@ -226,8 +236,6 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
             Text(p.unit, style = MaterialTheme.typography.labelLarge)
             GlucoseChart(glucose, p, onOpenDay)
         }
-        NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
-            context, { w[it] }) { context = it } }
         WeeklyInsights(s, context, onOpenDay)
         Panel{
             SectionHeading(w["range_distribution"])

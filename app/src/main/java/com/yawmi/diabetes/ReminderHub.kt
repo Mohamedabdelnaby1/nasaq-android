@@ -114,7 +114,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             SettingsRow("water",w["water_reminders"],w[if(s.preferences.waterEnabled)"enabled"else"disabled"]){edit("water")}
             SettingsRow("glucose",w["glucose_reminders"],w[if(s.preferences.glucoseEnabled)"enabled"else"disabled"]){edit("glucose")}
             SettingsRow("medication",w["medications"],w["per_medicine_policy"]){medications()}
-            SettingsRow("care",w["care_tools"],w["care_tools_subtitle"],onCare)
+            SettingsRow("care",w["care_tools"],w["care_tools_subtitle"],onClick=onCare)
         }
         if(suggestion!=null || s.preferences.waterOffset>0)Panel(w["adaptive_water"]){
             if(suggestion!=null){
@@ -190,7 +190,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             Toggle(w["after_meal_reminders"],after){after=it}
             if(after)Field(w["minutes"],delay,{delay=it;invalid=false},true)
         }
-        Panel{SettingsRow("bell",w["channel"],w["notification_sound_note"],channel);OutlineAction(onClick=test,modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}}
+        Panel{SettingsRow("bell",w["channel"],w["notification_sound_note"],onClick=channel);OutlineAction(onClick=test,modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}}
         if(invalid)Notice(w["schedule_error"],true)
         Text(w["policy_shared_hint"],style=MaterialTheme.typography.bodySmall)
     }

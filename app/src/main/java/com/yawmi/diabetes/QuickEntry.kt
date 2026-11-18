@@ -52,7 +52,9 @@ internal fun RecordingSheet(
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
             } else editor(current, ::close)
         } else key(page) {
-            if (page == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater, onSelect) else editor(page, ::close)
+            if (page == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater) { kind ->
+                if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
+            } else editor(page, ::close)
         }
     }
 }
@@ -60,99 +62,71 @@ internal fun RecordingSheet(
 @Composable
 private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWater: (() -> Unit)?, onHideWater: ((Double) -> Unit)?, choose: (String) -> Unit) {
     val w = LocalWords.current
-    val c = MaterialTheme.colorScheme
     val feedback = rememberFeedback()
     fun chooseAction(kind: String) { feedback(); choose(kind) }
     val habits = remember(state) { state?.let { journalHabits(it, System.currentTimeMillis()) } }
+    var showTools by rememberSaveable { mutableStateOf(false) }
     var phrase by rememberSaveable { mutableStateOf("") }
     val request = remember(phrase, state?.preferences) {
         state?.let { JournalLanguage.parse(phrase, it.preferences) as? JournalRequest.Draft }
     }
-        Column(
-            Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            SectionBanner("today", w["quick_add"])
-            if (state != null && onQuickWater != null) {
-                val amount = number(state.preferences.cup.toDouble(), w)
-                val water = domainColors("water")
-                ActionButton(onClick = onQuickWater, modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = water.backdrop, contentColor = water.ink)) {
-                    Glyph("water", Modifier.size(20.dp), water.ink)
-                    Spacer(Modifier.width(9.dp))
-                    Text(w.f("quick_log_cup", "amount" to amount))
-                    Spacer(Modifier.weight(1f))
-                    Glyph("plus", Modifier.size(18.dp), water.ink)
-                }
-            }
-            if (state != null && onDraft != null) {
-                OutlinedTextField(phrase, { phrase = it.take(250) }, modifier = Modifier.fillMaxWidth(),
-                    shape = ControlShape, label = { Text(w["quick_phrase"]) }, singleLine = true,
-                    leadingIcon = { Glyph("spark", Modifier.size(19.dp)) })
-                MotionExpand(request != null) {
-                    request?.let { draft ->
-                        NasaqBoard {
-                            Text(w[draft.entry.kind] + " · " + entryTitle(draft.entry, state, w),
-                                style = MaterialTheme.typography.titleMedium)
-                            ActionButton(onClick = { onDraft(draft.entry) }) { Text(w["assistant_edit_draft"]) }
-                        }
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp).padding(bottom = 22.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        ScreenTitle(w["quick_add"])
+        val primary = listOf("glucose", "water")
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            primary.forEach { kind ->
+                val tone = domainColors(kind)
+                Surface({ chooseAction(kind) }, Modifier.weight(1f).fillMaxHeight(), shape = ControlShape,
+                    color = tone.backdrop, contentColor = tone.ink) {
+                    Row(Modifier.heightIn(min = 58.dp).padding(10.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                        Glyph(kind, Modifier.size(21.dp), tone.ink)
+                        Text(w[kind], Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                        Glyph("arrow", Modifier.size(13.dp), tone.ink)
                     }
-                }
-                MotionExpand(phrase.isBlank() && habits?.waterAmount != null) {
-                    habits?.waterAmount?.let { amount ->
-                        NasaqBoard {
-                            SuggestionChip(onClick = { onDraft(Entry(kind = "water", value = amount, unit = "mL")) },
-                                label = { Text(w.f("habit_water", "amount" to number(amount, w, 2))) })
-                            Text(w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w)),
-                                style = MaterialTheme.typography.bodySmall)
-                            if (onHideWater != null) TextAction(onClick = { onHideWater(amount) }) { Text(w["hide_suggestion"]) }
-                        }
-                    }
-                }
-            }
-            Surface(
-                onClick = { chooseAction("assistant_title") }, shape = RoundedCornerShape(22.dp),
-                color = c.primaryContainer, contentColor = c.onPrimaryContainer, modifier = Modifier.fillMaxWidth()
-            ) {
-                Row(Modifier.padding(17.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Glyph("spark", Modifier.size(27.dp), c.onPrimaryContainer)
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(w["assistant_title"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(w["assistant_subtitle"], style = MaterialTheme.typography.bodySmall, color = c.onPrimaryContainer)
-                    }
-                    Glyph("arrow", Modifier.size(18.dp), c.onPrimaryContainer)
-                }
-            }
-            FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                (habits?.actions ?: journalActions).forEach { kind ->
-                    val tone = domainColors(kind)
-                    Surface(
-                        onClick = { chooseAction(kind) }, shape = BoardShape,
-                        color = tone.backdrop, contentColor = tone.ink, modifier = Modifier.weight(1f)
-                    ) {
-                        Box {
-                            SectionArt(kind, Modifier.matchParentSize(), tone.ink)
-                            Column(Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(11.dp),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                                    Glyph(kind, Modifier.size(24.dp), tone.ink)
-                                    Glyph("arrow", Modifier.size(15.dp), tone.ink)
-                                }
-                                Text(w[kind], style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-            Surface(
-                onClick = { chooseAction("care_tools") }, shape = RoundedCornerShape(18.dp),
-                color = c.surfaceContainerHigh, modifier = Modifier.fillMaxWidth().pressResponse()
-            ) {
-                Row(Modifier.padding(14.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Glyph("medication", Modifier.size(21.dp))
-                    Text(w["care_tools"], Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
-                    Glyph("arrow", Modifier.size(17.dp))
                 }
             }
         }
+        if (state != null && onQuickWater != null) {
+            val amount = number(state.preferences.cup.toDouble(), w)
+            OutlineAction(onQuickWater, Modifier.fillMaxWidth()) {
+                Glyph("plus", Modifier.size(17.dp))
+                Spacer(Modifier.width(6.dp))
+                Text(w.f("quick_log_cup", "amount" to amount))
+            }
+        }
+        (habits?.actions ?: journalActions).filterNot { it in primary }.forEach { kind ->
+            SettingsRow(kind, w[kind]) { chooseAction(kind) }
+        }
+        HorizontalDivider()
+        SettingsRow("more", w["more_tools"], w[if (showTools) "less" else "details"], expanded = showTools) { showTools = !showTools }
+        MotionExpand(showTools) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                SettingsRow("spark", w["assistant_title"]) { chooseAction("assistant_title") }
+                SettingsRow("shield", w["care_tools"]) { chooseAction("care_tools") }
+                if (state != null && onDraft != null) {
+                    OutlinedTextField(phrase, { phrase = it.take(250) }, modifier = Modifier.fillMaxWidth(),
+                        shape = ControlShape, label = { Text(w["quick_phrase"]) }, singleLine = true)
+                    request?.let { draft ->
+                        TonalAction({ onDraft(draft.entry) }, Modifier.fillMaxWidth()) {
+                            Text(w["assistant_edit_draft"])
+                        }
+                    }
+                    habits?.waterAmount?.takeIf { phrase.isBlank() }?.let { amount ->
+                        NasaqBoard {
+                            TonalAction({ onDraft(Entry(kind = "water", value = amount, unit = "mL")) }) {
+                                Text(w.f("habit_water", "amount" to number(amount, w, 2)))
+                            }
+                            Text(w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w)),
+                                style = MaterialTheme.typography.bodySmall)
+                            if (onHideWater != null) TextAction({ onHideWater(amount) }) { Text(w["hide_suggestion"]) }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

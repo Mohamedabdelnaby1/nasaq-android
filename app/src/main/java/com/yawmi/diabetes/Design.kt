@@ -137,11 +137,11 @@ fun AppChrome(
     }, content = content)
 }
 
-@Composable fun SettingsRow(kind:String,title:String,subtitle:String?=null,onClick:()->Unit){
+@Composable fun SettingsRow(kind:String,title:String,subtitle:String?=null,expanded:Boolean?=null,onClick:()->Unit){
     val c=MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().pressResponse(compression=.985f).clickable(onClick=onClick).padding(vertical=11.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
         DomainMark(kind)
         Column(Modifier.weight(1f)){Text(title,style=MaterialTheme.typography.bodyLarge,fontWeight=FontWeight.Medium);if(subtitle!=null)Text(subtitle,style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)}
-        Glyph("arrow",Modifier.size(16.dp),c.onSurfaceVariant)
+        Glyph(when (expanded) { true -> "up"; false -> "down"; null -> "arrow" },Modifier.size(16.dp),c.onSurfaceVariant)
     }
 }

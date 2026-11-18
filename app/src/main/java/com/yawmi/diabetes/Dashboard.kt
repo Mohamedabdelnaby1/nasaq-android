@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
 import java.time.LocalDate
@@ -44,16 +45,23 @@ fun Home(
     val doses = remember(s, now) { Reminders.plan(s, now - 7_200_000, now + 86_400_000).filter { it.kind == "medication" } }
     val permission = remember(permissionRevision, now) { Reminders.permitted(device) to Reminders.exact(device) }
     val ordered = p.order.filter { it !in p.hiddenCards && it in deskKinds }
-    val habits = remember(s, now) { journalHabits(s, now) }
     val motion = LocalMotion.current
     val scroll = rememberScrollState()
     Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(15.dp)) {
-        SectionBanner("today", w.f("hello", "name" to p.name.ifBlank { w["friend"] }), dateText(now, w), action = {
+        ScreenTitle(w["today"], dateText(now, w)) {
             IconAction(customise, Modifier.semantics { contentDescription = w["customise"] }) {
-                Glyph("settings", Modifier.size(22.dp), MaterialTheme.colorScheme.onPrimaryContainer)
+                Glyph("settings", Modifier.size(21.dp))
             }
-        })
+        }
+        Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            DailyAction("glucose", w["add_reading"], null, !busy, { add("glucose") }, Modifier.weight(1f).fillMaxHeight())
+            DailyAction("water", w["log_cup_short"],
+                number(p.cup.toDouble(), w) + " " + w["ml"], !busy, cup, Modifier.weight(1f).fillMaxHeight())
+        }
+        NextActionCard(s, now, onAction = { reminder ->
+            if (reminder.kind == "medication") dose(reminder) else add(if (reminder.kind == "care") "care_tools" else reminder.kind)
+        }, onSetup = notifications)
         SegmentedRail(listOf(w["compact_home"], w["detailed"]), if (p.compactHome) 0 else 1, { onMode(it == 0) })
         AnimatedContent(p.compactHome, transitionSpec = {
             if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
@@ -62,42 +70,25 @@ fun Home(
                 .using(SizeTransform(clip = true) { _, _ -> tween(500, easing = NasaqEase) })
         }, label = "daily-desk-layout") { compact ->
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                fun open(kind: String): (() -> Unit)? = when (kind) {
-                    "glucose" -> openGlucose
-                    "water" -> openHydration
-                    else -> openMedicines
+                fun destination(kind: String): () -> Unit = when (kind) {
+                    "glucose" -> openGlucose ?: { add("glucose") }
+                    "water" -> openHydration ?: { add("water") }
+                    else -> openMedicines ?: { doses.firstOrNull()?.let(dose) ?: add("dose") }
                 }
-                fun log(kind: String) {
-                    when (kind) {
-                        "water" -> if (compact) cup() else add("water")
-                        "glucose" -> add(kind)
-                        else -> doses.firstOrNull()?.let(dose) ?: add("dose")
-                    }
-                }
-                if (compact) {
+                if (compact && ordered.isNotEmpty()) {
                     NasaqBoard {
-                        SectionHeading(w["day_overview"], w["details"], openOverview)
-                        ordered.forEach { kind ->
-                            HorizontalDivider()
-                            DeskMetricLine(kind, summary, s, busy, open(kind), { log(kind) })
+                        ordered.forEachIndexed { index, kind ->
+                            if (index > 0) HorizontalDivider()
+                            DeskMetricLine(kind, summary, s, destination(kind))
                         }
                         if ("water" in ordered && summary.waterAverageMl != null) {
                             Text(w["water_week"] + " · " + number(summary.waterAverageMl / 1000, w, 2) + " " + w["litres_short"],
                                 style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
                         }
                     }
-                } else {
-                    ordered.firstOrNull()?.let { kind ->
-                        Reveal(0) { DeskInstrument(kind, summary, s, busy, open(kind), { log(kind) }) }
-                    }
-                    ordered.drop(1).chunked(2).forEachIndexed { row, kinds ->
-                        Reveal(row + 1) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                kinds.forEach { kind ->
-                                    DeskTile(kind, summary, s, p.cardSizes[kind], Modifier.weight(1f), open(kind) ?: { log(kind) })
-                                }
-                            }
-                        }
+                } else if (!compact) {
+                    ordered.forEachIndexed { index, kind ->
+                        Reveal(index) { DeskMetricCard(kind, summary, s, destination(kind)) }
                     }
                     if ("meals" !in p.hiddenCards) NasaqBoard {
                         SectionHeading(w["today_story"], w["details"], openOverview)
@@ -113,25 +104,19 @@ fun Home(
             }
         }
         if (openDay != null) NasaqBoard {
-            SectionHeading(w["day_overview"], w["details"], openOverview)
+            SectionHeading(w["days_in_log"], w["today"], openOverview)
             DeskWeek(now, summary.activityCount, openDay)
         }
         if (!p.compactHome && "water" in ordered && p.waterGoal > 0) {
+            var showingCups by rememberSaveable { mutableStateOf(false) }
             NasaqBoard {
-                SectionHeading(w["water_fill_cup"], openHydration?.let { w["details"] }) { openHydration?.invoke() }
-                WaterCups(s, busy, portion)
+                SettingsRow("water", w["water_cup_plan"], w[if (showingCups) "less" else "details"], expanded = showingCups,
+                    onClick = { showingCups = !showingCups })
+                MotionExpand(showingCups) { WaterCups(s, busy, portion) }
             }
         }
-        NextActionCard(s, now, onAction = { reminder ->
-            if (reminder.kind == "medication") dose(reminder) else add(if (reminder.kind == "care") "care_tools" else reminder.kind)
-        }, onSetup = notifications)
         if ("symptoms" !in p.hiddenCards && !p.compactHome) {
-            NasaqBoard { SettingsRow("shield", w["care_corner"], w["care_corner_body"], sick) }
-        }
-        if (!p.compactHome) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                habits.actions.forEach { kind -> RoundAction(kind, w[kind], { if (!busy) add(kind) }, domainColors(kind).backdrop) }
-            }
+            NasaqBoard { SettingsRow("shield", w["care_corner"], w["care_corner_body"], onClick = sick) }
         }
         if ((p.waterEnabled || p.glucoseEnabled || s.medications.any { it.active && it.reminders }) &&
             (!permission.first || !permission.second)) {
@@ -183,92 +168,68 @@ private fun deskValue(kind: String, summary: DayOverview, state: State): Pair<St
 }
 
 @Composable
-private fun DeskMetricLine(kind: String, summary: DayOverview, state: State, busy: Boolean,
-    open: (() -> Unit)?, add: () -> Unit) {
-    val w = LocalWords.current
-    val (value, unit) = deskValue(kind, summary, state)
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).sharedDesk(kind).clip(ControlShape).clickable(enabled = open != null) { open?.invoke() }
-            .padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-            DomainMark(kind)
-            Column(Modifier.weight(1f)) {
-                Text(deskLabel(kind), style = MaterialTheme.typography.labelMedium)
-                DeskAmount(listOf(value, unit).filter(String::isNotEmpty).joinToString(" "), MaterialTheme.typography.titleLarge)
-            }
-        }
-        IconAction(onClick = add, enabled = !busy, modifier = Modifier.semantics { contentDescription = w["add"] + " " + w[kind] }) {
-            Glyph("plus", Modifier.size(21.dp))
-        }
-    }
-}
-
-@Composable
-private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: Boolean, open: (() -> Unit)?, add: () -> Unit) {
-    val w = LocalWords.current
-    val (value, unit) = deskValue(kind, summary, s)
-    val colorway = domainColors(kind)
-    val solid = colorway.backdrop
-    val onSolid = colorway.ink
-    val size = s.preferences.cardSizes[kind]
-    Surface(modifier = Modifier.sharedDesk(kind), shape = RoundedCornerShape(32.dp), color = solid, contentColor = onSolid) {
-        Box(Modifier.fillMaxWidth()) {
-            SectionArt(kind, Modifier.matchParentSize(), onSolid)
-            Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Glyph(kind, Modifier.size(24.dp), onSolid)
-                    Text(deskLabel(kind), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (open != null) IconAction(onClick = open, modifier = Modifier.semantics { contentDescription = w["details"] }) {
-                        Glyph("arrow", Modifier.size(21.dp), onSolid)
-                    }
-                }
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    Column(Modifier.weight(1f)) {
-                        DeskAmount(value, if (size == "small") MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge)
-                        if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelLarge)
-                        if (kind == "glucose") Text(w.f("day_reading_count", "count" to number(summary.glucoseCount.toDouble(), w)),
-                            style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (size != "small") when (kind) {
-                        "glucose" -> {
-                            val points = summary.entries.filter { it.kind == "glucose" }.asReversed().takeLast(12)
-                            if (points.size > 1) ReadingTrace(points, Modifier.weight(1f).height(if (size == "large") 104.dp else 76.dp), onSolid)
-                            else Glyph("glucose", Modifier.size(45.dp), onSolid.copy(alpha = .55f))
-                        }
-                        "water" -> WaterVessel(if(s.preferences.waterGoal > 0) (summary.waterMl / s.preferences.waterGoal).toFloat() else 0f,
-                            Modifier.size(62.dp, 98.dp))
-                        else -> Glyph("medication", Modifier.size(46.dp), onSolid.copy(alpha = .65f))
-                    }
-                }
-                ActionButton(onClick = add, enabled = !busy, modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(containerColor = onSolid, contentColor = solid)) {
-                    Glyph("plus", Modifier.size(18.dp), solid)
-                    Spacer(Modifier.width(8.dp))
-                    Text(w[when (kind) { "glucose" -> "add_reading"; "water" -> "water_record_button"; else -> "record_dose" }])
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun DeskTile(kind: String, summary: DayOverview, s: State, size: String?, modifier: Modifier, open: () -> Unit) {
+private fun DailyAction(kind: String, label: String, note: String?, enabled: Boolean, action: () -> Unit, modifier: Modifier) {
     val tone = domainColors(kind)
-    val (value, unit) = deskValue(kind, summary, s)
-    Surface(onClick = open, modifier = modifier.sharedDesk(kind), shape = BoardShape, color = tone.backdrop, contentColor = tone.ink) {
+    Surface(action, modifier, enabled = enabled, shape = ControlShape,
+        color = tone.backdrop, contentColor = tone.ink) {
+        Row(Modifier.heightIn(min = 56.dp).padding(horizontal = 10.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+            Glyph(kind, Modifier.size(19.dp), tone.ink)
+            Column(Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                if (note != null) Text(note, style = MaterialTheme.typography.labelMedium)
+            }
+        }
+    }
+}
+
+@Composable
+private fun DeskMetricLine(kind: String, summary: DayOverview, state: State, onOpen: () -> Unit) {
+    val (value, unit) = deskValue(kind, summary, state)
+    Row(Modifier.fillMaxWidth().clip(ControlShape).clickable(onClick = onOpen).heightIn(min = 52.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        DomainMark(kind)
+        Text(deskLabel(kind), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        Text(listOf(value, unit).filter { it.isNotBlank() }.joinToString(" "),
+            style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+        Glyph("arrow", Modifier.size(15.dp))
+    }
+}
+
+@Composable
+private fun DeskMetricCard(kind: String, summary: DayOverview, state: State, onOpen: () -> Unit) {
+    val w = LocalWords.current
+    val tone = domainColors(kind)
+    val (value, unit) = deskValue(kind, summary, state)
+    val size = state.preferences.cardSizes[kind]
+    Surface(onOpen, Modifier.fillMaxWidth().sharedDesk(kind), shape = BoardShape,
+        color = tone.backdrop, contentColor = tone.ink) {
         Box {
             SectionArt(kind, Modifier.matchParentSize(), tone.ink)
-            Column(Modifier.fillMaxWidth().heightIn(min = when (size) { "small" -> 104.dp; "large" -> 165.dp; else -> 135.dp })
-                .padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Glyph(kind, Modifier.size(25.dp), tone.ink)
-                    Glyph("arrow", Modifier.size(16.dp), tone.ink)
+            Column(Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Glyph(kind, Modifier.size(20.dp), tone.ink)
+                    Text(deskLabel(kind), Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                    Glyph("arrow", Modifier.size(17.dp), tone.ink)
                 }
-                Text(deskLabel(kind), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                DeskAmount(value, MaterialTheme.typography.headlineMedium)
-                if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelMedium)
+                Row(Modifier.fillMaxWidth().heightIn(min = if (size == "large") 65.dp else 33.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        DeskAmount(value, if (size == "large") MaterialTheme.typography.displaySmall else MaterialTheme.typography.headlineMedium)
+                        if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelMedium)
+                    }
+                    if (kind == "glucose" && size != "small") {
+                        val points = summary.entries.filter { it.kind == "glucose" }.asReversed().takeLast(12)
+                        if (points.size > 1)
+                            ReadingTrace(points, Modifier.weight(.9f).height(39.dp), tone.ink)
+                    }
+                }
+                if (kind == "glucose") Text(w.f("day_reading_count", "count" to number(summary.glucoseCount.toDouble(), w)),
+                    style = MaterialTheme.typography.labelMedium)
+                if (kind == "water") summary.waterAverageMl?.let {
+                    Text(w["water_week"] + " · " + number(it / 1000, w, 2) + " " + w["litres_short"],
+                        style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

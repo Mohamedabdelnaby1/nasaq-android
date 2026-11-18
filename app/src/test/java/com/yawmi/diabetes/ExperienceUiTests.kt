@@ -40,6 +40,44 @@ class ExperienceUiTests{
         compose.onNodeWithText(Words("ar")["detailed"]).performClick()
         compose.onNodeWithText(Words("ar")["today_story"]).assertExists()
     }
+    @Test @Config(qualifiers="w360dp-h640dp-port-mdpi") fun dailyActionsAreVisibleAndSeparateInEitherLayout() {
+        var compact by mutableStateOf(false)
+        var route = ""
+        var cups = 0
+        val base = sample(language = "en")
+        val words = Words("en")
+        compose.setContent {
+            val state = base.copy(preferences = base.preferences.copy(compactHome = compact))
+            YawmiTheme(state.preferences) {
+                AppChrome("today", state.preferences, {}, {}, {}) { padding ->
+                    Box(Modifier.fillMaxSize().padding(padding)) {
+                        Home(state, false, { route = it }, {}, {}, { cups++ }, {}, { _, _, _ -> },
+                            onMode = { compact = it }, openGlucose = { route = "glucose_log" })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText(words["add_reading"]).assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals("glucose", route) }
+        compose.onNodeWithText(words["log_cup_short"]).assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(1, cups); compact = true }
+        compose.onNodeWithText(words["add_reading"]).assertIsDisplayed()
+        compose.onNodeWithText(words["log_cup_short"]).assertIsDisplayed().performClick()
+        compose.runOnIdle { assertEquals(2, cups) }
+    }
+
+    @Test fun journalOffersDirectEditAndExplicitFilters() {
+        val state = sample(language = "en")
+        val words = Words("en")
+        var edited: Entry? = null
+        compose.setContent { YawmiTheme(state.preferences) { Journal(state, { edited = it }, {}) } }
+        compose.onNodeWithContentDescription(words["edit"] + " " + words["water"]).performClick()
+        compose.runOnIdle { assertEquals("water", edited?.kind) }
+        compose.onNodeWithText(words["filter_records"]).performClick()
+        compose.onAllNodes(hasText(words["water"]) and isSelectable()).onFirst().performClick()
+        compose.onNodeWithContentDescription(words["edit"] + " " + words["glucose"]).assertDoesNotExist()
+    }
+
     @Test fun todayOverviewShowsDosesAndAverages() {
         val s = sample().let { it.copy(entries = it.entries + listOf(Entry(kind="dose", status="taken"), Entry(kind="water", value=1500.0, unit="mL", time=System.currentTimeMillis()-86_400_000L))) }
         compose.setContent { YawmiTheme(s.preferences) { DayOverviewScreen(s, onEdit = {}, onAdd = { _, _ -> }) {} } }

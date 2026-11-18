@@ -45,6 +45,7 @@ welcome_back|مساحتك اليومية|YOUR DAILY SPACE
 hero_empty|ابدأ بقراءة واحدة|Start with one reading
 hero_empty_body|بدون زحمة تفاصيل. سجل الرقم وسيحفظ وقته تلقائيًا.|No clutter. Enter a value; its time is recorded automatically.
 clear_search|امسح البحث|Clear search
+filter_records|فلترة السجل|Filter records
 chart_explore|حرّك على الرسم عشان تشوف توقيت القراءة وقيمتها|Slide across the chart to inspect a reading
 clock_am|ص|AM
 clock_pm|م|PM
@@ -69,6 +70,13 @@ widget_locked_preview|قفل التطبيق يخفي القياسات على ا�
 widget_preview_pin|صمّم وشوف المعاينة قبل الإضافة|Design and preview before adding
 widget_manage_number|إعدادات الويدجت {number}|Widget {number} settings
 record_short|سجّل|Record
+log_cup_short|سجّل كوب|Log a cup
+water_cup_plan|أكواب هدف اليوم|Cups in today’s goal
+days_in_log|الأيام في السجل|Days in the journal
+more_tools|أدوات إضافية|More tools
+settings_daily|المتابعة اليومية|Daily tracking
+settings_display|العرض والتخصيص|Display and layout
+settings_storage|الخصوصية والبيانات|Privacy and data
 recorded_today|تسجيلات اليوم|Today's records
 water_week|متوسط آخر ٧ أيام|Last 7 days' average
 chart_current_point|قراءة {value} عند {time}|{value} at {time}

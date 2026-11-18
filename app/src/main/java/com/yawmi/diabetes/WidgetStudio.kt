@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -70,13 +71,13 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
     }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).safeDrawingPadding().padding(horizontal = 17.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            SectionBanner("widgets", w["widget_studio"], action = {
+            ScreenTitle(w["widget_studio"]) {
                 IconAction(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("close", Modifier.size(22.dp))
                 }
-            })
-            SegmentedRail(listOf(w["templates"], w["widget_content"], w["widget_style"]), page, { page = it })
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            }
+            val previewHeight = if (LocalConfiguration.current.screenHeightDp < 700) 84.dp else 110.dp
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 val previewColor = domainColors(when (look.mode) {
                     "day_summary" -> "insights"
                     "summary" -> "widgets"
@@ -91,9 +92,10 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
                         ChoiceChip(selected = sampleNumbers, onClick = { sampleNumbers = !sampleNumbers },
                             label = { Text(w["widget_sample"]) })
                     }
-                    Box(Modifier.fillMaxWidth().height(155.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().height(previewHeight), contentAlignment = Alignment.Center) {
                         SectionArt(look.mode, Modifier.matchParentSize(), previewColor.ink)
-                        AnimatedContent(size to look, contentAlignment = Alignment.Center, transitionSpec = {
+                        AnimatedContent(size to look, contentAlignment = Alignment.Center,
+                            contentKey = { (index, draft) -> listOf(index, draft.mode, draft.layout, draft.style) }, transitionSpec = {
                             if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
                             else ((fadeIn(tween(240, 45)) + scaleIn(tween(510, easing = NasaqEase), initialScale = .76f)) togetherWith
                                 (fadeOut(tween(160)) + scaleOut(tween(350), targetScale = .86f))).using(null)
@@ -104,12 +106,17 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
                         }
                     }
                     SegmentedRail(previewSizes.map { w[it.name] }, size, { size = it })
-                    if (look.title && !geometry.header || look.action && !geometry.footer && !geometry.compactAction) {
-                        Text(w["widget_space_hint"], style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
-                    }
-                    if (!sampleNumbers && s.preferences.lock && look.visible) {
-                        Text(w["widget_locked_preview"], style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
-                    }
+                }
+            }
+            SegmentedRail(listOf(w["templates"], w["widget_content"], w["widget_style"]), page, { page = it })
+            val scroll = rememberScrollState()
+            LaunchedEffect(page) { scroll.scrollTo(0) }
+            Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (look.title && !geometry.header || look.action && !geometry.footer && !geometry.compactAction) {
+                    Text(w["widget_space_hint"], style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
+                }
+                if (!sampleNumbers && s.preferences.lock && look.visible) {
+                    Text(w["widget_locked_preview"], style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
                 }
                 AnimatedContent(page, transitionSpec = {
                     if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)

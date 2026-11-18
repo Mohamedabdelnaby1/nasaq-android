@@ -40,7 +40,12 @@ internal fun HydrationScreen(
                 Glyph("back", Modifier.size(21.dp), c.onTertiaryContainer)
             }
         })
-        HydrationInstrument(state, overview.waterMl, busy) { add("water") }
+        ActionButton({ add("water") }, Modifier.fillMaxWidth(), enabled = !busy) {
+            Glyph("plus", Modifier.size(18.dp), LocalContentColor.current)
+            Spacer(Modifier.width(7.dp))
+            Text(w["custom_amount"])
+        }
+        HydrationInstrument(state, overview.waterMl)
         if (state.preferences.waterGoal > 0) {
             Reveal(1) {
                 NasaqBoard(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, outlined = false) {
@@ -78,7 +83,7 @@ internal fun HydrationScreen(
 
 
 @Composable
-private fun HydrationInstrument(state: State, water: Double, busy: Boolean, record: () -> Unit) {
+private fun HydrationInstrument(state: State, water: Double) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val goal = state.preferences.waterGoal
@@ -113,13 +118,7 @@ private fun HydrationInstrument(state: State, water: Double, busy: Boolean, reco
                         AnimatedNumber(progress * 100.0, suffix = "%", style = MaterialTheme.typography.labelLarge, color = pale)
                     }
                 }
-                ActionButton(onClick = record, enabled = !busy,
-                    colors = ButtonDefaults.buttonColors(containerColor = pale, contentColor = reservoir),
-                    modifier = Modifier.fillMaxWidth()) {
-                    Glyph("plus", Modifier.size(18.dp), reservoir)
-                    Spacer(Modifier.width(8.dp))
-                    Text(w["custom_amount"])
-                }
+
             }
         }
     }
