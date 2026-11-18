@@ -1,11 +1,15 @@
 package com.yawmi.diabetes
 
 import androidx.test.core.app.ApplicationProvider
+import android.app.Application
 import android.content.Context
+import android.view.View
+import android.widget.FrameLayout
 import org.junit.*
 import org.junit.Assert.*
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.*
 import java.io.File
 
@@ -18,7 +22,7 @@ class WidgetVisualTests{
     private fun render(name:String,width:Int,height:Int,look:WidgetLook){
         val bitmap=WidgetArt.bitmap(c,state(),width,height,look)
         assertEquals((width*1.5f).toInt(),bitmap.width)
-        File("build/reports/design-v3/$name.png").apply{parentFile.mkdirs()}.outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
+        File("build/reports/design-v3/$name.png").apply{parentFile?.mkdirs()}.outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
     }
     @Test fun eachWidgetCardOpensItsOwnScreenAndAddHasSeparateIdentity(){
         val screens=mapOf("glucose" to "glucose_log", "water" to "hydration", "medication" to "medications", "day_summary" to "day_summary")
@@ -49,10 +53,40 @@ class WidgetVisualTests{
     @Test fun waterWidget(){render("10-widget-water",170,180,WidgetLook(mode="water",style="blue",visible=true))}
     @Test fun wideWidget(){render("11-widget-wide",320,150,WidgetLook(mode="glucose",style="cream",visible=true))}
     @Test fun newWidgetDesigns(){
+        render("nasaq-focus",300,250,WidgetLook(visible=true,style="cream",layout="widget_focus"))
+        render("nasaq-compact",154,162,WidgetLook(visible=true))
+        render("nasaq-wide",320,152,WidgetLook(visible=true))
         render("v5-tiles",300,250,WidgetLook(visible=true,style="widget_midnight",layout="widget_tiles"))
         render("v5-rows",300,250,WidgetLook(visible=true,style="widget_rose",layout="widget_lines"))
         render("v5-day",300,250,WidgetLook(mode="day_summary",visible=true,style="cream",accent="#C9DEAB"))
-        render("v5-water",170,200,WidgetLook(mode="water",visible=true,style="blue",waterVisual="widget_bars",quickWater=true,undoWater=true))
+        render("v5-water",170,200,WidgetLook(mode="water",visible=true,style="blue",waterVisual="bottle",quickWater=true,undoWater=true))
+    }
+
+    @Test fun widgetHostMirrorsControlsAndDispatchesVisibleCells() {
+        val viewIds = listOf(R.id.widget_primary, R.id.widget_secondary, R.id.widget_third)
+        val screens = mapOf("glucose" to "glucose_log", "water" to "hydration", "medication" to "medications")
+        val app = shadowOf(c as Application)
+        for (language in listOf("ar", "en")) {
+            val state = state().let { it.copy(preferences = it.preferences.copy(language = language)) }
+            val look = WidgetLook(visible = true, layout = "widget_tiles")
+            val widget = GraphicalWidgets.layout(c, state, 21, look, 300, 242, false, 1f, 0, null)
+                .apply(c, FrameLayout(c))
+            val mode = View.MeasureSpec.EXACTLY
+            widget.measure(View.MeasureSpec.makeMeasureSpec(300,mode), View.MeasureSpec.makeMeasureSpec(242,mode))
+            widget.layout(0,0,300,242)
+            val rtl = language == "ar"
+            val groups = if (rtl) R.id.widget_header_rtl to R.id.widget_header_ltr
+                else R.id.widget_header_ltr to R.id.widget_header_rtl
+            val controls = widget.findViewById<View>(groups.first)
+            assertEquals(View.VISIBLE, controls.visibility)
+            assertEquals(View.GONE, widget.findViewById<View>(groups.second).visibility)
+            assertEquals(if (rtl) 0 else 300 - controls.width, controls.left)
+            val parts = WidgetLayout.calculate(300,242,look,rtl).parts
+            viewIds.zip(parts).forEach { (id, kind) ->
+                assertTrue(widget.findViewById<View>(id).performClick())
+                assertEquals(screens[kind], app.nextStartedActivity.getStringExtra("screen"))
+            }
+        }
     }
     @Test fun smallWidget(){render("12-widget-small",110,80,WidgetLook(mode="water",visible=true))}
     @Test fun hiddenValuesDoNotLeakIntoPixels(){

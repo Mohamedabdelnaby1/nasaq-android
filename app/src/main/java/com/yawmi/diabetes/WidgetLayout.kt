@@ -62,9 +62,9 @@ internal data class WidgetLayout(
             val hasRoomForAll = fit(height) != null
             val canAddFooter = look.action && width >= 145
             val priorityFooter = canAddFooter && look.quickWater && "water" in parts && fit(height - 46) != null
-            val header = width >= 145 && (look.title || parts.size > 1) &&
-                (if (hasRoomForAll) fit(height - 44 - if (priorityFooter) 46 else 0) != null
-                else height >= 96 && parts.size > 1)
+            val header = if (hasRoomForAll) width >= 145 && (look.title || parts.size > 1) &&
+                fit(height - 44 - if (priorityFooter) 46 else 0) != null
+            else width >= 110 && height >= 80 && parts.size > 1
             val bodyHeight = height - if (header) 44 else 0
             val footer = canAddFooter && (priorityFooter || fit(bodyHeight - 46) != null)
             val body = fit(bodyHeight - if (footer) 46 else 0) ?: WidgetBody.SINGLE

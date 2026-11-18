@@ -1,10 +1,13 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="300dp" android:height="230dp" android:viewportWidth="300" android:viewportHeight="230">
-    <path android:fillColor="#154F42" android:pathData="M24,0H276Q300,0 300,24V206Q300,230 276,230H24Q0,230 0,206V24Q0,0 24,0Z"/>
-    <path android:fillColor="#36FFFFFF" android:pathData="M14,43H286V115H14Z M14,122H146V175H14Z M154,122H286V175H154Z"/>
-    <path android:strokeColor="#A9DFDD" android:strokeWidth="5" android:strokeLineCap="round" android:strokeLineJoin="round"
-        android:pathData="M33,81H44L51,67L60,92L67,81H81 M166,150H195 M37,135C33,145 27,151 27,157C27,171 47,171 47,157C47,151 41,144 37,135Z"/>
-    <path android:fillColor="#D9EFE2" android:pathData="M22,19H81V25H22Z M101,72H144V79H101Z M101,86H163V95H101Z M56,145H102V151H56Z M206,145H251V151H206Z"/>
-    <path android:fillColor="#E9BD50" android:pathData="M24,184H276Q286,184 286,194V204Q286,214 276,214H24Q14,214 14,204V194Q14,184 24,184Z"/>
-    <path android:strokeColor="#154F42" android:strokeWidth="3" android:strokeLineCap="round" android:pathData="M142,199H158 M150,191V207"/>
+    <path android:fillColor="#F8F6EF" android:pathData="M24,0H276Q300,0 300,24V206Q300,230 276,230H24Q0,230 0,206V24Q0,0 24,0Z"/>
+    <path android:fillColor="#183C32" android:pathData="M20,11H34Q39,11 39,16V30Q39,35 34,35H20Q15,35 15,30V16Q15,11 20,11Z"/>
+    <path android:strokeColor="#DAE9C4" android:strokeWidth="2.5" android:strokeLineCap="round" android:pathData="M22,28V24 M27,28V20 M32,28V16"/>
+    <path android:strokeColor="#CBD0C5" android:strokeWidth="1" android:pathData="M15,44H285 M15,121H285 M150,131V176"/>
+    <path android:strokeColor="#527963" android:strokeWidth="3" android:strokeLineCap="round" android:strokeLineJoin="round"
+        android:pathData="M177,90L202,81L226,93L253,71L277,81"/>
+    <path android:strokeColor="#183C32" android:strokeWidth="6" android:strokeLineCap="round"
+        android:pathData="M50,25H80 M18,69H77 M18,96H113 M18,140H64 M164,140H212 M18,163H49 M164,163H200"/>
+    <path android:fillColor="#E4EBE1" android:pathData="M22,190H278Q288,190 288,200V210Q288,220 278,220H22Q12,220 12,210V200Q12,190 22,190Z"/>
+    <path android:strokeColor="#37634E" android:strokeWidth="2" android:strokeLineCap="round" android:pathData="M24,205H36 M30,199V211 M47,205H101"/>
 </vector>

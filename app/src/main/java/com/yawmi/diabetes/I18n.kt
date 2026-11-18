@@ -512,6 +512,10 @@ day_detail_title|يومك بالتفصيل|Your day in detail
 day_activity|نشاط اليوم|Today's activity
 day_glucose_average|متوسط سكر اليوم|Today's glucose average
 widget_glucose_average|متوسط السكر|Glucose avg.
+widget_goal_short|الهدف {amount}|Goal {amount}
+widget_no_dose|مفيش جرعة مجدولة|No dose scheduled
+widget_doses_short|جرعات مأخوذة|Doses taken
+widget_sample|أرقام تجريبية|Sample numbers
 day_water_average|متوسط المياه اليومي|Daily water average
 day_water_coverage|{count} أيام بها تسجيل من آخر 7 أيام مكتملة|{count} logged days out of the last 7 completed days
 cup_full|كوباية مكتملة|Cup completed

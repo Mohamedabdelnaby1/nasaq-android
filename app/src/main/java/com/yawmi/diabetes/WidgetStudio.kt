@@ -11,6 +11,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import java.time.LocalDate
+import java.time.ZoneId
 
 data class WidgetPreset(val name:String,val look:WidgetLook)
 val widgetPresets=listOf(
@@ -18,16 +20,29 @@ val widgetPresets=listOf(
     WidgetPreset("preset_water",WidgetLook(mode="water",style="blue",waterVisual="bottle",radius=28)),
     WidgetPreset("preset_glucose",WidgetLook(mode="glucose",style="cream",radius=18)),
     WidgetPreset("preset_medicine",WidgetLook(mode="medication",style="forest",radius=24)),
-    WidgetPreset("preset_grid",WidgetLook(style="widget_midnight",layout="widget_tiles",accent="#8FDBDA",radius=22)),
-    WidgetPreset("preset_rows",WidgetLook(style="widget_rose",layout="widget_lines",accent="#F1B49C",radius=16)),
-    WidgetPreset("preset_day",WidgetLook(mode="day_summary",style="cream",accent="#C9DEAB",radius=27))
+    WidgetPreset("preset_grid",WidgetLook(style="widget_midnight",layout="widget_tiles",radius=22)),
+    WidgetPreset("preset_rows",WidgetLook(style="widget_rose",layout="widget_lines",radius=20)),
+    WidgetPreset("preset_day",WidgetLook(mode="day_summary",style="cream",radius=26))
 )
 
 @Composable fun WidgetStudio(s:State,initial:WidgetLook,onDismiss:()->Unit,onSave:(WidgetLook)->Unit){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme;val feedback=rememberFeedback()
     var look by remember{mutableStateOf(initial)}
     var tab by remember{mutableStateOf("templates")};var size by remember{mutableStateOf("large")}
+    var sampleNumbers by remember { mutableStateOf(false) }
     var error by remember{mutableStateOf(false)}
+    val sample = remember(s.preferences.language, s.preferences.unit) {
+        val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val readings = listOf(106.0, 133.0, 118.0, 127.0).mapIndexed { index, value ->
+            Entry(kind="glucose", unit="mg/dL", value=value, time=start+index*60_000L)
+        }
+        State(
+            preferences=Preferences(language=s.preferences.language, unit=s.preferences.unit, waterGoal=2000),
+            entries=readings + Entry(kind="water", unit="mL", value=1250.0, time=start) +
+                Entry(kind="dose", time=start, status="taken") +
+                Entry(kind="water", unit="mL", value=1500.0, time=start-3_600_000L)
+        )
+    }
     val small=androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp<650
     Scaffold(containerColor=c.background,bottomBar={Surface(color=c.surfaceContainerLow){
         Button(onClick={try{require(look.parts.isNotEmpty());if(look.background.isNotBlank())android.graphics.Color.parseColor(look.background);if(look.accent.isNotBlank())android.graphics.Color.parseColor(look.accent);onSave(look)}catch(e:Exception){error=true}},shape=RoundedCornerShape(15.dp),modifier=Modifier.navigationBarsPadding().imePadding().fillMaxWidth().padding(16.dp).heightIn(min=52.dp).pressResponse()){Text(w["save_widget"])}
@@ -39,37 +54,50 @@ val widgetPresets=listOf(
             }
             Surface(
                 modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp),
-                color=c.surfaceContainer,
-                shape=RoundedCornerShape(24.dp)
+                color=c.surfaceContainerLow,
+                shape=RoundedCornerShape(24.dp),
+                border=BorderStroke(1.dp,c.outlineVariant.copy(alpha=.6f))
             ) {
                 Box(Modifier.fillMaxWidth().height(if(small)147.dp else 219.dp).padding(12.dp),contentAlignment=Alignment.Center){
                     val dimensions=when(size){"compact"->154 to 162;"wide"->320 to 152;else->320 to 242}
-                    WidgetPreview(s,look,dimensions.first,dimensions.second,fitBox=true)
+                    WidgetPreview(if(sampleNumbers) sample else s, if(sampleNumbers) look.copy(visible=true) else look,
+                        dimensions.first, dimensions.second, fitBox=true)
                 }
             }
-            FlowRow(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.Center){listOf("compact","wide","large").forEach{key->FilterChip(selected=size==key,onClick={size=key},label={Text(w[if(key=="compact")"widget_size_compact"else key])},modifier=Modifier.padding(horizontal=3.dp),shape=RoundedCornerShape(50))}}
+            FlowRow(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
+                listOf("compact","wide","large").forEach { key ->
+                    FilterChip(selected=size==key,onClick={size=key},label={Text(w[if(key=="compact")"widget_size_compact"else key])},shape=RoundedCornerShape(50))
+                }
+                FilterChip(selected=sampleNumbers,onClick={sampleNumbers=!sampleNumbers},label={Text(w["widget_sample"])},shape=RoundedCornerShape(50))
+            }
             FlowRow(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("templates","widget_content","appearance").forEach{key->FilterChip(selected=tab==key,onClick={tab=key},label={Text(w[if(key=="appearance")"widget_style"else key])},shape=RoundedCornerShape(50))}}
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
                 if(tab=="templates"){
                     Text(w["choose_template"],style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
-                    widgetPresets.forEach{preset->
+                    widgetPresets.chunked(2).forEach { group ->
+                      Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                       group.forEach { preset ->
                         val selected = look.copy(visible=false, undoWater=false) == preset.look
                         Surface(
                             onClick={look=preset.look.copy(visible=look.visible);feedback()},
-                            shape=RoundedCornerShape(16.dp), modifier=Modifier.pressResponse(compression=.975f), color=if(selected)c.primaryContainer else c.surfaceContainerLow,
-                            border=if(selected)BorderStroke(1.dp,c.primary) else null
+                            shape=RoundedCornerShape(16.dp), modifier=Modifier.weight(1f).pressResponse(compression=.975f), color=if(selected)c.primaryContainer else c.surfaceContainerLow,
+                            border=BorderStroke(1.dp,if(selected)c.primary else c.outlineVariant.copy(alpha=.55f))
                         ) {
-                            Row(Modifier.fillMaxWidth().padding(10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(11.dp)) {
-                                Box(Modifier.size(88.dp,55.dp)) {
-                                    WidgetPreview(s,preset.look,260,164,fitBox=true,announce=false)
+                            Column(Modifier.fillMaxWidth().padding(9.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                                Box(Modifier.fillMaxWidth().height(78.dp)) {
+                                    val compact = preset.look.mode in widgetParts
+                                    WidgetPreview(sample, preset.look.copy(visible=true), if(compact) 155 else 300,
+                                        if(compact) 182 else 195,fitBox=true,announce=false)
                                 }
-                                Column(Modifier.weight(1f)) {
-                                    Text(w[preset.name],style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold)
-                                    Text(w[when(preset.look.mode){"summary"->"summary_widget";"day_summary"->"day_overview";else->preset.look.mode}],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+                                Row(verticalAlignment=Alignment.CenterVertically) {
+                                    Text(w[preset.name],Modifier.weight(1f),style=MaterialTheme.typography.labelLarge,fontWeight=FontWeight.Bold)
+                                    if(selected) Glyph("check",Modifier.size(15.dp))
                                 }
-                                Glyph(if(selected)"check"else"arrow",Modifier.size(17.dp))
                             }
                         }
+                       }
+                       if(group.size==1) Spacer(Modifier.weight(1f))
+                      }
                     }
                     Text(w["widget_size_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
                 }
