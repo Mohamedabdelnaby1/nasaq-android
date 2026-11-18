@@ -29,28 +29,38 @@ internal fun HydrationScreen(
         }
     }
     val overview = remember(state, now) { dayOverview(state, now) }
-    Column(
-        Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val c = MaterialTheme.colorScheme
+    val records = remember(overview.entries) { overview.entries.filter { it.kind == "water" } }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        ScreenTitle(w["water"], dateText(now, w)) {
             IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
-                Glyph("back", Modifier.size(22.dp))
+                Glyph("back", Modifier.size(21.dp))
             }
-            Text(w["water"], style = MaterialTheme.typography.headlineSmall)
         }
-        DetailedWater(state, overview.waterMl, busy, add, portion)
-        Panel(w["day_water_average"]) {
-            val value = overview.waterAverageMl?.let { number(it / 1000, w, 2) + " " + w["litres_short"] } ?: "—"
-            Text(value, style = MaterialTheme.typography.headlineSmall)
-            Text(w.f("day_water_coverage", "count" to number(overview.waterDays.toDouble(), w)))
+        DetailedWater(state, overview.waterMl, busy, add, portion, expanded = true)
+        Reveal(1) {
+            NasaqBoard {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    DomainMark("water")
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        Text(w["day_water_average"], style = MaterialTheme.typography.titleMedium)
+                        Text(w.f("day_water_coverage", "count" to number(overview.waterDays.toDouble(), w)),
+                            style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+                    }
+                    val value = overview.waterAverageMl?.let { number(it / 1000, w, 2) + " " + w["litres_short"] } ?: "—"
+                    Text(value, style = MaterialTheme.typography.titleLarge)
+                }
+            }
         }
-        Panel(w["day_activity"]) {
-            val records = overview.entries.filter { it.kind == "water" }
-            if (records.isEmpty()) EmptyState(w["story_empty"])
-            records.forEachIndexed { index, entry ->
-                ActivityRow(entry, state)
-                if (index < records.lastIndex) HorizontalDivider()
+        Reveal(2) {
+            NasaqBoard {
+                Text(w["recorded_today"], style = MaterialTheme.typography.titleMedium)
+                if (records.isEmpty()) EmptyState(w["story_empty"])
+                records.forEachIndexed { index, entry ->
+                    ActivityRow(entry, state)
+                    if (index < records.lastIndex) HorizontalDivider()
+                }
             }
         }
     }

@@ -76,7 +76,9 @@ check(theme.count('fontFamily=tajawal') == 15, 'All Material typography styles m
 check('data:font/ttf;base64' in reports and '@page{size:A4' in reports, 'Print font or A4 layout missing')
 check('Escapes.html' in reports, 'HTML report data must be escaped')
 check('Escapes.csv' in reports, 'CSV formula protection missing')
-check('p.reduceMotion' in (JAVA/'App.kt').read_text(encoding='utf-8'), 'Reduced-motion option must be applied')
+app = (JAVA / 'App.kt').read_text(encoding='utf-8')
+check('LocalMotion provides !preferences.reduceMotion' in theme and 'if (!LocalMotion.current)' in app,
+      'Section transitions must respect the reduced-motion preference')
 check('isSystemInDarkTheme()' in theme, 'System dark mode support missing')
 print(f'PASS {checks} source integrity checks; {len(keys)} Arabic/English translation pairs')
 print('Android compile, lint, emulator and visual checks still require an Android SDK environment.')

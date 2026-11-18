@@ -10,11 +10,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -105,16 +107,16 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                             Spacer(Modifier.height(24.dp))
                             Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(40.dp))
                             Spacer(Modifier.height(24.dp))
-                            listOf("today","log","medications","insights","settings").forEach { key ->
-                                NavigationRailItem(selected=tab==key,onClick={tab=key},icon={Glyph(key,Modifier.size(24.dp))},label={Text(w[key])})
+                            mainSections.forEach { key ->
+                                NavigationRailItem(selected=sectionGroup(tab)==key,onClick={tab=key},icon={Glyph(key,Modifier.size(24.dp))},label={Text(w[key])})
                             }
                         }
-                        AppChrome(tab,p,onTab={tab=it},onQuick={form="quick"},notifications={tab="settings";activity.openNotifications=true},snackbar=snackbar) { insets ->
+                        AppChrome(tab,p,onTab={tab=it},onQuick={form="quick"},notifications={tab="settings";activity.openNotifications=true},snackbar=snackbar,showBottomBar=!wide) { insets ->
                             val content:@Composable (String)->Unit={destination->
                                 Box(Modifier.fillMaxSize().padding(insets),contentAlignment=Alignment.TopCenter) {
                                     Box(Modifier.widthIn(max=1000.dp).fillMaxSize()) {
                                         when(destination) {
-                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={tab="day_summary"})
+                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={tab="day_summary"},openHydration={tab="hydration"},openGlucose={tab="glucose_log"})
                                             "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
                                                 initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"})
                                             "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
@@ -127,20 +129,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                                     }
                                 }
                             }
-                            val sections = listOf("today","log","medications","insights","settings")
-                            if (p.reduceMotion) content(tab) else AnimatedContent(targetState=tab,transitionSpec={
-                                val from = sections.indexOf(initialState)
-                                val to = sections.indexOf(targetState)
-                                if (from < 0 || to < 0) {
-                                    val direction = if (to < 0) 1 else -1
-                                    (fadeIn(tween(280,60)) + slideInVertically(tween(350,easing=FastOutSlowInEasing)){direction*it/8}) togetherWith
-                                        (fadeOut(tween(190)) + slideOutVertically(tween(260)){-direction*it/18})
-                                } else {
-                                    val direction = (if(to>=from)1 else -1) * (if(w.rtl)-1 else 1)
-                                    (fadeIn(tween(280,45)) + slideInHorizontally(tween(350,easing=FastOutSlowInEasing)){direction*it/5}) togetherWith
-                                        (fadeOut(tween(170)) + slideOutHorizontally(tween(250)){-direction*it/9})
-                                }
-                            },label="section") { destination -> content(destination) }
+                            SectionMotion(tab, content)
                         }
                     }
                     if(repo.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
@@ -148,22 +137,33 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             }
         }
         if(!activity.locked || repo.error=="load_error") {
-        if(form=="quick")QuickActionsSheet(onDismiss={form=null},choose={form=it})
-        else if(form=="assistant_title")ArabicAssistant(s,{form=null}){entry->draftEntry=entry;form=entry.kind}
-        else if(form=="day_summary") androidx.compose.ui.window.Dialog(
-            onDismissRequest={form=null},
-            properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)
-        ) { DayOverviewScreen(s) { form=null } }
-        else if(form=="care_tools")CareTools(s,{form=null}){change->repo.change(block=change)}
-        else if(form=="new_med" || medEdit!=null) MedicationEditor(medEdit,p,onDismiss={form=null;medEdit=null},onSave={repo.put(it);form=null;medEdit=null})
-        else form?.let { kind -> val commit:(Entry)->Unit={entry ->
-            val old=recordEdit
-            if(old!=null)repo.change(onSuccess={saved(entry,old,it)}){Records.add(Records.remove(it,entry.id),entry)}else record(entry)
-            form=null;recordEdit=null;draftEntry=null
+        fun dismissEntry() {
+            form = null
+            recordEdit = null
+            draftEntry = null
         }
-        if(kind in setOf("glucose","water"))QuickEntrySheet(kind,recordEdit,s,onDismiss={form=null;recordEdit=null;draftEntry=null},onSave=commit,draft=draftEntry)
-        else EntryEditor(kind,recordEdit,s,onDismiss={form=null;recordEdit=null},onSave=commit)
+        fun saveEntry(entry: Entry) {
+            val old = recordEdit
+            if (old != null) repo.change(onSuccess = { saved(entry, old, it) }) { Records.add(Records.remove(it, entry.id), entry) }
+            else record(entry)
+            dismissEntry()
         }
+        val activeForm = form
+        if (activeForm == "quick" || activeForm == "glucose" || activeForm == "water") {
+            RecordingSheet(activeForm, ::dismissEntry, onSelect = { form = it }) { kind, close ->
+                QuickEntryContent(kind, recordEdit, s, onDismiss = { close(::dismissEntry) },
+                    onSave = { entry -> close { saveEntry(entry) } }, draft = draftEntry)
+            }
+        } else if (activeForm == "assistant_title") ArabicAssistant(s, { form = null }) { entry ->
+            draftEntry = entry
+            form = entry.kind
+        } else if (activeForm == "day_summary") androidx.compose.ui.window.Dialog(
+            onDismissRequest = { form = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
+        ) { DayOverviewScreen(s) { form = null } }
+        else if (activeForm == "care_tools") CareTools(s, { form = null }) { change -> repo.change(block = change) }
+        else if (activeForm == "new_med" || medEdit != null) MedicationEditor(medEdit,p,onDismiss={form=null;medEdit=null},onSave={repo.put(it);form=null;medEdit=null})
+        else if (activeForm != null) EntryEditor(activeForm, recordEdit, s, onDismiss = ::dismissEntry, onSave = ::saveEntry)
         pendingDose?.let { r ->
             val med=s.medications.find { it.id==r.medicationId }
             AlertDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -198,6 +198,46 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
     }
 }
 
+internal val mainSections = listOf("today", "log", "medications", "insights", "settings")
+
+internal fun sectionGroup(section: String): String = when (section) {
+    "hydration", "day_summary" -> "today"
+    "glucose_log" -> "log"
+    else -> section
+}
+
+@Composable
+internal fun SectionMotion(section: String, content: @Composable (String) -> Unit) {
+    val state = rememberSaveableStateHolder()
+    if (!LocalMotion.current) {
+        state.SaveableStateProvider(section) { content(section) }
+        return
+    }
+    val rtl = LocalWords.current.rtl
+    AnimatedContent(
+        targetState = section,
+        modifier = Modifier.fillMaxSize().clipToBounds(),
+        transitionSpec = {
+            val from = mainSections.indexOf(sectionGroup(initialState))
+            val to = mainSections.indexOf(sectionGroup(targetState))
+            val result = if (targetState != sectionGroup(targetState)) {
+                (fadeIn(tween(240, 35)) + slideInVertically(tween(480, easing = NasaqEase)) { it / 6 }) togetherWith
+                    (fadeOut(tween(180)) + scaleOut(tween(360, easing = NasaqEase), targetScale = .965f))
+            } else if (initialState != sectionGroup(initialState)) {
+                (fadeIn(tween(230)) + scaleIn(tween(370, easing = NasaqEase), initialScale = .965f)) togetherWith
+                    (fadeOut(tween(220)) + slideOutVertically(tween(365, easing = NasaqEase)) { it / 7 })
+            } else {
+                val direction = (if (to >= from) 1 else -1) * (if (rtl) -1 else 1)
+                (fadeIn(tween(280, 70)) + slideInHorizontally(tween(520, easing = NasaqEase)) { direction * it / 5 } +
+                    scaleIn(tween(490, easing = NasaqEase), initialScale = .985f)) togetherWith
+                    (fadeOut(tween(185)) + slideOutHorizontally(tween(360, easing = NasaqEase)) { -direction * it / 10 })
+            }
+            result.using(null)
+        },
+        label = "destination"
+    ) { destination -> state.SaveableStateProvider(destination) { content(destination) } }
+}
+
 @Composable fun Welcome(repo:Repository) {
     val w=LocalWords.current;val p=repo.state.preferences
     Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(22.dp)) {
@@ -216,11 +256,9 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
 }
 
 @Composable fun Panel(title:String?=null,tone:Color=MaterialTheme.colorScheme.surfaceContainerLow,content:@Composable ColumnScope.()->Unit) {
-    Surface(modifier=Modifier.fillMaxWidth().animateContentSize(if(LocalMotion.current)spring(stiffness=450f)else snap()),shape=RoundedCornerShape(22.dp),color=tone) {
-        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            if(title!=null) Text(title,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-            content()
-        }
+    NasaqBoard(modifier = Modifier.animateContentSize(if (LocalMotion.current) tween(370, easing = NasaqEase) else snap()), color = tone) {
+        if (title != null) Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        content()
     }
 }
 @Composable fun Notice(text:String,error:Boolean=false) {

@@ -4,6 +4,7 @@ import androidx.activity.ComponentActivity
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalDensity
@@ -91,5 +92,28 @@ class ExperienceUiTests{
         compose.onNodeWithText(Words("en")["last_water_amount"]+": 750 mL").performClick()
         compose.onNodeWithText(Words("en")["water_record_button"]).assertIsDisplayed().performClick()
         compose.runOnIdle{assertEquals(750.0,result!!.value,0.0)}
+    }
+
+    @Test fun quickMenuOpensTheWaterEditorAndSavesFromTheSameSheet() {
+        val s = sample(language = "en").let { it.copy(preferences = it.preferences.copy(reduceMotion = false)) }
+        val words = Words("en")
+        var recorded: Entry? = null
+        compose.setContent {
+            var page by remember { mutableStateOf<String?>("quick") }
+            YawmiTheme(s.preferences) {
+                page?.let { current ->
+                    RecordingSheet(current, { page = null }, { page = it }) { kind, close ->
+                        QuickEntryContent(kind, null, s, { page = null }, { entry ->
+                            close { recorded = entry; page = null }
+                        })
+                    }
+                }
+            }
+        }
+        compose.onNodeWithText(words["water"], substring = false).performClick()
+        compose.onNodeWithText(words["water_quick_title"]).assertIsDisplayed()
+        compose.onNodeWithText(words["water_record_button"]).performClick()
+        compose.onNodeWithText(words["water_quick_title"]).assertDoesNotExist()
+        compose.runOnIdle { assertEquals(s.preferences.cup.toDouble(), recorded!!.value, 0.0) }
     }
 }

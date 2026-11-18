@@ -21,18 +21,37 @@ import androidx.compose.ui.text.font.FontWeight
 
 @Composable fun YawmiTheme(preferences:Preferences,content:@Composable ()->Unit) {
     val dark=when(preferences.theme) { "dark"->true;"light"->false;else->isSystemInDarkTheme() }
-    val seed=when(preferences.palette) { "violet"->Color(0xFF7451AE);"coral"->Color(0xFFAA4D44);"blue"->Color(0xFF315DA8);else->Color(0xFF185446) }
-    val tint=when(preferences.palette) { "violet"->Color(0xFFEADDFF);"coral"->Color(0xFFFFDAD5);"blue"->Color(0xFFD9E2FF);else->Color(0xFFE2ECDD) }
-    val colors=if(preferences.dynamicColors && Build.VERSION.SDK_INT>=31) {
-        if(dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
-    } else if(dark) darkColorScheme(primary=tint, onPrimary=Color(0xFF12382F), primaryContainer=seed.copy(alpha=1f),onPrimaryContainer=Color.White,
-        secondary=Color(0xFFFFD291),secondaryContainer=Color(0xFF594327),tertiary=Color(0xFF9FD4D8),
-        surface=Color(0xFF101512),background=Color(0xFF101512),surfaceContainer=Color(0xFF1C2320),
-        surfaceContainerLow=Color(0xFF171D1A),surfaceContainerHigh=Color(0xFF272F2B),onSurface=Color(0xFFE4EBE5),onSurfaceVariant=Color(0xFFBDC9C1),outline=Color(0xFF8B9E91),outlineVariant=Color(0xFF3E5146),tertiaryContainer=Color(0xFF193B40),onTertiaryContainer=Color(0xFFBAE9EC),onSecondaryContainer=Color(0xFFFFE8B4))
-    else lightColorScheme(primary=seed,onPrimary=Color.White,primaryContainer=tint,onPrimaryContainer=Color(0xFF132B24),
-        secondary=Color(0xFF80551A),secondaryContainer=Color(0xFFF2D77D),tertiary=Color(0xFF367F87),tertiaryContainer=Color(0xFFE2ECEE),
-        surface=Color(0xFFF5F3EB),background=Color(0xFFF5F3EB),surfaceContainer=Color(0xFFF0EEE4),
-        surfaceContainerLow=Color(0xFFFFFFFF),surfaceContainerHigh=Color(0xFFE8EEE7),onSurface=Color(0xFF17231C),onSurfaceVariant=Color(0xFF4C5D53),outline=Color(0xFF708272),outlineVariant=Color(0xFFCDD7CC),onTertiaryContainer=Color(0xFF174B52),onSecondaryContainer=Color(0xFF3C351B))
+    val seed = when (preferences.palette) {
+        "violet" -> Color(0xFF513D91)
+        "coral" -> Color(0xFF943F37)
+        "blue" -> Color(0xFF2453A6)
+        else -> Color(0xFF173C39)
+    }
+    val tint = when (preferences.palette) {
+        "violet" -> Color(0xFFEAE1FF)
+        "coral" -> Color(0xFFFFDFD8)
+        "blue" -> Color(0xFFDCE8FF)
+        else -> Color(0xFFDAF4C0)
+    }
+    val colors = if (preferences.dynamicColors && Build.VERSION.SDK_INT >= 31) {
+        if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
+    } else if (dark) darkColorScheme(
+        primary = tint, onPrimary = Color(0xFF172A22), primaryContainer = Color(0xFF243F38), onPrimaryContainer = tint,
+        secondary = Color(0xFFFFC790), secondaryContainer = Color(0xFF463329), onSecondaryContainer = Color(0xFFFFDEB8),
+        tertiary = Color(0xFF9DDDF8), tertiaryContainer = Color(0xFF1B3A51), onTertiaryContainer = Color(0xFFD9F2FF),
+        surface = Color(0xFF111B1D), background = Color(0xFF111B1D), surfaceContainer = Color(0xFF202B2B),
+        surfaceContainerLow = Color(0xFF182223), surfaceContainerHigh = Color(0xFF31413E),
+        onSurface = Color(0xFFEDF2EA), onSurfaceVariant = Color(0xFFB9C9C4),
+        outline = Color(0xFF95A9A1), outlineVariant = Color(0xFF435550)
+    ) else lightColorScheme(
+        primary = seed, onPrimary = Color.White, primaryContainer = tint, onPrimaryContainer = Color(0xFF172F26),
+        secondary = Color(0xFF845630), secondaryContainer = Color(0xFFFFE3C5), onSecondaryContainer = Color(0xFF472C16),
+        tertiary = Color(0xFF1D5F89), tertiaryContainer = Color(0xFFDCEFFC), onTertiaryContainer = Color(0xFF153D59),
+        surface = Color(0xFFF3F5EF), background = Color(0xFFF3F5EF), surfaceContainer = Color(0xFFE9EEE8),
+        surfaceContainerLow = Color(0xFFFCFDF8), surfaceContainerHigh = Color(0xFFE2EBE2),
+        onSurface = Color(0xFF192B26), onSurfaceVariant = Color(0xFF485B53),
+        outline = Color(0xFF63796B), outlineVariant = Color(0xFFD1DFD1)
+    )
     val words=remember(preferences.language) { Words(preferences.language) };val density=LocalDensity.current
     val baseContext=LocalContext.current
     val baseConfiguration=androidx.compose.ui.platform.LocalConfiguration.current
@@ -50,8 +69,8 @@ import androidx.compose.ui.text.font.FontWeight
         val base=Typography()
         val typography=base.copy(
             displayLarge=base.displayLarge.copy(fontFamily=tajawal,fontSize=52.sp,lineHeight=58.sp),displayMedium=base.displayMedium.copy(fontFamily=tajawal,fontSize=44.sp,lineHeight=50.sp),displaySmall=base.displaySmall.copy(fontFamily=tajawal,fontSize=36.sp,lineHeight=42.sp),
-            headlineLarge=base.headlineLarge.copy(fontFamily=tajawal,fontSize=30.sp,lineHeight=36.sp),headlineMedium=base.headlineMedium.copy(fontFamily=tajawal,fontSize=26.sp,lineHeight=32.sp),headlineSmall=base.headlineSmall.copy(fontFamily=tajawal,fontSize=23.sp,lineHeight=29.sp),
-            titleLarge=base.titleLarge.copy(fontFamily=tajawal,fontSize=22.sp,lineHeight=28.sp),titleMedium=base.titleMedium.copy(fontFamily=tajawal,fontSize=16.sp,lineHeight=22.sp),titleSmall=base.titleSmall.copy(fontFamily=tajawal,fontSize=14.sp,lineHeight=20.sp),
+            headlineLarge=base.headlineLarge.copy(fontFamily=tajawal,fontSize=34.sp,lineHeight=39.sp),headlineMedium=base.headlineMedium.copy(fontFamily=tajawal,fontSize=26.sp,lineHeight=32.sp),headlineSmall=base.headlineSmall.copy(fontFamily=tajawal,fontSize=23.sp,lineHeight=29.sp),
+            titleLarge=base.titleLarge.copy(fontFamily=tajawal,fontSize=22.sp,lineHeight=28.sp),titleMedium=base.titleMedium.copy(fontFamily=tajawal,fontSize=18.sp,lineHeight=24.sp),titleSmall=base.titleSmall.copy(fontFamily=tajawal,fontSize=14.sp,lineHeight=20.sp),
             bodyLarge=base.bodyLarge.copy(fontFamily=tajawal,fontSize=15.sp,lineHeight=22.sp),bodyMedium=base.bodyMedium.copy(fontFamily=tajawal,fontSize=13.sp,lineHeight=20.sp),bodySmall=base.bodySmall.copy(fontFamily=tajawal,fontSize=12.sp,lineHeight=18.sp),
             labelLarge=base.labelLarge.copy(fontFamily=tajawal,fontSize=12.sp,lineHeight=18.sp),labelMedium=base.labelMedium.copy(fontFamily=tajawal,fontSize=11.sp,lineHeight=16.sp),labelSmall=base.labelSmall.copy(fontFamily=tajawal,fontSize=10.sp,lineHeight=14.sp))
         val shapes=Shapes(extraSmall=androidx.compose.foundation.shape.RoundedCornerShape(8.dp),small=androidx.compose.foundation.shape.RoundedCornerShape(12.dp),medium=androidx.compose.foundation.shape.RoundedCornerShape(18.dp),large=androidx.compose.foundation.shape.RoundedCornerShape(24.dp),extraLarge=androidx.compose.foundation.shape.RoundedCornerShape(30.dp))
@@ -84,6 +103,8 @@ import androidx.compose.ui.text.font.FontWeight
             "insights" -> {line(4f,21f,4f,15f);line(10f,21f,10f,9f);line(16f,21f,16f,3f);line(22f,21f,22f,12f)}
             "settings" -> {for(y in listOf(5f,12f,19f)) line(3f,y,21f,y);drawCircle(color,2.3f*sx,point(8f,5f));drawCircle(color,2.3f*sx,point(16f,12f));drawCircle(color,2.3f*sx,point(10f,19f))}
             "plus" -> {line(12f,4f,12f,20f);line(4f,12f,20f,12f)}
+            "clock" -> {drawCircle(color,8f*sx,point(12f,12f),style=Stroke(1.8f*sx));path(12f,7f,12f,12f,15f,14f)}
+            "minus" -> line(5f,12f,19f,12f)
             "close" -> {line(5f,5f,19f,19f);line(5f,19f,19f,5f)}
             "back" -> {path(15f,5f,8f,12f,15f,19f)}
             "down" -> {path(5f,10f,12f,17f,19f,10f)}

@@ -60,7 +60,7 @@ h3{font-size:1.43rem;margin-bottom:.6rem}
 .preview{background:var(--pine);color:#f5f9f0}
 .preview-grid{display:grid;gap:1.2rem;grid-template-columns:minmax(225px,.7fr) minmax(0,1.3fr)}
 .capture{display:grid;justify-items:center;align-content:center;gap:1rem;padding:1.25rem;border:1px solid #72a59a57;border-radius:24px}
-.capture img{width:min(205px,100%);border-radius:18px;border:1px solid #87a39a;background:#eff3ec;box-shadow:0 12px 24px #062e27}
+.capture img{width:min(205px,100%);border-radius:18px;border:1px solid #87a39a;background:#eff3ec}
 .capture figcaption{color:#d9ece3;text-align:center;font-size:.9rem}
 .demo{padding:clamp(1.2rem,4vw,2.4rem);border-radius:24px;background:#eff6ed;color:var(--ink);align-content:center}
 .demo h3{font-size:clamp(1.8rem,3.3vw,2.9rem)}
@@ -91,3 +91,9 @@ progress::-moz-progress-bar{background:#2a827c}
 @media(max-width:760px){.shell{width:calc(100% - 2rem)}.bar nav{display:none}.hero-grid{grid-template-columns:1fr;gap:1.1rem;padding-top:3rem;padding-bottom:2.6rem}.hero-visual{height:410px}.hero-orbit{width:min(95%,450px)}.widget-float{left:9%;bottom:3%}.section{padding-block:3.2rem}.preview-grid{grid-template-columns:1fr}.capture{grid-row:2}.demo-body{grid-template-columns:105px minmax(0,1fr)}.bottle{width:94px;height:166px}}
 @media(max-width:390px){.features{grid-template-columns:1fr}.hero-visual{height:345px}.phone{width:161px}.widget-float{left:2%}.demo-body{grid-template-columns:78px minmax(0,1fr)}.bottle{width:74px;height:139px}.footer{align-items:flex-start;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.app-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(12rem,100%),1fr));gap:1rem;align-items:start}
+.app-gallery figure{margin:0;padding:.65rem;border:1px solid var(--line);border-radius:20px;background:#fcfdf8;text-align:center}
+.app-gallery img,.app-gallery video{width:100%;height:auto;aspect-ratio:411/891;object-fit:cover;display:block;border-radius:13px;background:#e9eee8}
+.app-gallery video{object-fit:contain}
+.app-gallery figcaption{padding:.55rem .25rem .1rem;font-weight:700}

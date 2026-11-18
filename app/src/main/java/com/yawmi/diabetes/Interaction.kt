@@ -30,8 +30,7 @@ fun Modifier.pressResponse(enabled: Boolean = true, compression: Float = .96f): 
     var pressed by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
         if (pressed) compression else 1f,
-        if (pressed) spring(dampingRatio = .95f, stiffness = 900f)
-        else spring(dampingRatio = .57f, stiffness = 460f),
+        tween(if (pressed) 95 else 170, easing = NasaqEase),
         label = "control-press"
     )
     return this.pointerInput(Unit) {
@@ -55,9 +54,15 @@ fun Modifier.pressResponse(enabled: Boolean = true, compression: Float = .96f): 
     }
 }
 
-@Composable fun MotionExpand(visible:Boolean,content:@Composable ()->Unit){
-    AnimatedVisibility(visible,enter=if(LocalMotion.current)fadeIn(tween(180))+expandVertically(tween(280,easing=FastOutSlowInEasing))else EnterTransition.None,
-        exit=if(LocalMotion.current)fadeOut(tween(120))+shrinkVertically(tween(220))else ExitTransition.None){content()}
+@Composable
+fun MotionExpand(visible: Boolean, content: @Composable () -> Unit) {
+    val motion = LocalMotion.current
+    AnimatedVisibility(visible,
+        enter = if (motion) expandVertically(tween(440, easing = NasaqEase), expandFrom = androidx.compose.ui.Alignment.Top) +
+            fadeIn(tween(260, 75)) + slideInVertically(tween(440, easing = NasaqEase)) { -it / 5 } else EnterTransition.None,
+        exit = if (motion) fadeOut(tween(150)) + shrinkVertically(tween(290, easing = NasaqEase), shrinkTowards = androidx.compose.ui.Alignment.Top)
+            else ExitTransition.None
+    ) { content() }
 }
 
 @Composable fun AnimatedNumber(value:Double,digits:Int=0,suffix:String="",style:TextStyle=MaterialTheme.typography.headlineLarge,color:Color=MaterialTheme.colorScheme.onSurface){

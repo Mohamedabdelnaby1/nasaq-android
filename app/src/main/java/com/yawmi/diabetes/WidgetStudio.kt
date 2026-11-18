@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.yawmi.diabetes
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
@@ -9,6 +11,8 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
@@ -27,6 +31,7 @@ val widgetPresets=listOf(
 
 @Composable fun WidgetStudio(s:State,initial:WidgetLook,onDismiss:()->Unit,onSave:(WidgetLook)->Unit){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme;val feedback=rememberFeedback()
+    val motion = LocalMotion.current
     var look by remember{mutableStateOf(initial)}
     var tab by remember{mutableStateOf("templates")};var size by remember{mutableStateOf("large")}
     var sampleNumbers by remember { mutableStateOf(false) }
@@ -49,19 +54,26 @@ val widgetPresets=listOf(
     }}){insets->
         Column(Modifier.fillMaxSize().padding(insets).safeDrawingPadding()){
             Row(Modifier.fillMaxWidth().padding(horizontal=20.dp,vertical=8.dp),verticalAlignment=Alignment.CenterVertically){
-                IconButton(onClick=onDismiss){Glyph("back",Modifier.size(21.dp))}
-                Text(w["widget_studio"],Modifier.weight(1f),style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
+                IconButton(onClick=onDismiss, modifier = Modifier.semantics { contentDescription = w["back"] }) { Glyph("back",Modifier.size(21.dp)) }
+                Text(w["widget_studio"],Modifier.weight(1f),style=MaterialTheme.typography.headlineSmall,fontWeight=FontWeight.Bold)
             }
             Surface(
                 modifier=Modifier.fillMaxWidth().padding(horizontal=20.dp),
-                color=c.surfaceContainerLow,
-                shape=RoundedCornerShape(24.dp),
+                color=c.surfaceContainerHigh,
+                shape=BoardShape,
                 border=BorderStroke(1.dp,c.outlineVariant.copy(alpha=.6f))
             ) {
                 Box(Modifier.fillMaxWidth().height(if(small)147.dp else 219.dp).padding(12.dp),contentAlignment=Alignment.Center){
-                    val dimensions=when(size){"compact"->154 to 162;"wide"->320 to 152;else->320 to 242}
-                    WidgetPreview(if(sampleNumbers) sample else s, if(sampleNumbers) look.copy(visible=true) else look,
-                        dimensions.first, dimensions.second, fitBox=true)
+                    Contours(Modifier.matchParentSize(), c.primary)
+                    AnimatedContent(size, transitionSpec = {
+                        if (motion) ((fadeIn(tween(220, 45)) + scaleIn(tween(500, easing = NasaqEase), initialScale = .88f)) togetherWith
+                            (fadeOut(tween(150)) + scaleOut(tween(300), targetScale = .96f))).using(null)
+                        else (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                    }, label = "widget-size-preview") { targetSize ->
+                        val dimensions = when (targetSize) { "compact" -> 154 to 162; "wide" -> 320 to 152; else -> 320 to 242 }
+                        WidgetPreview(if (sampleNumbers) sample else s, if (sampleNumbers) look.copy(visible = true) else look,
+                            dimensions.first, dimensions.second, fitBox = true)
+                    }
                 }
             }
             FlowRow(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(6.dp, Alignment.CenterHorizontally)) {
@@ -70,9 +82,17 @@ val widgetPresets=listOf(
                 }
                 FilterChip(selected=sampleNumbers,onClick={sampleNumbers=!sampleNumbers},label={Text(w["widget_sample"])},shape=RoundedCornerShape(50))
             }
-            FlowRow(Modifier.fillMaxWidth().padding(horizontal=20.dp),horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("templates","widget_content","appearance").forEach{key->FilterChip(selected=tab==key,onClick={tab=key},label={Text(w[if(key=="appearance")"widget_style"else key])},shape=RoundedCornerShape(50))}}
-            Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-                if(tab=="templates"){
+            val pages = listOf("templates", "widget_content", "appearance")
+            SegmentedRail(pages.map { w[if (it == "appearance") "widget_style" else it] }, pages.indexOf(tab),
+                { tab = pages[it] }, Modifier.padding(horizontal = 20.dp, vertical = 4.dp))
+            AnimatedContent(tab, Modifier.weight(1f), transitionSpec = {
+                if (motion) ((fadeIn(tween(240, 35)) + slideInVertically(tween(420, easing = NasaqEase)) { it / 10 }) togetherWith
+                    fadeOut(tween(150))).using(null)
+                else (EnterTransition.None togetherWith ExitTransition.None).using(null)
+            }, label = "widget-editor-tab") { selectedTab ->
+              Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal=20.dp).padding(bottom=20.dp),
+                  verticalArrangement=Arrangement.spacedBy(14.dp)){
+                if(selectedTab=="templates"){
                     Text(w["choose_template"],style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)
                     widgetPresets.chunked(2).forEach { group ->
                       Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.spacedBy(10.dp)){
@@ -101,7 +121,7 @@ val widgetPresets=listOf(
                     }
                     Text(w["widget_size_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
                 }
-                if(tab=="widget_content"){
+                if(selectedTab=="widget_content"){
                     ChoiceRow(w["widget_content"],widgetModes,look.mode,{w[when(it){"summary"->"summary_widget";"day_summary"->"day_overview";else->it}]}){look=look.copy(mode=it)}
                     Toggle(w["widget_show_values"],look.visible,w["widget_privacy"]){look=look.copy(visible=it)}
                     if(look.mode=="water" || (look.mode=="summary" && "water" in look.parts))Toggle(w["widget_quick_water"],look.quickWater,w["widget_quick_note"]){look=look.copy(quickWater=it)}
@@ -114,7 +134,7 @@ val widgetPresets=listOf(
                     Toggle(w["widget_time_toggle"],look.details){look=look.copy(details=it)}
                     Toggle(w["widget_action_toggle"],look.action){look=look.copy(action=it)}
                 }
-                if(tab=="appearance"){
+                if(selectedTab=="appearance"){
                     ChoiceRow(w["theme"],widgetStyles,look.style,{w[it]}){look=look.copy(style=it,background="")}
                     if(look.mode=="summary") ChoiceRow(w["widget_layout"],widgetLayouts,look.layout,{w[it]}){look=look.copy(layout=it)}
                     if(look.mode=="water" || look.mode=="summary") ChoiceRow(w["water_visual"],widgetWaterVisuals,look.waterVisual,{w[it]}){look=look.copy(waterVisual=it)}
@@ -129,6 +149,7 @@ val widgetPresets=listOf(
                 }
                 if(error)Notice(w["invalid_colour"],true)
             }
+          }
         }
     }
 }

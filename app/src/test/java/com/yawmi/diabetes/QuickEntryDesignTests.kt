@@ -38,7 +38,7 @@ class QuickEntryDesignTests{
     @Test fun waterStepperSavesTheShownVolume(){
         var result:Entry?=null
         compose.setContent{YawmiTheme(p){QuickEntrySheet("water",null,State(preferences=p),{}, {result=it})}}
-        compose.onNodeWithText("+").performClick()
+        compose.onNodeWithContentDescription(w["water_increase"]).performClick()
         compose.onNodeWithText("300").assertExists()
         capture("14-water-entry")
         compose.onNodeWithText(w["water_record_button"]).assertIsDisplayed().performClick()

@@ -1,6 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.yawmi.diabetes
 
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -15,25 +17,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
 @Composable
-fun QuickActionsSheet(onDismiss: () -> Unit, choose: (String) -> Unit) {
-    val w = LocalWords.current
-    val c = MaterialTheme.colorScheme
-    val feedback = rememberFeedback()
+internal fun RecordingSheet(
+    page: String, onDismiss: () -> Unit, onSelect: (String) -> Unit,
+    editor: @Composable (String, close: (() -> Unit) -> Unit) -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
     val motion = LocalMotion.current
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
-    var selection by remember { mutableStateOf<String?>(null) }
-    fun chooseAction(kind: String) {
-        if (selection != null) return
-        selection = kind
-        feedback()
-        if (!motion) choose(kind)
-        else scope.launch {
-            sheet.hide()
-            choose(kind)
+    var closing by remember { mutableStateOf(false) }
+    fun close(action: () -> Unit) {
+        if (closing) return
+        closing = true
+        if (!motion) action() else scope.launch {
+            try { sheet.hide() } finally { action() }
         }
     }
-    ModalBottomSheet(onDismissRequest = { if (selection == null) onDismiss() }, sheetState = sheet) {
+    ModalBottomSheet(
+        onDismissRequest = { if (!closing) onDismiss() },
+        sheetState = sheet,
+        containerColor = colors.surfaceContainerLow,
+        scrimColor = Color.Black.copy(alpha = .26f),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        if (motion) AnimatedContent(page, transitionSpec = {
+            (fadeIn(tween(270,100)) + slideInVertically(tween(580,easing=NasaqEase)) { it / 6 } togetherWith
+                fadeOut(tween(185))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
+        }, label = "quick-record-page") { current ->
+            if (current == "quick") QuickActions { kind ->
+                if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
+            } else editor(current, ::close)
+        } else key(page) {
+            if (page == "quick") QuickActions(onSelect) else editor(page, ::close)
+        }
+    }
+}
+
+@Composable
+private fun QuickActions(choose: (String) -> Unit) {
+    val w = LocalWords.current
+    val c = MaterialTheme.colorScheme
+    val feedback = rememberFeedback()
+    fun chooseAction(kind: String) { feedback(); choose(kind) }
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -41,15 +66,15 @@ fun QuickActionsSheet(onDismiss: () -> Unit, choose: (String) -> Unit) {
             Text(w["quick_add"], style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Surface(
                 onClick = { chooseAction("assistant_title") }, shape = RoundedCornerShape(22.dp),
-                color = LocalBrand.current, contentColor = Color.White, modifier = Modifier.fillMaxWidth().pressResponse()
+                color = c.primaryContainer, contentColor = c.onPrimaryContainer, modifier = Modifier.fillMaxWidth()
             ) {
                 Row(Modifier.padding(17.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Glyph("spark", Modifier.size(27.dp), Gold)
+                    Glyph("spark", Modifier.size(27.dp), c.onPrimaryContainer)
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                         Text(w["assistant_title"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        Text(w["assistant_subtitle"], style = MaterialTheme.typography.bodySmall, color = Color(0xFFD7E9DE))
+                        Text(w["assistant_subtitle"], style = MaterialTheme.typography.bodySmall, color = c.onPrimaryContainer)
                     }
-                    Glyph("arrow", Modifier.size(18.dp), Gold)
+                    Glyph("arrow", Modifier.size(18.dp), c.onPrimaryContainer)
                 }
             }
             FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -61,7 +86,7 @@ fun QuickActionsSheet(onDismiss: () -> Unit, choose: (String) -> Unit) {
                     }
                     Surface(
                         onClick = { chooseAction(kind) }, shape = RoundedCornerShape(18.dp),
-                        color = c.surfaceContainerLow, modifier = Modifier.weight(1f).pressResponse()
+                        color = tone, modifier = Modifier.weight(1f)
                     ) {
                         Row(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                             Surface(shape = RoundedCornerShape(12.dp), color = tone) {
@@ -83,5 +108,4 @@ fun QuickActionsSheet(onDismiss: () -> Unit, choose: (String) -> Unit) {
                 }
             }
         }
-    }
 }

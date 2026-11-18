@@ -7,6 +7,10 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -19,14 +23,34 @@ import java.time.format.DateTimeFormatter
 
 @Composable fun EditorShell(title:String,onDismiss:()->Unit,onSave:()->Unit,saveLabel:String=LocalWords.current["save"],content:@Composable ColumnScope.()->Unit) {
     val w=LocalWords.current
-    Dialog(onDismissRequest=onDismiss,properties=DialogProperties(usePlatformDefaultWidth=false)) {
-        Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
-            Scaffold(containerColor=MaterialTheme.colorScheme.background,topBar={TopAppBar(title={Text(title,style=MaterialTheme.typography.titleLarge)},navigationIcon={IconButton(onClick=onDismiss){Glyph("back",Modifier.size(22.dp))}},actions={TextButton(onClick=onDismiss){Text(w["cancel"])}})},
-                bottomBar={Surface(color=MaterialTheme.colorScheme.surfaceContainerLow) {
-                    Button(onClick=onSave,modifier=Modifier.navigationBarsPadding().imePadding().fillMaxWidth().padding(16.dp).heightIn(min=52.dp).pressResponse()) {Text(saveLabel)}
-                }}) { insets ->
-                Box(Modifier.fillMaxSize().padding(insets),contentAlignment=androidx.compose.ui.Alignment.TopCenter) {
-                    Column(Modifier.widthIn(max=680.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp),content=content)
+    val c = MaterialTheme.colorScheme
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Scaffold(containerColor = c.background, topBar = {
+            Column(Modifier.statusBarsPadding()) {
+                Box(Modifier.padding(horizontal = 20.dp, vertical = 9.dp)) {
+                    ScreenTitle(title) {
+                        IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                            Glyph("close", Modifier.size(22.dp))
+                        }
+                    }
+                }
+                HorizontalDivider(color = c.outlineVariant)
+            }
+        }, bottomBar = {
+            Surface(color = c.surfaceContainerLow) {
+                Column(Modifier.navigationBarsPadding().imePadding()) {
+                    HorizontalDivider(color = c.outlineVariant)
+                    Button(onClick = onSave, shape = CircleShape,
+                        modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 50.dp)) {
+                        Text(saveLabel)
+                    }
+                }
+            }
+        }) { insets ->
+            Box(Modifier.fillMaxSize().padding(insets), contentAlignment = Alignment.TopCenter) {
+                Column(Modifier.widthIn(max = 680.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(ScreenGutters),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Reveal { Column(verticalArrangement = Arrangement.spacedBy(16.dp), content = content) }
                 }
             }
         }
@@ -35,7 +59,7 @@ import java.time.format.DateTimeFormatter
 
 @Composable fun Field(label:String,value:String,onChange:(String)->Unit,numeric:Boolean=false,multiline:Boolean=false) {
     OutlinedTextField(value=value,onValueChange={if(it.length<=4000)onChange(it)},label={Text(label)},modifier=Modifier.fillMaxWidth(),shape=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,unfocusedBorderColor=androidx.compose.ui.graphics.Color.Transparent,focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow),
+        colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant,focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow),
         singleLine=!multiline,minLines=if(multiline) 3 else 1,keyboardOptions=KeyboardOptions(keyboardType=if(numeric) KeyboardType.Decimal else KeyboardType.Text))
 }
 @Composable fun TimeChoiceDialog(initial:LocalTime,onDismiss:()->Unit,onPicked:(LocalTime)->Unit) {

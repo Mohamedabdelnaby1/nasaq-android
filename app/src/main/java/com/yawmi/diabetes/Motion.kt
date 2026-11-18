@@ -1,158 +1,156 @@
 package com.yawmi.diabetes
 
-import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.*
 import androidx.compose.ui.graphics.*
-import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 import kotlin.math.*
 
 val LocalMotion=staticCompositionLocalOf{true}
 val LocalBrand=staticCompositionLocalOf{Color(0xFF154F42)}
+internal val NasaqEase = CubicBezierEasing(.22f, 1f, .36f, 1f)
 
 @Composable fun Reveal(index:Int=0,content:@Composable ()->Unit) {
     val motion=LocalMotion.current
-    var entered by remember {mutableStateOf(!motion)}
-    LaunchedEffect(Unit){if(motion)delay((index*45L).coerceAtMost(225));entered=true}
-    AnimatedVisibility(visible=entered,enter=fadeIn(tween(380))+slideInVertically(tween(420,easing=FastOutSlowInEasing))){Column(Modifier.fillMaxWidth()){content()}}
+    val progress = remember { Animatable(if (motion) 0f else 1f) }
+    LaunchedEffect(motion) {
+        if (motion) progress.animateTo(1f, tween(400, (index * 36).coerceAtMost(145), NasaqEase))
+        else progress.snapTo(1f)
+    }
+    Column(Modifier.fillMaxWidth().graphicsLayer {
+        alpha = progress.value
+        translationY = 16.dp.toPx() * (1 - progress.value)
+    }) { content() }
 }
 
-@Composable fun WaterVessel(fraction:Float,modifier:Modifier=Modifier) {
-    val motion=LocalMotion.current
+@Composable
+fun WaterVessel(fraction: Float, modifier: Modifier = Modifier) {
+    val motion = LocalMotion.current
     val amount = fraction.coerceIn(0f, 1f)
-    val fill by animateFloatAsState(amount, if (motion) spring(dampingRatio = .78f, stiffness = 115f) else snap(), label = "water-level")
+    val fill = animateFloatAsState(amount, if (motion) tween(780, 100, NasaqEase) else snap(), label = "bottle-fill")
+    val wave = remember { Animatable(1f) }
     var previous by remember { mutableFloatStateOf(amount) }
     var direction by remember { mutableFloatStateOf(1f) }
-    val splash = remember { Animatable(1f) }
     LaunchedEffect(amount, motion) {
-        val changed = amount != previous
-        direction = if (amount > previous) 1f else -1f
+        val difference = amount - previous
         previous = amount
-        if (motion && changed) {
-            splash.snapTo(0f)
-            splash.animateTo(1f, tween(970, easing = LinearEasing))
-        } else if (!motion) splash.snapTo(1f)
+        if (motion && difference != 0f) {
+            direction = if (difference > 0f) 1f else -1f
+            wave.snapTo(0f)
+            wave.animateTo(1f, tween(970, easing = LinearEasing))
+        } else if (!motion) wave.snapTo(1f)
     }
-    val phase = splash.value
-    val impact = (1f - phase).pow(2)
     Canvas(modifier) {
-        val w=size.width;val h=size.height
-        val vessel=Path().apply{
-            moveTo(w*.34f,h*.09f)
-            lineTo(w*.66f,h*.09f)
-            lineTo(w*.66f,h*.19f)
-            cubicTo(w*.66f,h*.25f,w*.85f,h*.24f,w*.85f,h*.39f)
-            lineTo(w*.85f,h*.85f)
-            quadraticTo(w*.85f,h*.94f,w*.68f,h*.95f)
-            lineTo(w*.32f,h*.95f)
-            quadraticTo(w*.15f,h*.94f,w*.15f,h*.85f)
-            lineTo(w*.15f,h*.39f)
-            cubicTo(w*.15f,h*.25f,w*.34f,h*.25f,w*.34f,h*.19f)
+        val h = size.height
+        val w = min(size.width, h * .65f)
+        val left = (size.width - w) / 2
+        fun at(x: Float, y: Float) = Offset(left + w * x, h * y)
+        val outline = Path().apply {
+            moveTo(at(.33f, .14f).x, h * .14f)
+            lineTo(at(.67f, .14f).x, h * .14f)
+            lineTo(at(.67f, .22f).x, h * .22f)
+            cubicTo(at(.68f, .28f).x, h*.28f, at(.87f, .25f).x, h*.25f, at(.87f, .40f).x, h*.40f)
+            lineTo(at(.87f, .86f).x, h*.86f)
+            quadraticTo(at(.87f, .95f).x, h*.95f, at(.72f, .95f).x, h*.95f)
+            lineTo(at(.28f, .95f).x, h*.95f)
+            quadraticTo(at(.13f, .95f).x, h*.95f, at(.13f, .86f).x, h*.86f)
+            lineTo(at(.13f, .40f).x, h*.40f)
+            cubicTo(at(.13f, .25f).x, h*.25f, at(.32f, .28f).x, h*.28f, at(.33f, .22f).x, h*.22f)
             close()
         }
-        drawOval(Color(0xFF175E6A).copy(alpha=.18f),Offset(w*.17f,h*.92f),Size(w*.66f,h*.07f))
-        drawPath(vessel,Brush.horizontalGradient(listOf(Color(0xFFA4C8CB),Color(0xFFEBF9F7),Color(0xFFC2E2E3),Color(0xFF84B7BE))))
-        clipPath(vessel){
-            val level = h * (.95f - fill.coerceIn(0f,1f) * .72f)
-            if (fill > .001f) repeat(2) { layer ->
-                val wave = Path().apply {
-                    moveTo(0f, h)
-                    lineTo(0f, level)
-                    for (sample in 0..40) {
-                        val x = sample / 40f
-                        val ripple = sin(x * 7f - direction * phase * 16f + layer * 1.8f)
-                        val tilt = (x - .5f) * sin(phase * 19f) * impact * .24f
-                        lineTo(w * x, level + h * (ripple * (.012f + impact * .058f) + tilt))
+        val body = listOf(Color(0xFFC3DFE5), Color(0xFFF1FBFC), Color(0xFFAED2DA))
+        drawPath(outline, Brush.horizontalGradient(body, at(.13f, 0f).x, at(.87f, 0f).x))
+        val phase = wave.value
+        val level = h * (.94f - fill.value * .67f)
+        val surge = (1 - phase).pow(2)
+        clipPath(outline) {
+            if (fill.value > .001f) {
+                val edge = Path().apply {
+                    moveTo(left, level)
+                    for (step in 0..28) {
+                        val x = step / 28f
+                        val oscillation = sin(x * 8f - phase * 19f * direction) * surge * .063f
+                        val incline = (x - .5f) * sin(phase * 15f) * surge * .17f
+                        lineTo(at(x, 0f).x, level + h * (oscillation + incline))
                     }
-                    lineTo(w, h)
-                    close()
                 }
-                val upper = if (layer == 0) Color(0xFF8CD7DD) else Color(0xFF339BA9).copy(alpha = .82f)
-                drawPath(wave, Brush.verticalGradient(listOf(upper, Color(0xFF196777)), startY = level.coerceAtMost(h - 1), endY = h))
+                val liquid = Path().apply { addPath(edge); lineTo(left+w, h); lineTo(left, h); close() }
+                drawPath(liquid, Brush.verticalGradient(listOf(Color(0xFF53C6CD), Color(0xFF147E99), Color(0xFF155874)), level, h))
+                drawPath(edge, Color(0xC7C8FCFC), style = Stroke(1.65.dp.toPx()))
+                if (direction > 0 && surge > .02f) repeat(4) { index ->
+                    val point = Offset(at(.28f + index * .135f, 0f).x, level + h * (.07f + index * .035f - phase * .09f))
+                    if (point.y > level) drawCircle(Color.White.copy(alpha = surge * .70f), (2 + index % 2).dp.toPx(), point,
+                        style = Stroke(1.dp.toPx()))
+                }
             }
-            if (fill > .06f && impact > .01f && direction > 0) repeat(6) { index ->
-                val spread = (index * .173f + .17f) % .66f
-                val y = h * (.92f - phase * (.25f + index * .065f))
-                if (y > level + h * .035f) drawCircle(Color.White.copy(alpha = .68f * (1f - phase)), w * (.025f + (index % 3) * .007f), Offset(w * spread, y))
-            }
+            drawRoundRect(Color.White.copy(alpha = .54f), at(.23f, .36f), Size(w*.048f, h*.46f), CornerRadius(w*.03f))
         }
-        drawPath(vessel,Color(0xFF245E68),style=Stroke(1.25.dp.toPx()))
-        drawRoundRect(Brush.verticalGradient(listOf(Color.White.copy(alpha=.82f),Color.White.copy(alpha=.13f)),h*.32f,h*.81f),
-            Offset(w*.216f,h*.33f),Size(w*.065f,h*.46f),CornerRadius(w*.04f))
-        repeat(5) { i ->
-            val y=h*(.38f+i*.09f)
-            drawLine(Color(0xFF254E56).copy(alpha=.65f),Offset(w*(if(i%2==0).63f else .69f),y),Offset(w*.76f,y),strokeWidth=1.dp.toPx(),cap=StrokeCap.Round)
+        val ink = Color(0xFF235664)
+        drawPath(outline, ink, style = Stroke(1.55.dp.toPx()))
+        repeat(4) { index ->
+            val y = .40f + index * .122f
+            drawLine(ink.copy(alpha = .75f), at(if (index % 2 == 0) .63f else .68f, y), at(.78f, y),
+                1.dp.toPx(), StrokeCap.Round)
         }
-        drawRoundRect(Brush.verticalGradient(listOf(Color(0xFFF8DE9E),Color(0xFFC18B37)),h*.022f,h*.117f),
-            Offset(w*.27f,h*.022f),Size(w*.46f,h*.105f),CornerRadius(w*.065f))
-        repeat(6) { i ->
-            val x=w*(.33f+i*.068f)
-            drawLine(Color(0xFF7E521F).copy(alpha=.30f),Offset(x,h*.058f),Offset(x,h*.103f),strokeWidth=1.dp.toPx(),cap=StrokeCap.Round)
-        }
+        drawRoundRect(ink, at(.275f, .07f), Size(w*.45f, h*.09f), CornerRadius(w*.043f))
+        drawRoundRect(Color(0xFF6D9FA8), at(.31f, .077f), Size(w*.38f, h*.022f), CornerRadius(w*.016f))
+        drawLine(ink, at(.34f, .192f), at(.66f, .192f), 1.dp.toPx())
     }
 }
 
 @Composable
 internal fun WaterGlass(amount: Float, modifier: Modifier = Modifier) {
     val motion = LocalMotion.current
-    val fill by animateFloatAsState(amount.coerceIn(0f,1f), if(motion) tween(460,easing=FastOutSlowInEasing) else snap(), label="glass-fill")
+    val fill = animateFloatAsState(amount.coerceIn(0f, 1f), if (motion) tween(530, easing = NasaqEase) else snap(), label = "glass-fill")
     val ripple = remember { Animatable(1f) }
     var previous by remember { mutableFloatStateOf(amount) }
-    LaunchedEffect(amount,motion) {
-        val changed=amount!=previous
-        previous=amount
-        if(motion && changed) {
+    LaunchedEffect(amount, motion) {
+        val changed = previous != amount
+        previous = amount
+        if (motion && changed) {
             ripple.snapTo(0f)
-            ripple.animateTo(1f,tween(560,easing=LinearEasing))
-        } else if(!motion) ripple.snapTo(1f)
+            ripple.animateTo(1f, tween(690, easing = LinearEasing))
+        } else if (!motion) ripple.snapTo(1f)
     }
     Canvas(modifier) {
-        val w=size.width
-        val h=size.height
-        val glass=Path().apply {
-            moveTo(w*.11f,h*.14f)
-            cubicTo(w*.12f,h*.03f,w*.88f,h*.03f,w*.89f,h*.14f)
-            lineTo(w*.79f,h*.82f)
-            quadraticTo(w*.77f,h*.92f,w*.64f,h*.92f)
-            lineTo(w*.36f,h*.92f)
-            quadraticTo(w*.23f,h*.92f,w*.21f,h*.82f)
+        val w = size.width
+        val h = size.height
+        val glass = Path().apply {
+            moveTo(w*.12f,h*.17f)
+            quadraticTo(w*.50f,h*.06f,w*.88f,h*.17f)
+            lineTo(w*.77f,h*.81f)
+            quadraticTo(w*.76f,h*.90f,w*.64f,h*.90f)
+            lineTo(w*.36f,h*.90f)
+            quadraticTo(w*.24f,h*.90f,w*.23f,h*.81f)
             close()
         }
-        drawOval(Color(0xFF1A6170).copy(alpha=.18f),Offset(w*.18f,h*.86f),Size(w*.64f,h*.12f))
-        drawPath(glass,Brush.horizontalGradient(listOf(Color(0xFFABCAD0),Color(0xFFF1FCFC),Color(0xFFA8CED4))))
-        if(fill>.001f) clipPath(glass) { drawGlassWater(fill,ripple.value) }
-        drawPath(glass,Color(0xFF376D77),style=Stroke(1.dp.toPx()))
-        drawOval(Color.White.copy(alpha=.76f),Offset(w*.13f,h*.08f),Size(w*.74f,h*.15f),style=Stroke(1.dp.toPx()))
-        drawLine(Color.White.copy(alpha=.72f),Offset(w*.27f,h*.32f),Offset(w*.31f,h*.71f),strokeWidth=2.dp.toPx(),cap=StrokeCap.Round)
+        val ink = Color(0xFF2C6171)
+        val ice = Color(0xFFD8EEF2)
+        drawPath(glass, Brush.horizontalGradient(listOf(Color(0xFFB6D6DF), Color(0xFFF3FBFC), ice)))
+        if (fill.value > .001f) clipPath(glass) {
+            val level = h * (.885f - fill.value * .64f)
+            val phase = ripple.value
+            val swing = sin(phase * PI.toFloat() * 5f) * (1 - phase) * h * .15f
+            val surface = Path().apply {
+                moveTo(0f, level + swing)
+                cubicTo(w*.32f, level - h*.07f, w*.66f, level + h*.06f, w, level - swing)
+            }
+            val water = Path().apply { addPath(surface); lineTo(w, h); lineTo(0f, h); close() }
+            drawPath(water, Brush.verticalGradient(listOf(Color(0xFF64D3D8), Color(0xFF298EA8)), level, h))
+            drawPath(surface, Color(0xE4C9FBFB), style = Stroke(1.dp.toPx()))
+        }
+        drawPath(glass, ink, style = Stroke(1.25.dp.toPx()))
+        val rim = Path().apply { moveTo(w*.12f,h*.17f); quadraticTo(w*.50f,h*.29f,w*.88f,h*.17f) }
+        drawPath(rim, ink, style = Stroke(1.dp.toPx()))
+        drawLine(Color.White.copy(alpha=.8f), Offset(w*.28f,h*.37f), Offset(w*.33f,h*.70f), 1.5.dp.toPx(), StrokeCap.Round)
     }
-}
-
-private fun DrawScope.drawGlassWater(fill: Float, phase: Float) {
-    val w=size.width
-    val h=size.height
-    val level=h*(.91f-fill*.70f)
-    val ripple=sin(phase*PI.toFloat()*5f)*(1f-phase)*h*.14f
-    val liquid=Path().apply {
-        moveTo(0f,level+ripple)
-        cubicTo(w*.31f,level-h*.08f,w*.58f,level+h*.06f,w,level-ripple)
-        lineTo(w,h)
-        lineTo(0f,h)
-        close()
-    }
-    drawPath(liquid,Brush.verticalGradient(listOf(Color(0xFF65C7CF),Color(0xFF287995)),level,h))
-    drawOval(Color(0xFFCCFBF6).copy(alpha=.40f),Offset(w*.29f,level),Size(w*.42f,h*.035f))
 }
 
 @Composable fun MeterRing(value:Float,modifier:Modifier=Modifier,color:Color=MaterialTheme.colorScheme.primary) {

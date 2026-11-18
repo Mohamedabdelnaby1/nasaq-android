@@ -43,7 +43,15 @@ import androidx.compose.ui.unit.dp
         }
         Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){repeat(pages.size){i->Surface(color=if(i<=step)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha=.4f),shape=RoundedCornerShape(50),modifier=Modifier.weight(1f).height(4.dp)){} }}
         Box(Modifier.weight(1f)) {
-            AnimatedContent(targetState=step,transitionSpec={fadeIn(tween(220))+slideInHorizontally{it/8} togetherWith fadeOut(tween(150))},label="setup") {page->
+            val motion = LocalMotion.current
+            AnimatedContent(targetState=step,transitionSpec={
+                if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                else {
+                    val direction = (if (targetState > initialState) 1 else -1) * (if (w.rtl) -1 else 1)
+                    ((fadeIn(tween(230, 105)) + slideInHorizontally(tween(540, easing = NasaqEase)) { direction * it / 4 }) togetherWith
+                        (fadeOut(tween(170)) + slideOutHorizontally(tween(320, easing = NasaqEase)) { -direction * it / 7 })).using(null)
+                }
+            },label="setup") {page->
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(20.dp)) {
                     Spacer(Modifier.height(4.dp))
                     if(page!=0)Text(w[pages[page]],style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold)

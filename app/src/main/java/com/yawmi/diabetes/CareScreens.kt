@@ -1,7 +1,8 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.yawmi.diabetes
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
@@ -12,36 +13,95 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import kotlinx.coroutines.delay
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.*
 import java.time.*
 
-@Composable fun Journal(s:State,onEdit:(Entry)->Unit,onDelete:(Entry)->Unit,initialFilter:String="all",onAddReading:(()->Unit)?=null){
-    val w=LocalWords.current;val c=MaterialTheme.colorScheme
-    var filter by rememberSaveable(initialFilter){mutableStateOf(initialFilter)};var query by rememberSaveable{mutableStateOf("")}
-    val entries=s.entries.filter{(filter=="all" || it.kind==filter) && (query.isBlank() || it.note.contains(query,true) || w[it.context].contains(query,true))}.sortedByDescending{it.time}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-        item{PageIntro(w[if(initialFilter=="glucose")"glucose"else"log"],w["journal_subtitle"],"log")}
-        if(initialFilter=="glucose" && onAddReading!=null) item {
-            ReadingHero(dayOverview(s,System.currentTimeMillis()),s.preferences,onAdd=onAddReading)
+@Composable
+fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
+    initialFilter: String = "all", onAddReading: (() -> Unit)? = null) {
+    val w = LocalWords.current
+    val c = MaterialTheme.colorScheme
+    var filter by rememberSaveable(initialFilter) { mutableStateOf(initialFilter) }
+    var query by rememberSaveable { mutableStateOf("") }
+    var expandedId by rememberSaveable { mutableStateOf<String?>(null) }
+    val entries = remember(s.entries, s.medications, filter, query, w) {
+        val search = query.trim()
+        s.entries.filter {
+            (filter == "all" || it.kind == filter) &&
+                (search.isBlank() || it.note.contains(search, true) || w[it.context].contains(search, true) ||
+                    entryTitle(it, s, w).contains(search, true))
+        }.sortedByDescending { it.time }
+    }
+    val zone = remember { ZoneId.systemDefault() }
+    val grouped = remember(entries, zone) { entries.groupBy { Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate() } }
+    val motion = LocalMotion.current
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenGutters, verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        item("journal-heading") {
+            ScreenTitle(w[if (initialFilter == "glucose") "glucose" else "log"], w["journal_subtitle"]) { DomainMark("log") }
         }
-        item{OutlinedTextField(value=query,onValueChange={query=it},placeholder={Text(w["search"])},leadingIcon={Glyph("search",Modifier.size(18.dp))},shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth(),singleLine=true,colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=c.surfaceContainerLow,unfocusedBorderColor=Color.Transparent))}
-        item{Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("all","glucose","dose","water","meal","symptom","weight","pressure","a1c").forEach{key->FilterChip(selected=filter==key,onClick={filter=key},label={Text(w[if(key=="dose")"medication"else key])},shape=RoundedCornerShape(50))}}}
-        if(entries.isEmpty())item{Panel{EmptyState(w["empty"])}}
-        entries.groupBy{Instant.ofEpochMilli(it.time).atZone(ZoneId.systemDefault()).toLocalDate()}.forEach{(_,group)->
-            item(key="date_"+group.first().time){SectionHeading(dateText(group.first().time,w));Spacer(Modifier.height(7.dp))
-                Panel{group.forEachIndexed{i,e->
-                    var expanded by remember{mutableStateOf(false)}
-                    Column(Modifier.fillMaxWidth().clickable{expanded=!expanded}){
-                        ActivityRow(e,s)
-                        MotionExpand(expanded){Column(Modifier.padding(start=48.dp),verticalArrangement=Arrangement.spacedBy(4.dp)){
-                            if(e.note.isNotBlank())Text(e.note,style=MaterialTheme.typography.bodySmall)
-                            if(e.kind=="dose")Text(w[e.status],style=MaterialTheme.typography.labelMedium)
-                            Row{if(e.kind!="dose")TextButton(onClick={onEdit(e)}){Text(w["edit"])};TextButton(onClick={onDelete(e)},colors=ButtonDefaults.textButtonColors(contentColor=c.error)){Text(w["delete"])}}
-                        }}
+        if (initialFilter == "glucose" && onAddReading != null) item("daily-average") {
+            ReadingHero(dayOverview(s, System.currentTimeMillis()), s.preferences, onAdd = onAddReading)
+        }
+        item("journal-controls") {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(value = query, onValueChange = { query = it }, placeholder = { Text(w["search"]) },
+                    leadingIcon = { Glyph("search", Modifier.size(20.dp)) },
+                    trailingIcon = if (query.isNotEmpty()) {{
+                        IconButton(onClick = { query = "" }, modifier = Modifier.semantics { contentDescription = w["clear_search"] }) {
+                            Glyph("close", Modifier.size(18.dp))
+                        }
+                    }} else null,
+                    shape = CircleShape, modifier = Modifier.fillMaxWidth(), singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = c.surfaceContainerLow,
+                        unfocusedBorderColor = c.outlineVariant))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("all", "glucose", "dose", "water", "meal", "symptom", "weight", "pressure", "a1c").forEach { kind ->
+                        FilterChip(selected = filter == kind, onClick = { filter = kind; expandedId = null },
+                            label = { Text(w[if (kind == "dose") "medication" else kind]) }, shape = CircleShape,
+                            colors = FilterChipDefaults.filterChipColors(selectedContainerColor = c.primary, selectedLabelColor = c.onPrimary))
                     }
-                    if(i<group.lastIndex)HorizontalDivider(color=c.outlineVariant.copy(alpha=.3f))
-                }}
+                }
+            }
+        }
+        if (entries.isEmpty()) item("journal-empty") { NasaqBoard { EmptyState(w["empty"]) } }
+        grouped.forEach { (date, group) ->
+            item("date-$date") {
+                Row(Modifier.fillMaxWidth().padding(top = 5.dp), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                    Text(dateText(group.first().time, w), style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold, color = c.onSurfaceVariant)
+                    HorizontalDivider(Modifier.weight(1f), color = c.outlineVariant)
+                    Text(number(group.size.toDouble(), w), style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
+                }
+            }
+            items(group, key = { it.id }) { entry ->
+                val expanded = expandedId == entry.id
+                NasaqBoard(modifier = if (motion) Modifier.animateItem(
+                    fadeInSpec = tween(250, 55), placementSpec = tween(480, easing = NasaqEase), fadeOutSpec = tween(160))
+                    else Modifier) {
+                    Column(Modifier.fillMaxWidth().clip(ControlShape).clickable {
+                        expandedId = if (expanded) null else entry.id
+                    }) {
+                        ActivityRow(entry, s, trailing = { Glyph(if (expanded) "up" else "down", Modifier.size(16.dp), c.onSurfaceVariant) })
+                    }
+                    MotionExpand(expanded) {
+                        Column(Modifier.fillMaxWidth().padding(start = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            if (entry.note.isNotBlank()) Text(entry.note, style = MaterialTheme.typography.bodyMedium)
+                            if (entry.kind == "dose") Text(w[entry.status], style = MaterialTheme.typography.labelMedium)
+                            Row {
+                                if (entry.kind != "dose") TextButton(onClick = { onEdit(entry) }) { Text(w["edit"]) }
+                                TextButton(onClick = { onDelete(entry) }, colors = ButtonDefaults.textButtonColors(contentColor = c.error)) {
+                                    Text(w["delete"])
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -50,31 +110,59 @@ import java.time.*
 @Composable fun Medicines(s:State,add:()->Unit,edit:(Medication)->Unit,dose:(Reminder)->Unit,manual:()->Unit){
     val device=androidx.compose.ui.platform.LocalContext.current;val w=LocalWords.current;val c=MaterialTheme.colorScheme
     var archived by rememberSaveable{mutableStateOf(false)}
-    val now=System.currentTimeMillis();val upcoming=remember(s.revision){Reminders.plan(s,now-2*3600000,now+172800000).filter{it.kind=="medication"}}
-    LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-        item{PageIntro(w["medications"],w["medicines_subtitle"],"medication")}
-        item{Surface(color=LocalBrand.current,shape=RoundedCornerShape(24.dp)){Box(Modifier.fillMaxWidth()){
-            Pattern(Modifier.matchParentSize())
-            Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-                Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Text(w["next_reminder"],style=MaterialTheme.typography.labelLarge,color=Color(0xFFCEE0D6));Glyph("bell",Modifier.size(20.dp),Gold)}
-                val next=upcoming.firstOrNull()
-                Text(next?.let{timeText(it.due,w)} ?: "—",color=Color.White,style=MaterialTheme.typography.displaySmall,fontWeight=FontWeight.Bold)
-                Text(next?.let{r->s.medications.find{it.id==r.medicationId}?.name} ?: w["no_doses"],color=Color.White,style=MaterialTheme.typography.titleMedium)
-                Button(onClick={if(next!=null)dose(next)else add()},shape=RoundedCornerShape(12.dp),colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),modifier=Modifier.fillMaxWidth()){Text(w[if(next!=null)"record_dose"else"add_med"]) }
+    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) { while (true) { delay(60_000 - now % 60_000); now = System.currentTimeMillis() } }
+    val upcoming = remember(s, now) { Reminders.plan(s, now - 7_200_000, now + 172_800_000).filter { it.kind == "medication" } }
+    val motion = LocalMotion.current
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenGutters, verticalArrangement = Arrangement.spacedBy(15.dp)) {
+        item("medicines-heading") {
+            ScreenTitle(w["medications"], w["medicines_subtitle"]) {
+                FilledTonalIconButton(onClick = add, modifier = Modifier.semantics { contentDescription = w["add_med"] }) {
+                    Glyph("plus", Modifier.size(22.dp))
+                }
             }
-        }}}
-        item{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(8.dp)){
-            FilterChip(selected=!archived,onClick={archived=false},label={Text(w["active"])},shape=RoundedCornerShape(50));FilterChip(selected=archived,onClick={archived=true},label={Text(w["archived"])},shape=RoundedCornerShape(50));Spacer(Modifier.weight(1f));FilledTonalIconButton(onClick=add){Glyph("plus",Modifier.size(21.dp))}
-        }}
+        }
+        item("medicines-next") {
+            val next = upcoming.firstOrNull()
+            val tone = domainColors("medication")
+            Surface(color = tone.backdrop, contentColor = tone.ink, shape = BoardShape) {
+                Box(Modifier.fillMaxWidth()) {
+                    Contours(Modifier.matchParentSize(), tone.ink)
+                    Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                            Glyph("clock", Modifier.size(20.dp), tone.ink)
+                            Text(w["next_reminder"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        }
+                        if (next != null) {
+                            Text(timeText(next.due, w), style = MaterialTheme.typography.displayMedium, fontWeight = FontWeight.Bold)
+                            Text(s.medications.find { it.id == next.medicationId }?.name ?: w["no_doses"],
+                                style = MaterialTheme.typography.titleMedium)
+                        } else Text(w["no_doses"], style = MaterialTheme.typography.bodyLarge)
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                            Button(onClick = { if (next != null) dose(next) else add() }, modifier = Modifier.weight(1f)) {
+                                Text(w[if (next != null) "record_dose" else "add_med"])
+                            }
+                            if (s.medications.any { it.active }) TextButton(onClick = manual) { Text(w["manual_dose"]) }
+                        }
+                    }
+                }
+            }
+        }
+        item("medicines-switch") {
+            SegmentedRail(listOf(w["active"], w["archived"]), if (archived) 1 else 0, { archived = it == 1 })
+        }
         val meds=s.medications.filter{it.active!=archived}
         if(meds.isEmpty())item{Panel{EmptyState(w["no_meds"])}}
         items(meds,key={it.id}){med->
-            var details by remember{mutableStateOf(false)}
-            Panel{
+            var details by rememberSaveable { mutableStateOf(false) }
+            NasaqBoard(modifier = if (motion) Modifier.animateItem(
+                fadeInSpec = tween(260, 40), placementSpec = tween(440, easing = NasaqEase), fadeOutSpec = tween(150))
+                else Modifier) {
                 Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                    Surface(shape=RoundedCornerShape(15.dp),color=c.primaryContainer){Glyph("medication",Modifier.padding(12.dp).size(25.dp))}
+                    DomainMark("medication")
                     Column(Modifier.weight(1f)){Text(med.name,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold);Text(listOf(med.strength,med.dose).filter{it.isNotBlank()}.joinToString(" · "),style=MaterialTheme.typography.bodySmall,color=c.onSurfaceVariant)}
-                    IconButton(onClick={edit(med)}){Glyph("edit",Modifier.size(20.dp))}
+                    IconButton(onClick={edit(med)}, modifier = Modifier.semantics { contentDescription = w["edit"] }){Glyph("edit",Modifier.size(20.dp))}
                 }
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                     if(med.mode=="interval")StatusPill(w.f("hours_every","n" to number(med.intervalHours.toDouble(),w)))
@@ -102,7 +190,10 @@ import java.time.*
 }
 
 @Composable fun MetricTile(label:String,value:String,modifier:Modifier=Modifier,tone:Color=MaterialTheme.colorScheme.surfaceContainerLow){
-    Surface(modifier.height(90.dp),shape=RoundedCornerShape(18.dp),color=tone){Column(Modifier.padding(13.dp),verticalArrangement=Arrangement.SpaceBetween){Text(label,style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2);Text(value,style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,maxLines=1)}}
+    NasaqBoard(modifier.heightIn(min = 96.dp), color = tone) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+        Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+    }
 }
 
 @Composable fun Insights(s:State,add:(String)->Unit,export:(Int,String)->Unit){
@@ -112,19 +203,24 @@ import java.time.*
     val entries=s.entries.filter{it.time>=periodStart(days) && it.time<=System.currentTimeMillis()}
     val glucose=entries.filter{it.kind=="glucose" && (context=="all" || it.context==context)}
     val range=if(glucose.isEmpty())0.0 else glucose.count{mg(it) in p.lower..p.upper}*100.0/glucose.size
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),verticalArrangement=Arrangement.spacedBy(16.dp)){
         PageIntro(w["insights"],w["insights_subtitle"],"insights")
-        WeeklyInsights(s)
-        ChoiceRow(w["reading_filter"],listOf("all","fasting","not_fasting","before","after"),context,{w[it]}){context=it}
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(6.dp)){listOf(1,7,14,30).forEach{n->FilterChip(selected=days==n,onClick={days=n},label={Text(w[if(n==1)"today_only"else"last$n"])},shape=RoundedCornerShape(50),modifier=Modifier.weight(1f))}}
+        val periods = listOf(1, 7, 14, 30)
+        SegmentedRail(periods.map { w[if (it == 1) "today_only" else "last${it}"] }, periods.indexOf(days), { days = periods[it] })
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             MetricTile(w["average_short"],if(glucose.isEmpty())"—"else number(com.yawmi.diabetes.core.Planner.fromMg(glucose.map{mg(it)}.average(),p.unit),w,1),Modifier.weight(1f),c.primaryContainer.copy(alpha=.6f))
             MetricTile(w["readings"],number(glucose.size.toDouble(),w),Modifier.weight(1f))
         }
-        Panel{
-            SectionHeading(w["glucose_trend"]);Text(p.unit,style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
-            GlucoseChart(glucose,p)
+        NasaqBoard(color = c.primaryContainer, contentColor = c.onPrimaryContainer, outlined = false) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                SectionHeading(w["glucose_trend"])
+            }
+            Text(p.unit, style = MaterialTheme.typography.labelLarge)
+            GlucoseChart(glucose, p)
         }
+        NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
+            context, { w[it] }) { context = it } }
+        WeeklyInsights(s)
         Panel{
             SectionHeading(w["range_distribution"])
             if(glucose.isNotEmpty()){

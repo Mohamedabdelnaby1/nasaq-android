@@ -69,17 +69,41 @@ fun DayOverviewCard(s: State, summary: DayOverview, onOpen: (() -> Unit)? = null
     val unit = s.preferences.unit
     val readings = summary.glucoseValue(unit,w)?.let { it + " " + unit } ?: "—"
     val waterAverage = summary.waterAverageMl?.let { number(it / 1000, w, 2) + " " + w["litres_short"] } ?: "—"
-    Surface(shape = RoundedCornerShape(24.dp), color = c.surfaceContainerLow,
-        border = BorderStroke(1.dp, c.outlineVariant.copy(alpha = .6f))) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            SectionHeading(w["day_overview"], onOpen?.let { w["details"] }) { onOpen?.invoke() }
-            OverviewMetric("glucose", w["day_glucose_average"], readings, w.f("day_reading_count", "count" to number(summary.glucoseCount.toDouble(), w)))
-            HorizontalDivider(color = c.outlineVariant.copy(alpha = .5f))
-            OverviewMetric("water", w["water_today"], number(summary.waterMl / 1000, w, 2) + " " + w["litres_short"])
-            OverviewMetric("insights", w["day_water_average"], waterAverage, w.f("day_water_coverage", "count" to number(summary.waterDays.toDouble(), w)))
-            HorizontalDivider(color = c.outlineVariant.copy(alpha = .5f))
-            OverviewMetric("medication", w["doses_taken_today"], number(summary.takenDoses.toDouble(), w))
+    NasaqBoard {
+        SectionHeading(w["day_overview"], onOpen?.let { w["details"] }) { onOpen?.invoke() }
+        Surface(shape = ControlShape, color = c.primaryContainer, contentColor = c.onPrimaryContainer) {
+            Row(Modifier.fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Glyph("glucose", Modifier.size(23.dp), c.onPrimaryContainer)
+                Column(Modifier.weight(1f)) {
+                    Text(w["day_glucose_average"], style = MaterialTheme.typography.titleSmall)
+                    Text(w.f("day_reading_count", "count" to number(summary.glucoseCount.toDouble(), w)),
+                        style = MaterialTheme.typography.labelMedium)
+                }
+                Text(readings, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            }
         }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            val water = domainColors("water")
+            val medicine = domainColors("medication")
+            Surface(Modifier.weight(1f), shape = ControlShape, color = water.backdrop, contentColor = water.ink) {
+                Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Glyph("water", Modifier.size(18.dp), water.ink)
+                    Text(w["water_today"], style = MaterialTheme.typography.labelMedium)
+                    Text(number(summary.waterMl / 1000, w, 2) + " " + w["litres_short"],
+                        style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+            Surface(Modifier.weight(1f), shape = ControlShape, color = medicine.backdrop, contentColor = medicine.ink) {
+                Column(Modifier.padding(11.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                    Glyph("medication", Modifier.size(18.dp), medicine.ink)
+                    Text(w["doses_taken_today"], style = MaterialTheme.typography.labelMedium)
+                    Text(number(summary.takenDoses.toDouble(), w), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+        OverviewMetric("insights", w["day_water_average"], waterAverage,
+            w.f("day_water_coverage", "count" to number(summary.waterDays.toDouble(), w)))
     }
 }
 
@@ -113,13 +137,9 @@ fun DayOverviewScreen(s: State, onClose: () -> Unit) {
                 .padding(horizontal = 18.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                IconButton(onClick = onClose, modifier = Modifier.pressResponse().semantics { contentDescription = w["close"] }) {
+            ScreenTitle(w["day_detail_title"], dateText(now, w)) {
+                IconButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("back", Modifier.size(22.dp))
-                }
-                Column {
-                    Text(w["day_detail_title"], style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text(dateText(now, w), style = MaterialTheme.typography.bodySmall, color = c.onSurfaceVariant)
                 }
             }
             DayOverviewCard(s, summary)

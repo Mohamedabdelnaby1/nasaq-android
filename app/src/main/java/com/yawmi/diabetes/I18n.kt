@@ -44,6 +44,15 @@ setup_finish|افتح يومي|Open my day
 welcome_back|مساحتك اليومية|YOUR DAILY SPACE
 hero_empty|ابدأ بقراءة واحدة|Start with one reading
 hero_empty_body|بدون زحمة تفاصيل. سجل الرقم وسيحفظ وقته تلقائيًا.|No clutter. Enter a value; its time is recorded automatically.
+clear_search|امسح البحث|Clear search
+chart_explore|حرّك على الرسم عشان تشوف توقيت القراءة وقيمتها|Slide across the chart to inspect a reading
+record_short|سجّل|Record
+recorded_today|تسجيلات اليوم|Today's records
+water_week|متوسط آخر ٧ أيام|Last 7 days' average
+chart_current_point|قراءة {value} عند {time}|{value} at {time}
+jump_glucose|سجل السكر|Glucose history
+water_fill_cup|سجّل الكوب|Log a cup
+water_goal_progress|{percent}٪ من الهدف|{percent}% of goal
 add_reading|تسجيل قراءة السكر|Log glucose
 your_next_step|خطوتك القادمة|Your next step
 next_reminder|التذكير القادم|Next reminder
@@ -56,6 +65,8 @@ care_corner|ركن الرعاية|Care corner
 care_corner_body|خطة أيام المرض ومتى تطلب المساعدة|Sick-day guidance and when to seek help
 water_quick_title|وقفة مياه صغيرة|A little water break
 water_quick_subtitle|اختار الكمية اللي شربتها|Choose how much you drank
+water_increase|زود ٥٠ مل|Increase by 50 mL
+water_decrease|قلل ٥٠ مل|Decrease by 50 mL
 glucose_quick_title|سجل رقمك، وكمل يومك|Log your number, carry on
 glucose_quick_subtitle|القيمة فقط تكفي، والتفاصيل اختيارية|A value is enough. Details are optional
 water_record_button|شربت هذه الكمية|I drank this amount

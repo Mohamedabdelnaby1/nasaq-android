@@ -42,8 +42,8 @@ object WidgetArt {
         private val regular = Typeface.createFromAsset(context.assets, "fonts/tajawal_medium.ttf")
         private val bold = Typeface.createFromAsset(context.assets, "fonts/tajawal_bold.ttf")
         private val fontScale = when (look.font) { "compact" -> .9f; "large" -> 1.12f; else -> 1f }
-        private val daylight = 0xFFF8F6EF.toInt()
-        private val pine = 0xFF102D2A.toInt()
+        private val daylight = 0xFFF6FAEF.toInt()
+        private val pine = 0xFF152D2D.toInt()
         private val proposed = when (look.style) {
             "forest" -> pine
             "widget_midnight" -> 0xFF162137.toInt()
@@ -57,7 +57,7 @@ object WidgetArt {
         private val dark = ink == Color.WHITE
         private val muted = readable(mix(ink, .76f), background)
         private val rule = mix(ink, if (dark) .20f else .13f)
-        private val accent = parse(look.accent, if (dark) 0xFFC6E8A9.toInt() else 0xFF37634E.toInt())
+        private val accent = parse(look.accent, if (dark) 0xFFC6E8A9.toInt() else 0xFF275A45.toInt())
         private val aqua = if (dark) 0xFF9ADAE0.toInt() else 0xFF216975.toInt()
         private val visible = Widgets.valuesVisible(state.preferences.lock, look.visible)
         private val layout = WidgetLayout.calculate(width.toInt(), height.toInt(), look, rtl)

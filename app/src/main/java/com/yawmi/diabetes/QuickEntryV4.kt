@@ -13,6 +13,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.*
 import com.yawmi.diabetes.core.Planner
 
@@ -23,7 +25,14 @@ fun quickEntryError(raw:String,water:Boolean,unit:String,time:Long,now:Long=Syst
     return if(time<=0 || time>now+60000)"time_value_error"else null
 }
 
-@Composable fun QuickEntrySheet(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit,draft:Entry?=null){
+@Composable
+fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> Unit, onSave: (Entry) -> Unit, draft: Entry? = null) {
+    RecordingSheet(kind, onDismiss, {}) { current, close ->
+        QuickEntryContent(current, existing, s, onDismiss = { close(onDismiss) }, onSave = onSave, draft = draft)
+    }
+}
+
+@Composable internal fun QuickEntryContent(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit,draft:Entry?=null){
     val w=LocalWords.current;val p=s.preferences;val c=MaterialTheme.colorScheme;val water=kind=="water";val feedback=rememberFeedback()
     val initial=existing ?: draft
     val id=remember{initial?.id ?: java.util.UUID.randomUUID().toString()}
@@ -42,22 +51,27 @@ fun quickEntryError(raw:String,water:Boolean,unit:String,time:Long,now:Long=Syst
         val entry=Entry(id=id,kind=kind,time=time,value=Planner.parseNumber(value),unit=if(water)"mL"else unit,context=if(water)""else context,note=note,created=existing?.created ?: System.currentTimeMillis())
         if(!water && (mg(entry)<20 || mg(entry)>600))unusual=entry else onSave(entry)
     }
-    ModalBottomSheet(onDismissRequest=onDismiss,sheetState=rememberModalBottomSheetState(skipPartiallyExpanded=true),containerColor=c.background,shape=RoundedCornerShape(topStart=30.dp,topEnd=30.dp)){
         Column(Modifier.fillMaxWidth().heightIn(max=maxHeight).imePadding()){
             Column(Modifier.weight(1f,fill=false).fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal=24.dp).padding(bottom=8.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(12.dp)){
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
-                    Surface(shape=CircleShape,color=if(water)Aqua.copy(alpha=.15f)else c.primaryContainer){Glyph(kind,Modifier.padding(12.dp).size(24.dp),if(water)Aqua else c.primary)}
+                    DomainMark(kind)
                     Column(Modifier.weight(1f)){Text(w[if(water)"water_quick_title"else"glucose_quick_title"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);Text(w[if(water)"water_quick_subtitle"else"glucose_quick_subtitle"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)}
+                    IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                        Glyph("close", Modifier.size(20.dp), c.onSurfaceVariant)
+                    }
                 }
                 if(water){
-                    val amount=runCatching{Planner.parseNumber(value)}.getOrDefault(0.0)
-                    Surface(color=Aqua.copy(alpha=.09f),shape=RoundedCornerShape(26.dp),modifier=Modifier.fillMaxWidth()){
-                        Box(Modifier.padding(13.dp),contentAlignment=Alignment.Center){WaterVessel((amount/500).toFloat(),Modifier.size(83.dp,120.dp))}
+                    val amount=runCatching{Planner.parseNumber(value)}.getOrNull()?.takeIf(Double::isFinite) ?: 0.0
+                    Surface(color=c.tertiaryContainer, shape=BoardShape, modifier=Modifier.fillMaxWidth()){
+                        Box(Modifier.fillMaxWidth().padding(8.dp),contentAlignment=Alignment.Center) {
+                            Contours(Modifier.matchParentSize(), c.onTertiaryContainer)
+                            WaterGlass((amount / 500).toFloat(), Modifier.size(110.dp, 115.dp))
+                        }
                     }
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)){
-                        FilledTonalIconButton(onClick={value=(amount-50).coerceAtLeast(50.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp)){Text("−",fontSize=28.sp)}
+                        FilledTonalIconButton(onClick={value=(amount-50).coerceAtLeast(50.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_decrease"] }) { Glyph("minus", Modifier.size(22.dp)) }
                         Column(horizontalAlignment=Alignment.CenterHorizontally){AnimatedNumber(amount,style=MaterialTheme.typography.displaySmall);Text(w["ml"],style=MaterialTheme.typography.labelMedium)}
-                        FilledTonalIconButton(onClick={value=(amount+50).coerceAtMost(5000.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp)){Text("+",fontSize=26.sp)}
+                        FilledTonalIconButton(onClick={value=(amount+50).coerceAtMost(5000.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_increase"] }) { Glyph("plus", Modifier.size(22.dp)) }
                     }
                     FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf(150,250,500).forEach{n->FilterChip(selected=amount==n.toDouble(),onClick={value=n.toString();error=null;feedback()},label={Text(number(n.toDouble(),w)+" "+w["ml"])},shape=RoundedCornerShape(50))}}
                     if(last!=null)TextButton(onClick={value=last.toString();error=null;feedback()}){Text(w["last_water_amount"]+": "+number(last,w)+" "+w["ml"])}
@@ -79,11 +93,10 @@ fun quickEntryError(raw:String,water:Boolean,unit:String,time:Long,now:Long=Syst
                     Field(w["notes"],note,{note=it},multiline=true)
                 }}
             }
-            Surface(color=c.background){Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(top=8.dp,bottom=14.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                Button(onClick={save()},shape=RoundedCornerShape(16.dp),modifier=Modifier.fillMaxWidth().heightIn(min=54.dp).pressResponse()){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
+            Surface(color=c.surfaceContainerLow){Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(top=8.dp,bottom=14.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
+                Button(onClick={save()},shape=CircleShape,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
                 Text(w["recorded_now_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
             }}
         }
-    }
     unusual?.let{entry->AlertDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${entry.value} ${entry.unit}")},confirmButton={TextButton(onClick={unusual=null;onSave(entry)}){Text(w["confirm"])}},dismissButton={TextButton(onClick={unusual=null}){Text(w["cancel"])}})}
 }
