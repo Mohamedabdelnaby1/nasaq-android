@@ -107,7 +107,7 @@ forest|أخضر عميق|Deep forest
 cream|كريمي|Warm cream
 summary_widget|ويدجت مجمّع|Combined widget
 widget_pin|إضافة إلى الشاشة الرئيسية|Add to home screen
-widget_manual|اضغط مطولًا على الشاشة الرئيسية، ثم الويدجتس، واختر يومي.|Long press your home screen, open Widgets and choose Yawmi.
+widget_manual|اضغط مطولًا على الشاشة الرئيسية، ثم الويدجتس، واختر نَسَق.|Long press your home screen, open Widgets and choose Nasaq.
 integrations|يومي متصل بهاتفك|Connected to your phone
 shortcuts|اختصارات التسجيل|Logging shortcuts
 shortcuts_body|اضغط مطولًا على أيقونة التطبيق لتسجيل السكر أو المياه أو الوجبة مباشرة.|Long press the app icon to jump straight to glucose, water or meal logging.
@@ -341,7 +341,7 @@ posted|محاولة إظهار التنبيه|Notification posting attempted
 blocked|التنبيه محجوب أو لا يوجد إذن|Notification blocked or permission missing
 snoozed|تم تأجيل التذكير|Reminder snoozed
 snooze|تأجيل التذكير|Snooze reminder
-reminder_title|لديك تذكير من يومي|You have a Yawmi reminder
+reminder_title|لديك تذكير من نَسَق|You have a Nasaq reminder
 med_reminder|راجع جرعتك وسجلها إن تناولتها بالفعل|Review your dose and record it if already taken
 water_reminder|هل شربت سوائل؟ سجل ما شربته|Had any fluids? Record what you drank
 glucose_reminder|موعد قياس حسب خطتك المحفوظة|A glucose check from your saved plan
@@ -394,7 +394,7 @@ unlock|فتح التطبيق|Unlock app
 locked|بياناتك خلف قفل الجهاز|Your data is behind the device lock
 set_device_lock|فعّل قفلًا آمنًا للهاتف أولًا|Set a secure device screen lock first
 local_privacy|تُحفظ بياناتك مشفرة على هذا الجهاز. لا حساب ولا إعلانات ولا اتصال بالإنترنت. التصدير اختياري بقرارك.|Your data is stored encrypted on this device. No account, ads or internet connection. Exports are initiated by you.
-about|عن يومي|About Yawmi
+about|عن نَسَق|About Nasaq
 medical_notice|أداة للتسجيل والتنظيم. ليست جهاز قياس أو تشخيصًا أو بديلًا للطبيب. لا تعدّل علاجك اعتمادًا عليها.|A logging and organisation tool, not a measuring device, diagnosis or replacement for clinical care. Do not change treatment based on it.
 sources|مصادر المعلومات الصحية|Health information sources
 welcome|أهلًا بك في نَسَق|Welcome to Nasaq
@@ -512,7 +512,7 @@ corner_radius|استدارة الزوايا|Corner radius
 invalid_colour|راجع كود اللون، مثل ‎#185446، واختر قسمًا واحدًا على الأقل.|Check the colour code, such as #185446, and keep at least one section.
 reorder|إعادة ترتيب|Reorder
 move_down|تحريك لأسفل|Move down
-assistant_title|مساعد يومي|Yawmi assistant
+assistant_title|مساعد نَسَق|Nasaq assistant
 assistant_subtitle|سجّل أو ابحث في سجلك بالكتابة أو بالصوت|Log an entry or search your journal by typing or speaking
 assistant_prompt|اكتب طلبك|Type your request
 assistant_examples|مثال: شربت نص لتر، أو اعرض قياسات الصيام الأسبوع ده|Try “I drank half a liter” or “show fasting readings this week”
@@ -611,7 +611,7 @@ plan_from_prescription|خطتك كما وصفها الطبيب|Your plan, as pre
 journal_subtitle|تفاصيل يومك، في مكان واحد|Your day, all in one place
 medicines_subtitle|جدول واضح وروتين أسهل|A clear schedule. An easier routine.
 insights_subtitle|صورة أوضح من تسجيلاتك|A clearer view of your records
-settings_subtitle|تجربة على مقاس يومك|Make Yawmi feel like you
+settings_subtitle|تجربة على مقاس يومك|Make Nasaq feel like you
 care_overview|نظرة على روتينك|Your care at a glance
 glucose_overview|ملخص القياسات|Glucose overview
 reading_average|متوسط القراءات|Reading average

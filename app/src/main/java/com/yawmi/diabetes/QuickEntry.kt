@@ -40,11 +40,13 @@ internal fun RecordingSheet(
         sheetState = sheet,
         containerColor = colors.surfaceContainerLow,
         scrimColor = Color.Black.copy(alpha = .26f),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 23.dp),
+        tonalElevation = 0.dp
     ) {
         if (motion) AnimatedContent(page, transitionSpec = {
-            (fadeIn(tween(270,100)) + slideInVertically(tween(580,easing=NasaqEase)) { it / 6 } togetherWith
-                fadeOut(tween(185))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
+            (fadeIn(tween(270,65)) + slideInVertically(tween(540,easing=NasaqEase)) { it / 4 } +
+                scaleIn(tween(540,easing=NasaqEase), initialScale = .93f) togetherWith
+                (fadeOut(tween(190)) + scaleOut(tween(285), targetScale = .93f))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
         }, label = "quick-record-page") { current ->
             if (current == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater) { kind ->
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
@@ -70,13 +72,17 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            ScreenTitle(w["quick_add"]) { DomainMark("plus") }
+            SectionBanner("today", w["quick_add"])
             if (state != null && onQuickWater != null) {
                 val amount = number(state.preferences.cup.toDouble(), w)
-                Button(onClick = onQuickWater, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Glyph("water", Modifier.size(19.dp), c.onPrimary)
-                    Spacer(Modifier.width(8.dp))
+                val water = domainColors("water")
+                ActionButton(onClick = onQuickWater, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = water.backdrop, contentColor = water.ink)) {
+                    Glyph("water", Modifier.size(20.dp), water.ink)
+                    Spacer(Modifier.width(9.dp))
                     Text(w.f("quick_log_cup", "amount" to amount))
+                    Spacer(Modifier.weight(1f))
+                    Glyph("plus", Modifier.size(18.dp), water.ink)
                 }
             }
             if (state != null && onDraft != null) {
@@ -88,7 +94,7 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
                         NasaqBoard {
                             Text(w[draft.entry.kind] + " · " + entryTitle(draft.entry, state, w),
                                 style = MaterialTheme.typography.titleMedium)
-                            Button(onClick = { onDraft(draft.entry) }) { Text(w["assistant_edit_draft"]) }
+                            ActionButton(onClick = { onDraft(draft.entry) }) { Text(w["assistant_edit_draft"]) }
                         }
                     }
                 }
@@ -99,7 +105,7 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
                                 label = { Text(w.f("habit_water", "amount" to number(amount, w, 2))) })
                             Text(w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w)),
                                 style = MaterialTheme.typography.bodySmall)
-                            if (onHideWater != null) TextButton(onClick = { onHideWater(amount) }) { Text(w["hide_suggestion"]) }
+                            if (onHideWater != null) TextAction(onClick = { onHideWater(amount) }) { Text(w["hide_suggestion"]) }
                         }
                     }
                 }
@@ -119,20 +125,21 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
             }
             FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
                 (habits?.actions ?: journalActions).forEach { kind ->
-                    val tone = when (kind) {
-                        "water" -> c.tertiaryContainer
-                        "meal" -> c.secondaryContainer
-                        else -> c.primaryContainer
-                    }
+                    val tone = domainColors(kind)
                     Surface(
-                        onClick = { chooseAction(kind) }, shape = RoundedCornerShape(18.dp),
-                        color = tone, modifier = Modifier.weight(1f)
+                        onClick = { chooseAction(kind) }, shape = BoardShape,
+                        color = tone.backdrop, contentColor = tone.ink, modifier = Modifier.weight(1f)
                     ) {
-                        Row(Modifier.padding(horizontal = 10.dp, vertical = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Surface(shape = RoundedCornerShape(12.dp), color = tone) {
-                                Glyph(kind, Modifier.padding(8.dp).size(20.dp), if (kind == "water") c.onTertiaryContainer else c.onPrimaryContainer)
+                        Box {
+                            SectionArt(kind, Modifier.matchParentSize(), tone.ink)
+                            Column(Modifier.fillMaxWidth().heightIn(min = 80.dp).padding(11.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                    Glyph(kind, Modifier.size(24.dp), tone.ink)
+                                    Glyph("arrow", Modifier.size(15.dp), tone.ink)
+                                }
+                                Text(w[kind], style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                             }
-                            Text(w[kind], Modifier.weight(1f), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

@@ -56,7 +56,7 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
                 Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
                     DomainMark(kind)
                     Column(Modifier.weight(1f)){Text(w[if(water)"water_quick_title"else"glucose_quick_title"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold);Text(w[if(water)"water_quick_subtitle"else"glucose_quick_subtitle"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)}
-                    IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                    IconAction(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                         Glyph("close", Modifier.size(20.dp), c.onSurfaceVariant)
                     }
                 }
@@ -69,20 +69,20 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
                         }
                     }
                     Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(24.dp)){
-                        FilledTonalIconButton(onClick={value=(amount-50).coerceAtLeast(50.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_decrease"] }) { Glyph("minus", Modifier.size(22.dp)) }
+                        IconAction(onClick={value=(amount-50).coerceAtLeast(50.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_decrease"] }) { Glyph("minus", Modifier.size(22.dp)) }
                         Column(horizontalAlignment=Alignment.CenterHorizontally){AnimatedNumber(amount,style=MaterialTheme.typography.displaySmall);Text(w["ml"],style=MaterialTheme.typography.labelMedium)}
-                        FilledTonalIconButton(onClick={value=(amount+50).coerceAtMost(5000.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_increase"] }) { Glyph("plus", Modifier.size(22.dp)) }
+                        IconAction(onClick={value=(amount+50).coerceAtMost(5000.0).toInt().toString();error=null;feedback()},modifier=Modifier.size(48.dp).semantics { contentDescription = w["water_increase"] }) { Glyph("plus", Modifier.size(22.dp)) }
                     }
-                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf(150,250,500).forEach{n->FilterChip(selected=amount==n.toDouble(),onClick={value=n.toString();error=null;feedback()},label={Text(number(n.toDouble(),w)+" "+w["ml"])},shape=RoundedCornerShape(50))}}
-                    if(last!=null)TextButton(onClick={value=last.toString();error=null;feedback()}){Text(w["last_water_amount"]+": "+number(last,w)+" "+w["ml"])}
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){listOf(150,250,500).forEach{n->ChoiceChip(selected=amount==n.toDouble(),onClick={value=n.toString();error=null;feedback()},label={Text(number(n.toDouble(),w)+" "+w["ml"])},shape=RoundedCornerShape(50))}}
+                    if(last!=null)TextAction(onClick={value=last.toString();error=null;feedback()}){Text(w["last_water_amount"]+": "+number(last,w)+" "+w["ml"])}
                     if(error!=null && error!="time_value_error")Text(w[error!!],color=c.error,style=MaterialTheme.typography.bodySmall)
                 }else{
                     OutlinedTextField(value=value,onValueChange={if(it.length<=8)value=it;error=null},label={Text(w["glucose"])},singleLine=true,isError=error!=null && error!="time_value_error",
                         supportingText=if(error!=null && error!="time_value_error"){{Text(w[error!!])}}else null,
                         textStyle=MaterialTheme.typography.displayMedium.copy(textAlign=TextAlign.Center,fontWeight=FontWeight.Bold),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),suffix={Text(unit)},shape=RoundedCornerShape(22.dp),modifier=Modifier.fillMaxWidth())
-                    FlowRow(horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("fasting","not_fasting","before","after","other").forEach{key->FilterChip(selected=context==key,onClick={context=key;feedback()},label={Text(w[key])},shape=RoundedCornerShape(50))}}
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("fasting","not_fasting","before","after","other").forEach{key->ChoiceChip(selected=context==key,onClick={context=key;feedback()},label={Text(w[key])},shape=RoundedCornerShape(50))}}
                 }
-                TextButton(onClick={details=!details}){Text(w[if(details)"less"else"optional_short"])}
+                TextAction(onClick={details=!details}){Text(w[if(details)"less"else"optional_short"])}
                 MotionExpand(details){Column(verticalArrangement=Arrangement.spacedBy(12.dp)){
                     if(water)Field(w["water_amount"],value,{value=it;error=null},true)
                     else ChoiceRow(w["unit"],listOf("mg/dL","mmol/L"),unit,{it}){selected->
@@ -94,9 +94,9 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
                 }}
             }
             Surface(color=c.surfaceContainerLow){Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(top=8.dp,bottom=14.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                Button(onClick={save()},shape=CircleShape,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
+                ActionButton(onClick={save()},shape=CircleShape,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
                 Text(w["recorded_now_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
             }}
         }
-    unusual?.let{entry->AlertDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${entry.value} ${entry.unit}")},confirmButton={TextButton(onClick={unusual=null;onSave(entry)}){Text(w["confirm"])}},dismissButton={TextButton(onClick={unusual=null}){Text(w["cancel"])}})}
+    unusual?.let{entry->BrandedDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${entry.value} ${entry.unit}")},confirmButton={TextAction(onClick={unusual=null;onSave(entry)}){Text(w["confirm"])}},dismissButton={TextAction(onClick={unusual=null}){Text(w["cancel"])}})}
 }

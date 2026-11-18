@@ -57,15 +57,15 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
         else if(kind=="audit"){audit=true;edit=null}
         else PreferencesEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null})
     }
-    if(medications)AlertDialog(onDismissRequest={medications=false},title={Text(w["medications"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+    if(medications)BrandedDialog(onDismissRequest={medications=false},title={Text(w["medications"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
         if(s.medications.isEmpty())Text(w["no_meds"])
-        s.medications.forEach{m->TextButton(onClick={med=m;medications=false}){Text(m.name)}}
-    }},confirmButton={TextButton(onClick={medications=false}){Text(w["close"])}})
+        s.medications.forEach{m->TextAction(onClick={med=m;medications=false}){Text(m.name)}}
+    }},confirmButton={TextAction(onClick={medications=false}){Text(w["close"])}})
     med?.let{m->MedicationEditor(m,s.preferences,{med=null},{repo.put(it);med=null})}
-    if(audit)AlertDialog(onDismissRequest={audit=false},title={Text(w["notification_log"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)){
+    if(audit)BrandedDialog(onDismissRequest={audit=false},title={Text(w["notification_log"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)){
         if(s.audit.isEmpty())Text(w["no_audit"])
         s.audit.takeLast(20).reversed().forEach{a->Text(dateText(a.time,w)+" "+timeText(a.time,w)+" · "+w[if(a.kind=="medication")"medication"else a.kind]+" · "+w[a.status],style=MaterialTheme.typography.bodySmall)}
-    }},confirmButton={TextButton(onClick={audit=false}){Text(w["close"])}})
+    }},confirmButton={TextAction(onClick={audit=false}){Text(w["close"])}})
 }
 
 @Composable fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
@@ -83,7 +83,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
                 ReadinessTile(w["permission"],allowed,Modifier.weight(1f),permission)
                 ReadinessTile(w["exact"],precise,Modifier.weight(1f),exact)
             }
-            Button(onClick=test,colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),shape=RoundedCornerShape(13.dp),modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}
+            ActionButton(onClick=test,colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),shape=RoundedCornerShape(13.dp),modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}
         }}}
         NasaqBoard {
             SectionHeading(w["reminder_status"])
@@ -119,9 +119,9 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
         if(suggestion!=null || s.preferences.waterOffset>0)Panel(w["adaptive_water"]){
             if(suggestion!=null){
                 Text(w.f("water_pattern","time" to clockText(suggestion.time, w),"days" to number(suggestion.respondingDays.toDouble(),w)))
-                FilledTonalButton(onClick=onApply){Text(w["apply_water_time"])}
+                TonalAction(onClick=onApply){Text(w["apply_water_time"])}
             }
-            if(s.preferences.waterOffset>0)TextButton(onClick=onReset){Text(w["reset_water_time"])}
+            if(s.preferences.waterOffset>0)TextAction(onClick=onReset){Text(w["reset_water_time"])}
         }
         SectionHeading(w["day_timeline"],w["sleep_card"]){edit("quiet")}
         Panel{
@@ -178,7 +178,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     }){
         Toggle(w["enabled"],enabled){enabled=it}
         Text(w["reminder_days"],style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-        FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){(1..7).forEach{day->FilterChip(selected=day in days,onClick={days=if(day in days)days-day else days+day},label={Text(w[dayKey(day)])},shape=RoundedCornerShape(50))}}
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){(1..7).forEach{day->ChoiceChip(selected=day in days,onClick={days=if(day in days)days-day else days+day},label={Text(w[dayKey(day)])},shape=RoundedCornerShape(50))}}
         if(water){
             Toggle(w["smart_water_reminders"],smart,w["smart_water_hint"]){smart=it}
             Field(w["daily_litres"],litres,{litres=it;invalid=false},true)
@@ -190,7 +190,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             Toggle(w["after_meal_reminders"],after){after=it}
             if(after)Field(w["minutes"],delay,{delay=it;invalid=false},true)
         }
-        Panel{SettingsRow("bell",w["channel"],w["notification_sound_note"],channel);OutlinedButton(onClick=test,modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}}
+        Panel{SettingsRow("bell",w["channel"],w["notification_sound_note"],channel);OutlineAction(onClick=test,modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}}
         if(invalid)Notice(w["schedule_error"],true)
         Text(w["policy_shared_hint"],style=MaterialTheme.typography.bodySmall)
     }

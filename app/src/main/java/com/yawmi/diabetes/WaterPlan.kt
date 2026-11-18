@@ -138,9 +138,9 @@ fun waterPortions(entries:List<Entry>,goal:Int,cup:Int,day:LocalDate=LocalDate.n
             }
         }
         if(cups.size>15)Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
-            TextButton(onClick={page--},enabled=page>0){Text(w["back"])}
+            TextAction(onClick={page--},enabled=page>0){Text(w["back"])}
             Text("${page+1} / ${(cups.size+14)/15}",style=MaterialTheme.typography.labelSmall)
-            TextButton(onClick={page++},enabled=(page+1)*15<cups.size){Text(w["next"])}
+            TextAction(onClick={page++},enabled=(page+1)*15<cups.size){Text(w["next"])}
         }
     }
 }

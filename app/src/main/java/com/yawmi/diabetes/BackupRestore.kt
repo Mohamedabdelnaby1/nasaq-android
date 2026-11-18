@@ -57,7 +57,7 @@ internal fun BackupRestoreReview(current: State, backup: State, recovery: Boolea
     var useSettings by remember(backup) { mutableStateOf(current.entries.isEmpty() && current.medications.isEmpty() && current.care.items.isEmpty()) }
     val preview = remember(current, backup, useSettings) { prepareRestore(current, backup, useSettings) }
     val acceptable = remember(preview) { runCatching { Codec.validate(preview.state) }.isSuccess }
-    AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(w["restore_preview"]) }, text = {
+    BrandedDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(w["restore_preview"]) }, text = {
         Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(9.dp)) {
             val n = preview.counts
             Text(w.f("restore_added", "entries" to number(n.entries.toDouble(), w),
@@ -70,6 +70,6 @@ internal fun BackupRestoreReview(current: State, backup: State, recovery: Boolea
             if (!acceptable) Text(w["restore_limit"], color = MaterialTheme.colorScheme.error)
         }
     }, confirmButton = {
-        Button(onClick = { onRestore(useSettings, preview.counts) }, enabled = acceptable && !busy) { Text(w["restore_confirm"]) }
-    }, dismissButton = { TextButton(onDismiss, enabled = !busy) { Text(w["cancel"]) } })
+        ActionButton(onClick = { onRestore(useSettings, preview.counts) }, enabled = acceptable && !busy) { Text(w["restore_confirm"]) }
+    }, dismissButton = { TextAction(onDismiss, enabled = !busy) { Text(w["cancel"]) } })
 }

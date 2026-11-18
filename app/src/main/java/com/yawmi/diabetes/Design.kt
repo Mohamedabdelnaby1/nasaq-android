@@ -30,7 +30,7 @@ val Aqua=Color(0xFF519BA3)
 @Composable fun SectionHeading(title:String,action:String?=null,onAction:()->Unit={}){
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.SpaceBetween){
         Text(title,Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-        if(action!=null)TextButton(onClick=onAction,contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp),modifier=Modifier.heightIn(min=40.dp)){Text(action,style=MaterialTheme.typography.labelMedium)}
+        if(action!=null)TextAction(onClick=onAction,contentPadding=PaddingValues(horizontal=4.dp,vertical=0.dp),modifier=Modifier.heightIn(min=40.dp)){Text(action,style=MaterialTheme.typography.labelMedium)}
     }
 }
 
@@ -54,73 +54,87 @@ val Aqua=Color(0xFF519BA3)
 }
 
 @Composable fun PageIntro(title: String, subtitle: String, kind: String) {
-    ScreenTitle(title, subtitle) { DomainMark(kind) }
+    SectionBanner(kind, title, subtitle)
 }
 
-@Composable fun AppChrome(tab:String,p:Preferences,onTab:(String)->Unit,onQuick:()->Unit,notifications:()->Unit,snackbar:SnackbarHostState=remember{SnackbarHostState()},showBottomBar:Boolean=true,content:@Composable (PaddingValues)->Unit){
-    val w=LocalWords.current;val c=MaterialTheme.colorScheme
-    Scaffold(containerColor=c.background,snackbarHost={SnackbarHost(snackbar){data->
-        Snackbar(containerColor=LocalBrand.current,contentColor=Color.White,shape=RoundedCornerShape(18.dp),modifier=Modifier.padding(horizontal=14.dp),
-            action={data.visuals.actionLabel?.let{label->TextButton(onClick={data.performAction()},colors=ButtonDefaults.textButtonColors(contentColor=Gold)){Text(label,fontWeight=FontWeight.Bold)}}},
-            dismissAction={if(data.visuals.withDismissAction)IconButton(onClick={data.dismiss()},modifier=Modifier.semantics{contentDescription=w["close"]}){Glyph("close",Modifier.size(17.dp),Color.White)}}){
-            Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(9.dp)){Glyph("check",Modifier.size(20.dp),Gold);Text(data.visuals.message,style=MaterialTheme.typography.bodyMedium)}
-        }
-    }},topBar = {
-        Column(Modifier.fillMaxWidth().statusBarsPadding().background(c.surfaceContainerLow)) {
-            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 14.dp, top = 7.dp, bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(34.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(w["app"], style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                }
-                IconButton(onClick = notifications, modifier = Modifier.semantics { contentDescription = w["notifications"] }) {
-                    Glyph("bell", Modifier.size(21.dp))
-                }
-                Surface(onClick = onQuick, color = c.secondaryContainer, contentColor = c.onSecondaryContainer, shape = ControlShape,
-                    modifier = Modifier.semantics { contentDescription = w["quick_add"] }) {
-                    Box(Modifier.defaultMinSize(minWidth = 72.dp, minHeight = 44.dp).padding(horizontal = 10.dp),
-                        contentAlignment = Alignment.Center) {
-                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Glyph("plus", Modifier.size(17.dp), c.onSecondaryContainer)
-                            Text(w["record_short"], style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
-                        }
+@Composable
+fun AppChrome(
+    tab: String, p: Preferences, onTab: (String) -> Unit, onQuick: () -> Unit, notifications: () -> Unit,
+    snackbar: SnackbarHostState = remember { SnackbarHostState() }, showBottomBar: Boolean = true,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    val w = LocalWords.current
+    val c = MaterialTheme.colorScheme
+    val motion = LocalMotion.current && !p.reduceMotion
+    val active = sectionGroup(tab)
+    val dock = Color(0xFF162F2A)
+    val accent = Color(0xFFD8F479)
+    Scaffold(containerColor = c.background, snackbarHost = {
+        SnackbarHost(snackbar) { data ->
+            Snackbar(containerColor = dock, contentColor = Color.White, shape = ControlShape,
+                modifier = Modifier.padding(horizontal = 14.dp),
+                action = { data.visuals.actionLabel?.let { label ->
+                    TextAction({ data.performAction() }, colors = ButtonDefaults.textButtonColors(contentColor = accent)) { Text(label) }
+                } },
+                dismissAction = { if (data.visuals.withDismissAction)
+                    IconAction({ data.dismiss() }, Modifier.semantics { contentDescription = w["close"] }) {
+                        Glyph("close", Modifier.size(17.dp), Color.White)
                     }
-                }
+                }) {
+                Text(data.visuals.message, style = MaterialTheme.typography.bodyMedium)
             }
-            HorizontalDivider(color = c.outlineVariant)
         }
-    },bottomBar={
-        if (showBottomBar) Surface(color=c.surfaceContainerLow) {
-            Column(Modifier.navigationBarsPadding()) {
-                HorizontalDivider(color=c.outlineVariant)
-                BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal=9.dp, vertical=8.dp)) {
-                    val cellWidth = maxWidth / mainSections.size
-                    val destination = sectionGroup(tab)
-                    val motion = LocalMotion.current && !p.reduceMotion
-                    val position by animateDpAsState(
-                        cellWidth * (mainSections.indexOf(destination).coerceAtLeast(0) + .5f) - 22.dp,
-                        if (motion) tween(520, easing=NasaqEase) else snap(), label="navigation-indicator"
-                    )
-                    Box(Modifier.offset(x=position, y=1.dp).size(44.dp, 30.dp).background(c.primary, ControlShape))
+    }, topBar = {
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 18.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(33.dp))
+            Text(w["app"], Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            IconAction(notifications, Modifier.semantics { contentDescription = w["notifications"] }) {
+                Glyph("bell", Modifier.size(20.dp), c.onSurface)
+            }
+            if (!showBottomBar) ActionButton(onQuick, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = dock)) {
+                Glyph("plus", Modifier.size(17.dp), dock)
+                Spacer(Modifier.width(7.dp))
+                Text(w["record_short"])
+            }
+        }
+    }, bottomBar = {
+        if (showBottomBar) Row(
+            Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 10.dp, end = 10.dp, top = 6.dp, bottom = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)
+        ) {
+            Surface(Modifier.weight(1f), shape = BoardShape, color = dock, contentColor = Color.White) {
+                BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp)) {
+                    val cell = maxWidth / mainSections.size
+                    val position by animateDpAsState(cell * mainSections.indexOf(active).coerceAtLeast(0),
+                        if (motion) tween(495, easing = NasaqEase) else snap(), label = "dock position")
+                    Box(Modifier.offset(x = position).width(cell).height(49.dp).padding(horizontal = 2.dp)
+                        .background(accent, ControlShape))
                     Row(Modifier.fillMaxWidth().selectableGroup()) {
                         mainSections.forEach { section ->
-                            val selected = section == destination
-                            val ink by animateColorAsState(if(selected)c.onPrimary else c.onSurfaceVariant,
-                                if(motion)tween(230)else snap(),label="navigation-ink")
-                            Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp))
-                                .selectable(selected=selected,role=Role.Tab,onClick={onTab(section)})
-                                .heightIn(min=49.dp).padding(top=5.dp, bottom=3.dp),
-                                horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(7.dp)) {
-                                Glyph(section,Modifier.size(20.dp),ink)
-                                Text(w[section],style=MaterialTheme.typography.labelSmall,color=if(selected)c.primary else c.onSurfaceVariant,
-                                    fontWeight=if(selected)FontWeight.Bold else FontWeight.Normal,maxLines=1,overflow=TextOverflow.Ellipsis)
+                            val selected = section == active
+                            val ink by animateColorAsState(if (selected) dock else Color(0xFFE4EEE6),
+                                if (motion) tween(210) else snap(), label = "dock ink")
+                            Column(Modifier.weight(1f).heightIn(min = 49.dp).clip(ControlShape)
+                                .selectable(selected, role = Role.Tab, onClick = { onTab(section) }).padding(vertical = 6.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                Glyph(section, Modifier.size(19.dp), ink)
+                                Text(w[section], style = MaterialTheme.typography.labelSmall, color = ink,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
                             }
                         }
                     }
                 }
             }
+            Surface(onClick = onQuick, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 15.dp, bottomStart = 15.dp, bottomEnd = 20.dp),
+                color = accent, contentColor = dock,
+                modifier = Modifier.size(52.dp).semantics { contentDescription = w["quick_add"] }) {
+                Box(contentAlignment = Alignment.Center) { Glyph("plus", Modifier.size(25.dp), dock) }
+            }
         }
-    },content=content)
+    }, content = content)
 }
 
 @Composable fun SettingsRow(kind:String,title:String,subtitle:String?=null,onClick:()->Unit){

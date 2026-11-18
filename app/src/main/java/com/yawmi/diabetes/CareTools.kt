@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)){
             kinds.forEach{kind->
                 val now=System.currentTimeMillis()
-                FilledTonalButton(onClick={
+                TonalAction(onClick={
                     editing=CareItem(kind=kind,title=if(kind=="sleep")w["actual_sleep"]else"",
                         time=if(kind=="question")0 else if(kind=="sleep")now-8*3_600_000L else now+3_600_000L,
                         end=if(kind=="sleep")now else 0,alert=kind in setOf("visit","lab","refill"))
@@ -29,7 +29,7 @@ import androidx.compose.ui.unit.dp
         if(lowStock.isNotEmpty())Panel(w["refill"]){
             lowStock.forEach{med->
                 Text(med.name+" · "+w["stock"]+" "+number(med.stock.toDouble(),w),fontWeight=FontWeight.Medium)
-                OutlinedButton(onClick={editing=CareItem(kind="refill",title=med.name,time=System.currentTimeMillis()+3600000,alert=true)}){Text(w["plan_refill"])}
+                OutlineAction(onClick={editing=CareItem(kind="refill",title=med.name,time=System.currentTimeMillis()+3600000,alert=true)}){Text(w["plan_refill"])}
             }
         }
         kinds.forEach{kind->
@@ -43,9 +43,9 @@ import androidx.compose.ui.unit.dp
                     }
                     if(item.alert && !item.done)Text(w["care_alert"],style=MaterialTheme.typography.labelSmall)
                     FlowRow(horizontalArrangement=Arrangement.spacedBy(4.dp)){
-                        if(kind!="sleep")TextButton(onClick={onChange{state->state.copy(care=state.care.copy(items=state.care.items.map{if(it.id==item.id)it.copy(done=!it.done)else it}))}}){Text(w[if(item.done)"reopen_item"else"mark_done"])}
-                        TextButton(onClick={editing=item}){Text(w["edit"])}
-                        TextButton(onClick={removing=item}){Text(w["delete"])}
+                        if(kind!="sleep")TextAction(onClick={onChange{state->state.copy(care=state.care.copy(items=state.care.items.map{if(it.id==item.id)it.copy(done=!it.done)else it}))}}){Text(w[if(item.done)"reopen_item"else"mark_done"])}
+                        TextAction(onClick={editing=item}){Text(w["edit"])}
+                        TextAction(onClick={removing=item}){Text(w["delete"])}
                     }
                     HorizontalDivider()
                 }
@@ -59,9 +59,9 @@ import androidx.compose.ui.unit.dp
             editing=null
         })
     }
-    removing?.let{item->AlertDialog(onDismissRequest={removing=null},title={Text(w["delete"])},text={Text(item.title)},
-        confirmButton={TextButton(onClick={onChange{state->state.copy(care=state.care.copy(items=state.care.items.filterNot{it.id==item.id}))};removing=null}){Text(w["delete"])}},
-        dismissButton={TextButton(onClick={removing=null}){Text(w["cancel"])}})}
+    removing?.let{item->BrandedDialog(onDismissRequest={removing=null},title={Text(w["delete"])},text={Text(item.title)},
+        confirmButton={TextAction(onClick={onChange{state->state.copy(care=state.care.copy(items=state.care.items.filterNot{it.id==item.id}))};removing=null}){Text(w["delete"])}},
+        dismissButton={TextAction(onClick={removing=null}){Text(w["cancel"])}})}
 }
 
 @Composable private fun CareItemEditor(item:CareItem,onClose:()->Unit,onSave:(CareItem)->Unit){

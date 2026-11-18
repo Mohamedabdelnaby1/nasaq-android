@@ -16,16 +16,22 @@ import java.time.ZoneId
     val s=repo.state;val p=s.preferences;val w=LocalWords.current
     var layoutEditor by remember{mutableStateOf(false)}
     var edit by remember {mutableStateOf<String?>(null)}
-    var notificationExpanded by remember {mutableStateOf(false)}
-    LaunchedEffect(activity.openNotifications) {if(activity.openNotifications){notificationExpanded=true;activity.openNotifications=false}}
-    var auditExpanded by remember {mutableStateOf(false)}
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),verticalArrangement=Arrangement.spacedBy(18.dp)) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+        val header = when (section) {
+            "appearance" -> "insights"
+            "personal" -> "glucose"
+            "home_cards" -> "log"
+            "privacy" -> "shield"
+            "backup" -> "export"
+            else -> "settings"
+        }
+        if (section != "integrations") SectionBanner(header, w[section])
         if(p.lastZone!=ZoneId.systemDefault().id) Panel(w["travel_hint"]) {
             Text(w["interval_travel"],style=MaterialTheme.typography.bodySmall)
-            Button(onClick={repo.preferences{it.copy(lastZone=ZoneId.systemDefault().id)}}){Text(w["acknowledge"])}
+            ActionButton(onClick={repo.preferences{it.copy(lastZone=ZoneId.systemDefault().id)}}){Text(w["acknowledge"])}
         }
         if(section=="integrations")IntegrationPanel(repo,activity)
-        if(section=="appearance")Panel(w["appearance"]) {
+        if(section=="appearance")Panel() {
             ChoiceRow(w["language"],listOf("system","ar","en"),p.language,{when(it){"ar"->"العربية";"en"->"English";else->w["system"]}}){choice->repo.preferences{it.copy(language=choice)}}
             ChoiceRow(w["theme"],listOf("system","light","dark"),p.theme,{w[it]}){choice->repo.preferences{it.copy(theme=choice)}}
             ChoiceRow(w["palette"],listOf("mint","violet","coral","blue"),p.palette,{w[it]}){choice->repo.preferences{it.copy(palette=choice,dynamicColors=false)}}
@@ -35,14 +41,14 @@ import java.time.ZoneId
             Toggle(w["adaptive_actions"], p.adaptive, w["adaptive_actions_body"]) { value -> repo.preferences { it.copy(adaptive = value) } }
             ChoiceRow(w["pin_shortcut"], listOf("") + journalActions, p.pinnedShortcut,
                 { w[if (it.isBlank()) "none" else it] }) { key -> repo.preferences { it.copy(pinnedShortcut = key) } }
-            TextButton(onClick = { repo.preferences { it.copy(adaptiveSince = System.currentTimeMillis(),
+            TextAction(onClick = { repo.preferences { it.copy(adaptiveSince = System.currentTimeMillis(),
                 pinnedShortcut = "", ignoredWaterAmounts = emptySet()) } }) { Text(w["reset_adaptation"]) }
             Toggle(w["haptics"],p.haptics,w["haptics_hint"]){v->repo.preferences{it.copy(haptics=v)}}
-            TextButton(onClick={repo.preferences {it.copy(theme="system",palette="mint",dynamicColors=false,largeText=false,reduceMotion=false)}}){Text(w["reset_appearance"])}
+            TextAction(onClick={repo.preferences {it.copy(theme="system",palette="mint",dynamicColors=false,largeText=false,reduceMotion=false)}}){Text(w["reset_appearance"])}
             Text(w["reset_appearance_hint"],style=MaterialTheme.typography.bodySmall)
         }
-        if(section=="home_cards")Panel(w["home_cards"]){HomeLayoutPreview(s);Button(onClick={layoutEditor=true},modifier=Modifier.fillMaxWidth()){Text(w["customise"])}}
-        if(section=="personal")Panel(w["personal"]) {
+        if(section=="home_cards")Panel(w["home_cards"]){HomeLayoutPreview(s);ActionButton(onClick={layoutEditor=true},modifier=Modifier.fillMaxWidth()){Text(w["customise"])}}
+        if(section=="personal")Panel() {
             SettingsLink(w["your_name"]){edit="personal"}
             SettingsLink(w["targets"]){edit="targets"}
             SettingsLink(w["daily_litres"]){edit="water"}
@@ -50,25 +56,25 @@ import java.time.ZoneId
             SettingsLink(w["sick_days"]){edit="sick"}
             ChoiceRow(w["unit"],listOf("mg/dL","mmol/L"),p.unit,{it}){choice->repo.preferences{it.copy(unit=choice)}}
         }
-        if(section=="privacy")Panel(w["privacy"]) {
+        if(section=="privacy")Panel() {
             Text(w["local_privacy"],style=MaterialTheme.typography.bodyMedium)
             Toggle(w["lock_app"],p.lock,w["lock_hint"]){v->if(!v || activity.canLock())repo.preferences{it.copy(lock=v)} else activity.message("set_device_lock")}
             Toggle(w["secure_screen"],p.secureScreen){v->repo.preferences{it.copy(secureScreen=v)}}
-            TextButton(onClick={info("privacy")}){Text(w["read_more"])}
+            TextAction(onClick={info("privacy")}){Text(w["read_more"])}
         }
-        if(section=="backup")Panel(w["backup"]) {
-            Button(onClick={backup("create")},modifier=Modifier.fillMaxWidth()){Text(w["backup_create"])}
-            OutlinedButton(onClick={backup("restore")},modifier=Modifier.fillMaxWidth()){Text(w["backup_restore"])}
+        if(section=="backup")Panel() {
+            ActionButton(onClick={backup("create")},modifier=Modifier.fillMaxWidth()){Text(w["backup_create"])}
+            OutlineAction(onClick={backup("restore")},modifier=Modifier.fillMaxWidth()){Text(w["backup_restore"])}
             Text(w["private_backup"],style=MaterialTheme.typography.bodySmall)
         }
-        if(section=="about")Panel(w["about"]) {
+        if(section=="about")Panel() {
             Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
             Text(w.f("version","version" to BuildConfig.VERSION_NAME),style=MaterialTheme.typography.labelMedium)
             Text(w["developer_credit"],style=MaterialTheme.typography.titleMedium)
             SettingsLink(w["developer_facebook"]) { activity.openSource("https://fb.com/mohamedabdelnaby190") }
-            Text("Material 3 · Tajawal · Android 8+",style=MaterialTheme.typography.labelMedium)
-            TextButton(onClick={activity.openSource("https://www.cdc.gov/diabetes/treatment/treatment-low-blood-sugar-hypoglycemia.html")}){Text("CDC · "+w["sources"])}
-            TextButton(onClick={activity.openSource("https://www.nhs.uk/conditions/dehydration/")}){Text("NHS · "+w["sources"])}
+            Text("Tajawal · Android 8+",style=MaterialTheme.typography.labelMedium)
+            TextAction(onClick={activity.openSource("https://www.cdc.gov/diabetes/treatment/treatment-low-blood-sugar-hypoglycemia.html")}){Text("CDC · "+w["sources"])}
+            TextAction(onClick={activity.openSource("https://www.nhs.uk/conditions/dehydration/")}){Text("NHS · "+w["sources"])}
         }
     }
     if(layoutEditor){
@@ -79,7 +85,7 @@ import java.time.ZoneId
 }
 
 @Composable private fun SettingsLink(title:String,onClick:()->Unit) {
-    TextButton(onClick=onClick,contentPadding=PaddingValues(vertical=10.dp,horizontal=0.dp),modifier=Modifier.fillMaxWidth()) {
+    TextAction(onClick=onClick,contentPadding=PaddingValues(vertical=10.dp,horizontal=0.dp),modifier=Modifier.fillMaxWidth()) {
         Text(title,Modifier.weight(1f),color=MaterialTheme.colorScheme.primary)
         Glyph("arrow",Modifier.size(20.dp))
     }
@@ -88,7 +94,7 @@ import java.time.ZoneId
     val w=LocalWords.current
     Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {Text(title);Text(w[if(enabled)"enabled" else "disabled"],style=MaterialTheme.typography.labelMedium,color=if(enabled)MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error)}
-        if(!enabled) TextButton(onClick=onFix){Text(w["allow"])}
+        if(!enabled) TextAction(onClick=onFix){Text(w["allow"])}
     }
 }
 

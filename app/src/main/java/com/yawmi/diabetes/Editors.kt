@@ -27,21 +27,22 @@ import java.time.format.DateTimeFormatter
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Scaffold(containerColor = c.background, topBar = {
             Column(Modifier.statusBarsPadding()) {
-                Box(Modifier.padding(horizontal = 20.dp, vertical = 9.dp)) {
-                    ScreenTitle(title) {
-                        IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
-                            Glyph("close", Modifier.size(22.dp))
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 7.dp)) {
+                    SectionBanner("edit", title, action = {
+                        IconAction(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                            Glyph("close", Modifier.size(22.dp), LocalContentColor.current)
                         }
-                    }
+                    })
                 }
-                HorizontalDivider(color = c.outlineVariant)
             }
         }, bottomBar = {
             Surface(color = c.surfaceContainerLow) {
                 Column(Modifier.navigationBarsPadding().imePadding()) {
                     HorizontalDivider(color = c.outlineVariant)
-                    Button(onClick = onSave, shape = CircleShape,
-                        modifier = Modifier.fillMaxWidth().padding(16.dp).heightIn(min = 50.dp)) {
+                    ActionButton(onClick = onSave,
+                        modifier = Modifier.fillMaxWidth().padding(14.dp).heightIn(min = 50.dp)) {
+                        Glyph("check", Modifier.size(19.dp), LocalContentColor.current)
+                        Spacer(Modifier.width(9.dp))
                         Text(saveLabel)
                     }
                 }
@@ -58,8 +59,8 @@ import java.time.format.DateTimeFormatter
 }
 
 @Composable fun Field(label:String,value:String,onChange:(String)->Unit,numeric:Boolean=false,multiline:Boolean=false) {
-    OutlinedTextField(value=value,onValueChange={if(it.length<=4000)onChange(it)},label={Text(label)},modifier=Modifier.fillMaxWidth(),shape=androidx.compose.foundation.shape.RoundedCornerShape(16.dp),
-        colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant,focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow),
+    OutlinedTextField(value=value,onValueChange={if(it.length<=4000)onChange(it)},label={Text(label)},modifier=Modifier.fillMaxWidth(),shape=ControlShape,
+        colors=OutlinedTextFieldDefaults.colors(unfocusedContainerColor=MaterialTheme.colorScheme.surfaceContainerHigh,unfocusedBorderColor=MaterialTheme.colorScheme.outlineVariant,focusedContainerColor=MaterialTheme.colorScheme.surfaceContainerLow),
         singleLine=!multiline,minLines=if(multiline) 3 else 1,keyboardOptions=KeyboardOptions(keyboardType=if(numeric) KeyboardType.Decimal else KeyboardType.Text))
 }
 @Composable fun TimeChoiceDialog(initial:LocalTime,onDismiss:()->Unit,onPicked:(LocalTime)->Unit) {
@@ -67,10 +68,10 @@ import java.time.format.DateTimeFormatter
     val state=rememberTimePickerState(initialHour=initial.hour,initialMinute=initial.minute,is24Hour=false)
     val compact=androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f ||
         androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp<600
-    AlertDialog(onDismissRequest=onDismiss,title={Text(w["time"])},text={
+    BrandedDialog(onDismissRequest=onDismiss,title={Text(w["time"])},text={
         if(compact)TimeInput(state=state)else TimePicker(state=state)
-    },confirmButton={TextButton(onClick={onPicked(LocalTime.of(state.hour,state.minute))}){Text(w["confirm"])}},
-        dismissButton={TextButton(onClick=onDismiss){Text(w["cancel"])}})
+    },confirmButton={TextAction(onClick={onPicked(LocalTime.of(state.hour,state.minute))}){Text(w["confirm"])}},
+        dismissButton={TextAction(onClick=onDismiss){Text(w["cancel"])}})
 }
 
 @Composable fun StampPicker(value:Long,onChange:(Long)->Unit,allowFuture:Boolean=false,label:String=LocalWords.current["date_time"]) {
@@ -81,8 +82,8 @@ import java.time.format.DateTimeFormatter
     Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
         Text(label,style=MaterialTheme.typography.labelLarge)
         Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick={showDate=true}){Text(dateText(value,w))}
-            OutlinedButton(onClick={showTime=true}){Text(timeText(value,w))}
+            OutlineAction(onClick={showDate=true}){Text(dateText(value,w))}
+            OutlineAction(onClick={showTime=true}){Text(timeText(value,w))}
         }
     }
     if(showDate) {
@@ -92,13 +93,13 @@ import java.time.format.DateTimeFormatter
                     allowFuture || !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isAfter(LocalDate.now())
             })
         DatePickerDialog(onDismissRequest={showDate=false},confirmButton={
-            TextButton(onClick={
+            TextAction(onClick={
                 picker.selectedDateMillis?.let{selected->
                     val date=Instant.ofEpochMilli(selected).atZone(ZoneOffset.UTC).toLocalDate()
                     onChange(date.atTime(z.toLocalTime()).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
                 };showDate=false
             },enabled=picker.selectedDateMillis!=null){Text(w["confirm"])}
-        },dismissButton={TextButton(onClick={showDate=false}){Text(w["cancel"])}}){DatePicker(state=picker)}
+        },dismissButton={TextAction(onClick={showDate=false}){Text(w["cancel"])}}){DatePicker(state=picker)}
     }
     if(showTime)TimeChoiceDialog(z.toLocalTime(),onDismiss={showTime=false},onPicked={
         onChange(z.toLocalDate().atTime(it).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli());showTime=false
@@ -115,11 +116,11 @@ import java.time.format.DateTimeFormatter
         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             times.forEachIndexed {index,time->
                 Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                    OutlinedButton(onClick={editingIndex=index;picking=true}){Text(clockText(time, w))}
-                    if(!single && times.size>1)TextButton(onClick={onChange(times.filterIndexed{i,_->i!=index}.joinToString(","))}){Text(w["delete"])}
+                    OutlineAction(onClick={editingIndex=index;picking=true}){Text(clockText(time, w))}
+                    if(!single && times.size>1)TextAction(onClick={onChange(times.filterIndexed{i,_->i!=index}.joinToString(","))}){Text(w["delete"])}
                 }
             }
-            if((!single && times.size<12) || times.isEmpty())TextButton(onClick={editingIndex=null;picking=true}){Text(w["add_time"])}
+            if((!single && times.size<12) || times.isEmpty())TextAction(onClick={editingIndex=null;picking=true}){Text(w["add_time"])}
         }
     }
     if(picking) {
@@ -195,7 +196,7 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
             }
             "water" -> {
                 Field(w["water_amount"],value,{value=it;invalid=false},true)
-                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf(150,250,500).forEach {n->FilterChip(selected=value==n.toString(),onClick={value=n.toString()},label={Text("${number(n.toDouble(),w)} ${w["ml"]}")})}}
+                Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {listOf(150,250,500).forEach {n->ChoiceChip(selected=value==n.toString(),onClick={value=n.toString()},label={Text("${number(n.toDouble(),w)} ${w["ml"]}")})}}
                 Text(w["goal_hint"],style=MaterialTheme.typography.bodySmall)
             }
             "meal" -> {
@@ -222,8 +223,8 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
         if(kind!="meal") Field(w["notes"],note,{note=it},multiline=true)
         if(kind=="symptom") Text(s.preferences.sickPlan.ifBlank {w["sick_hint"]},style=MaterialTheme.typography.bodySmall)
     }
-    unusual?.let {e->AlertDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${e.value} ${e.unit}")},
-        confirmButton={TextButton(onClick={unusual=null;onSave(e)}){Text(w["confirm"])}},dismissButton={TextButton(onClick={unusual=null}){Text(w["back"])}})}
+    unusual?.let {e->BrandedDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${e.value} ${e.unit}")},
+        confirmButton={TextAction(onClick={unusual=null;onSave(e)}){Text(w["confirm"])}},dismissButton={TextAction(onClick={unusual=null}){Text(w["back"])}})}
 }
 
 @Composable fun MedicationEditor(existing:Medication?,p:Preferences,onDismiss:()->Unit,onSave:(Medication)->Unit) {
@@ -268,10 +269,10 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
                 Notice(w["meal_schedule_hint"])
             }
         }
-        if(mode=="weekly") FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {(1..7).forEach {d->FilterChip(selected=d in days,onClick={days=if(d in days)days-d else days+d},label={Text(w[dayKey(d)])})}}
+        if(mode=="weekly") FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)) {(1..7).forEach {d->ChoiceChip(selected=d in days,onClick={days=if(d in days)days-d else days+d},label={Text(w[dayKey(d)])})}}
         if(mode!="meal") ChoiceRow(w["food_relation"],listOf("none","before","with","after"),relation,{w[it]}){relation=it}
         Notice(w["save_prescription"])
-        TextButton(onClick={advanced=!advanced}) {Text(w[if(advanced)"less" else "advanced"])}
+        TextAction(onClick={advanced=!advanced}) {Text(w[if(advanced)"less" else "advanced"])}
         if(advanced) {
             Field(w["instructions"],instructions,{instructions=it},multiline=true)
             Field(w["stock"],stock,{stock=it},true);Text(w["unknown_stock"],style=MaterialTheme.typography.bodySmall)
@@ -283,21 +284,21 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
             Toggle(w["active"],active){active=it}
             if(existing!=null) Text(w["edit_plan_hint"],style=MaterialTheme.typography.bodySmall)
         }
-        OutlinedButton(onClick={try{preview=build()}catch(e:Exception){invalid=true}}) {Text(w["preview"])}
+        OutlineAction(onClick={try{preview=build()}catch(e:Exception){invalid=true}}) {Text(w["preview"])}
     }
     preview?.let {m->
         val now=System.currentTimeMillis();val events=Planner.events(m.planner(),emptyList(),now,now+8*86_400_000L,ZoneId.systemDefault()).take(8)
-        AlertDialog(onDismissRequest={preview=null},title={Text(w["preview"])},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+        BrandedDialog(onDismissRequest={preview=null},title={Text(w["preview"])},text={Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
             if(events.isEmpty()) Text(w[if(m.mode=="meal")"wait_meal" else "no_doses"])
             events.forEach {e->Text("${dateText(e.millis(),w)} · ${timeText(e.millis(),w)}${if(e.estimated())" · "+w["planned_time"] else ""}")}
-        }},confirmButton={TextButton(onClick={preview=null}){Text(w["close"])}})
+        }},confirmButton={TextAction(onClick={preview=null}){Text(w["close"])}})
     }
 }
 
 @Composable fun BackupDialog(mode:String,onDismiss:()->Unit,onConfirm:(CharArray)->Unit) {
     val w=LocalWords.current;var password by remember {mutableStateOf("")};var repeat by remember {mutableStateOf("")}
     var understood by remember {mutableStateOf(false)};var invalid by remember {mutableStateOf(false)}
-    AlertDialog(onDismissRequest=onDismiss,title={Text(w[if(mode=="create")"backup_create" else "backup_restore"])},text={
+    BrandedDialog(onDismissRequest=onDismiss,title={Text(w[if(mode=="create")"backup_create" else "backup_restore"])},text={
         Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
             Text(w[if(mode=="create")"password_hint" else "restore_warning"])
             if(mode=="restore") Text(w["restore_lock_notice"],style=MaterialTheme.typography.bodySmall)
@@ -306,8 +307,8 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
             if(mode=="restore") Toggle(w["backup_replace_confirm"],understood){understood=it}
             if(invalid) Text(w["invalid"],color=MaterialTheme.colorScheme.error)
         }
-    },confirmButton={TextButton(onClick={
+    },confirmButton={TextAction(onClick={
         if(password.length<10 || (mode=="create" && password!=repeat) || (mode=="restore" && !understood)) invalid=true
         else {val chars=password.toCharArray();password="";repeat="";onConfirm(chars)}
-    }){Text(w["confirm"])}},dismissButton={TextButton(onClick=onDismiss){Text(w["cancel"])}})
+    }){Text(w["confirm"])}},dismissButton={TextAction(onClick=onDismiss){Text(w["cancel"])}})
 }

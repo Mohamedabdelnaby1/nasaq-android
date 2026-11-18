@@ -49,10 +49,18 @@ class ReferenceDesignTests{
     @Test fun settings(){show("settings"){SettingsOverview(it.preferences){}};screenshot("07-settings")}
     @Test fun welcome(){val s=sample();compose.setContent{YawmiTheme(s.preferences){Surface(Modifier.fillMaxSize()){Column(Modifier.padding(24.dp)){WelcomeHero()}}}};screenshot("08-welcome")}
     @Test fun navigationSelectsTheRequestedDestination(){
-        var selected=""
-        val s=sample()
-        compose.setContent{YawmiTheme(s.preferences){AppChrome("today",s.preferences,{selected=it},{},{}){}}}
-        compose.onNodeWithText(Words("ar")["insights"]).performClick()
-        compose.runOnIdle{assertEquals("insights",selected)}
+        var selected = ""
+        var opened = false
+        val s = sample()
+        val words = Words("ar")
+        compose.setContent { YawmiTheme(s.preferences) {
+            AppChrome("today", s.preferences, { selected = it }, { opened = true }, {}) {}
+        } }
+        compose.onNodeWithContentDescription(words["quick_add"]).assertIsDisplayed().performClick()
+        compose.onNodeWithText(words["insights"]).performClick()
+        compose.runOnIdle {
+            assertTrue(opened)
+            assertEquals("insights", selected)
+        }
     }
 }

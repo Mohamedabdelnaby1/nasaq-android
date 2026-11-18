@@ -49,14 +49,11 @@ fun Home(
     val scroll = rememberScrollState()
     Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(15.dp)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            ScreenTitle(w.f("hello", "name" to p.name.ifBlank { w["friend"] }), dateText(now, w)) {
-                OutlinedIconButton(onClick = customise, modifier = Modifier.semantics { contentDescription = w["customise"] }) {
-                    Glyph("settings", Modifier.size(22.dp))
-                }
+        SectionBanner("today", w.f("hello", "name" to p.name.ifBlank { w["friend"] }), dateText(now, w), action = {
+            IconAction(customise, Modifier.semantics { contentDescription = w["customise"] }) {
+                Glyph("settings", Modifier.size(22.dp), MaterialTheme.colorScheme.onPrimaryContainer)
             }
-        }
-        if (openDay != null) DeskWeek(now, summary.activityCount, openDay)
+        })
         SegmentedRail(listOf(w["compact_home"], w["detailed"]), if (p.compactHome) 0 else 1, { onMode(it == 0) })
         AnimatedContent(p.compactHome, transitionSpec = {
             if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
@@ -115,6 +112,10 @@ fun Home(
                 }
             }
         }
+        if (openDay != null) NasaqBoard {
+            SectionHeading(w["day_overview"], w["details"], openOverview)
+            DeskWeek(now, summary.activityCount, openDay)
+        }
         if (!p.compactHome && "water" in ordered && p.waterGoal > 0) {
             NasaqBoard {
                 SectionHeading(w["water_fill_cup"], openHydration?.let { w["details"] }) { openHydration?.invoke() }
@@ -152,7 +153,7 @@ private fun DeskWeek(now: Long, count: Int, open: (LocalDate) -> Unit) {
             val date = first.plusDays(offset)
             val active = date == today
             Surface(onClick = { open(date) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(15.dp),
-                color = if (active) c.primary else c.surfaceContainerLow, contentColor = if (active) c.onPrimary else c.onSurface) {
+                color = if (active) c.primary else c.surfaceContainerHigh, contentColor = if (active) c.onPrimary else c.onSurface) {
                 Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(3.dp)) {
                     val day = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, w.locale)
@@ -196,7 +197,7 @@ private fun DeskMetricLine(kind: String, summary: DayOverview, state: State, bus
                 DeskAmount(listOf(value, unit).filter(String::isNotEmpty).joinToString(" "), MaterialTheme.typography.titleLarge)
             }
         }
-        IconButton(onClick = add, enabled = !busy, modifier = Modifier.semantics { contentDescription = w["add"] + " " + w[kind] }) {
+        IconAction(onClick = add, enabled = !busy, modifier = Modifier.semantics { contentDescription = w["add"] + " " + w[kind] }) {
             Glyph("plus", Modifier.size(21.dp))
         }
     }
@@ -205,20 +206,20 @@ private fun DeskMetricLine(kind: String, summary: DayOverview, state: State, bus
 @Composable
 private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: Boolean, open: (() -> Unit)?, add: () -> Unit) {
     val w = LocalWords.current
-    val c = MaterialTheme.colorScheme
     val (value, unit) = deskValue(kind, summary, s)
-    val solid = c.primary
-    val onSolid = c.onPrimary
+    val colorway = domainColors(kind)
+    val solid = colorway.backdrop
+    val onSolid = colorway.ink
     val size = s.preferences.cardSizes[kind]
     Surface(modifier = Modifier.sharedDesk(kind), shape = RoundedCornerShape(32.dp), color = solid, contentColor = onSolid) {
         Box(Modifier.fillMaxWidth()) {
-            Contours(Modifier.matchParentSize(), onSolid)
+            SectionArt(kind, Modifier.matchParentSize(), onSolid)
             Column(Modifier.fillMaxWidth().padding(18.dp), verticalArrangement = Arrangement.spacedBy(11.dp)) {
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Glyph(kind, Modifier.size(24.dp), onSolid)
                     Text(deskLabel(kind), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    if (open != null) IconButton(onClick = open, modifier = Modifier.semantics { contentDescription = w["details"] }) {
+                    if (open != null) IconAction(onClick = open, modifier = Modifier.semantics { contentDescription = w["details"] }) {
                         Glyph("arrow", Modifier.size(21.dp), onSolid)
                     }
                 }
@@ -227,6 +228,8 @@ private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: B
                     Column(Modifier.weight(1f)) {
                         DeskAmount(value, if (size == "small") MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge)
                         if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelLarge)
+                        if (kind == "glucose") Text(w.f("day_reading_count", "count" to number(summary.glucoseCount.toDouble(), w)),
+                            style = MaterialTheme.typography.bodySmall)
                     }
                     if (size != "small") when (kind) {
                         "glucose" -> {
@@ -239,10 +242,10 @@ private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: B
                         else -> Glyph("medication", Modifier.size(46.dp), onSolid.copy(alpha = .65f))
                     }
                 }
-                Button(onClick = add, enabled = !busy, shape = ControlShape, modifier = Modifier.fillMaxWidth().heightIn(min = 46.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = c.onPrimary, contentColor = c.primary)) {
-                    Glyph("plus", Modifier.size(18.dp), c.primary)
-                    Spacer(Modifier.width(6.dp))
+                ActionButton(onClick = add, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = onSolid, contentColor = solid)) {
+                    Glyph("plus", Modifier.size(18.dp), solid)
+                    Spacer(Modifier.width(8.dp))
                     Text(w[when (kind) { "glucose" -> "add_reading"; "water" -> "water_record_button"; else -> "record_dose" }])
                 }
             }
@@ -254,14 +257,14 @@ private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: B
 private fun DeskTile(kind: String, summary: DayOverview, s: State, size: String?, modifier: Modifier, open: () -> Unit) {
     val tone = domainColors(kind)
     val (value, unit) = deskValue(kind, summary, s)
-    Surface(onClick = open, modifier = modifier.sharedDesk(kind), shape = RoundedCornerShape(25.dp), color = tone.backdrop, contentColor = tone.ink) {
+    Surface(onClick = open, modifier = modifier.sharedDesk(kind), shape = BoardShape, color = tone.backdrop, contentColor = tone.ink) {
         Box {
-            Contours(Modifier.matchParentSize(), tone.ink)
+            SectionArt(kind, Modifier.matchParentSize(), tone.ink)
             Column(Modifier.fillMaxWidth().heightIn(min = when (size) { "small" -> 104.dp; "large" -> 165.dp; else -> 135.dp })
                 .padding(14.dp), verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Glyph(kind, Modifier.size(22.dp), tone.ink)
-                    Glyph("arrow", Modifier.size(17.dp), tone.ink)
+                    Glyph(kind, Modifier.size(25.dp), tone.ink)
+                    Glyph("arrow", Modifier.size(16.dp), tone.ink)
                 }
                 Text(deskLabel(kind), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 DeskAmount(value, MaterialTheme.typography.headlineMedium)
@@ -321,15 +324,15 @@ fun ReadingHero(summary: DayOverview, p: Preferences, size: String = "standard",
                 if (openHistory != null) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Button(onClick = onAdd, modifier = Modifier.weight(1f).heightIn(min = 45.dp), shape = CircleShape,
+                        ActionButton(onClick = onAdd, modifier = Modifier.weight(1f).heightIn(min = 45.dp), shape = CircleShape,
                             contentPadding = PaddingValues(horizontal = 8.dp)) {
                             Glyph("plus", Modifier.size(17.dp), c.onPrimary); Spacer(Modifier.width(5.dp)); Text(w["add_reading"])
                         }
-                        IconButton(onClick = openHistory, modifier = Modifier.semantics { contentDescription = w["jump_glucose"] }) {
+                        IconAction(onClick = openHistory, modifier = Modifier.semantics { contentDescription = w["jump_glucose"] }) {
                             Glyph("log", Modifier.size(22.dp), tone.ink)
                         }
                     }
-                } else Button(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 45.dp), shape = CircleShape) {
+                } else ActionButton(onClick = onAdd, modifier = Modifier.fillMaxWidth().heightIn(min = 45.dp), shape = CircleShape) {
                     Glyph("plus", Modifier.size(17.dp), c.onPrimary); Spacer(Modifier.width(5.dp)); Text(w["add_reading"])
                 }
             }

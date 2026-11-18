@@ -52,7 +52,7 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
         State(preferences = Preferences(language = s.preferences.language, unit = s.preferences.unit, waterGoal = 2000),
             entries = readings + Entry(kind = "water", unit = "mL", value = 950.0, time = start) +
                 Entry(kind = "dose", status = "taken", time = start) +
-                Entry(kind = "water", unit = "mL", value = 1750.0, time = start - 3_600_000))
+                Entry(kind = "water", unit = "mL", value = 1750.0, time = start - 43_200_000))
     }
     fun validColor(value: String) = value.isBlank() || runCatching { android.graphics.Color.parseColor(value.trim()) }.isSuccess
     val canSave = validColor(look.background) && validColor(look.accent)
@@ -61,7 +61,7 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
         Surface(color = c.surfaceContainerLow) {
             Column(Modifier.navigationBarsPadding().imePadding().padding(horizontal = 17.dp, vertical = 8.dp)) {
                 if (!canSave) Text(w["invalid_colour"], color = c.error, style = MaterialTheme.typography.labelMedium)
-                Button(onClick = { onSave(look.copy(background = look.background.trim(), accent = look.accent.trim())) },
+                ActionButton(onClick = { onSave(look.copy(background = look.background.trim(), accent = look.accent.trim())) },
                     shape = ControlShape, enabled = canSave, modifier = Modifier.fillMaxWidth().heightIn(min = 49.dp)) {
                     Text(w[if (pinning) "widget_pin" else "save_widget"])
                 }
@@ -70,29 +70,36 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
     }) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).safeDrawingPadding().padding(horizontal = 17.dp),
             verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            ScreenTitle(w["widget_studio"]) {
-                IconButton(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+            SectionBanner("widgets", w["widget_studio"], action = {
+                IconAction(onClick = onDismiss, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("close", Modifier.size(22.dp))
                 }
-            }
+            })
             SegmentedRail(listOf(w["templates"], w["widget_content"], w["widget_style"]), page, { page = it })
             Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                NasaqBoard(color = c.surfaceContainerHigh, outlined = false) {
+                val previewColor = domainColors(when (look.mode) {
+                    "day_summary" -> "insights"
+                    "summary" -> "widgets"
+                    else -> look.mode
+                })
+                val canvasColor by androidx.compose.animation.animateColorAsState(previewColor.backdrop,
+                    if (motion) tween(430, easing = NasaqEase) else androidx.compose.animation.core.snap(), label = "widget preset stage")
+                NasaqBoard(color = canvasColor, contentColor = previewColor.ink, outlined = false) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween) {
                         Text(w["widget_preview"], style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                        FilterChip(selected = sampleNumbers, onClick = { sampleNumbers = !sampleNumbers },
+                        ChoiceChip(selected = sampleNumbers, onClick = { sampleNumbers = !sampleNumbers },
                             label = { Text(w["widget_sample"]) })
                     }
-                    Box(Modifier.fillMaxWidth().height(144.dp), contentAlignment = Alignment.Center) {
-                        Contours(Modifier.matchParentSize(), c.primary)
-                        AnimatedContent(size, contentAlignment = Alignment.Center, transitionSpec = {
+                    Box(Modifier.fillMaxWidth().height(155.dp), contentAlignment = Alignment.Center) {
+                        SectionArt(look.mode, Modifier.matchParentSize(), previewColor.ink)
+                        AnimatedContent(size to look, contentAlignment = Alignment.Center, transitionSpec = {
                             if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
                             else ((fadeIn(tween(240, 45)) + scaleIn(tween(510, easing = NasaqEase), initialScale = .76f)) togetherWith
                                 (fadeOut(tween(160)) + scaleOut(tween(350), targetScale = .86f))).using(null)
-                        }, label = "widget-canvas-size") { index ->
+                        }, label = "widget-canvas-size") { (index, draft) ->
                             val target = previewSizes[index]
-                            WidgetPreview(if (sampleNumbers) sample else s, if (sampleNumbers) look.copy(visible = true) else look,
+                            WidgetPreview(if (sampleNumbers) sample else s, if (sampleNumbers) draft.copy(visible = true) else draft,
                                 target.width, target.height, fitBox = true)
                         }
                     }

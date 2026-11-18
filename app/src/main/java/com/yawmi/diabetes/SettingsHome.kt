@@ -31,7 +31,7 @@ import androidx.compose.ui.unit.dp
     }, label = "settings-section") { current ->
         if (current == null) SettingsOverview(repo.state.preferences) { section = it }
         else Column(Modifier.fillMaxSize()) {
-            TextButton(onClick = { section = null }, modifier = Modifier.padding(horizontal = 16.dp)) {
+            TextAction(onClick = { section = null }, modifier = Modifier.padding(horizontal = 16.dp)) {
                 Glyph("back", Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)); Text(w["back_settings"])
             }
             Box(Modifier.weight(1f)) { SettingsDetail(repo, activity, backup, info, current) }
@@ -44,14 +44,14 @@ import androidx.compose.ui.unit.dp
     val c = MaterialTheme.colorScheme
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(15.dp)) {
-        ScreenTitle(w["settings"], w["settings_subtitle"]) { DomainMark("settings") }
-        Surface(onClick = { onSection("personal") }, color = c.primaryContainer, contentColor = c.onPrimaryContainer, shape = BoardShape) {
+        SectionBanner("settings", w["settings"])
+        Surface(onClick = { onSection("personal") }, color = Color(0xFF1B3B33), contentColor = Color(0xFFF3F9D9), shape = BoardShape) {
             Box(Modifier.fillMaxWidth()) {
-                Contours(Modifier.matchParentSize(), c.onPrimaryContainer)
+                SectionArt("settings", Modifier.matchParentSize(), Color(0xFFF3F9D9))
                 Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Surface(color = c.onPrimaryContainer, contentColor = c.primaryContainer, shape = CircleShape) {
+                        Surface(color = Color(0xFFD8F479), contentColor = Color(0xFF182F26), shape = CircleShape) {
                             Text(p.name.firstOrNull()?.toString() ?: w["app"].take(1), Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
                                 style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                         }
@@ -59,9 +59,9 @@ import androidx.compose.ui.unit.dp
                             Text(p.name.ifBlank { w["friend"] }, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text(w["local_privacy_short"], style = MaterialTheme.typography.labelMedium)
                         }
-                        Glyph("edit", Modifier.size(20.dp), c.onPrimaryContainer)
+                        Glyph("edit", Modifier.size(20.dp), Color(0xFFF3F9D9))
                     }
-                    HorizontalDivider(color = c.onPrimaryContainer.copy(alpha = .18f))
+                    HorizontalDivider(color = Color(0xFFF3F9D9).copy(alpha = .23f))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Column(Modifier.weight(1f)) {
                             Text(w["daily_target"], style = MaterialTheme.typography.labelMedium)
@@ -76,30 +76,46 @@ import androidx.compose.ui.unit.dp
                 }
             }
         }
-        Reveal(1) {
-            NasaqBoard {
-                Text(w["personalise"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                SettingsRow("settings", w["appearance"], w["settings_style_body"]) { onSection("appearance") }
-                HorizontalDivider(color = c.outlineVariant)
-                SettingsRow("today", w["home_cards"], w["settings_home_body"]) { onSection("home_cards") }
-                HorizontalDivider(color = c.outlineVariant)
-                SettingsRow("glucose", w["settings_care"], w["settings_care_body"]) { onSection("personal") }
+        val groups = listOf(
+            Triple("appearance", "insights", "appearance"),
+            Triple("home_cards", "log", "home_cards"),
+            Triple("notifications", "bell", "notification_hub"),
+            Triple("integrations", "water", "widgets"),
+            Triple("privacy", "shield", "privacy"),
+            Triple("backup", "medication", "backup"),
+        )
+        groups.chunked(2).forEachIndexed { index, row ->
+            Reveal(index + 1) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    row.forEach { (key, color, label) ->
+                        val icon = when (key) {
+                            "appearance" -> "settings"
+                            "home_cards" -> "today"
+                            "notifications" -> "bell"
+                            "integrations" -> "widgets"
+                            "privacy" -> "shield"
+                            else -> "backup"
+                        }
+                        val tone = domainColors(color)
+                        Surface({ onSection(key) }, Modifier.weight(1f), shape = BoardShape,
+                            color = tone.backdrop, contentColor = tone.ink) {
+                            Box {
+                                SectionArt(color, Modifier.matchParentSize(), tone.ink)
+                                Column(Modifier.fillMaxWidth().heightIn(min = 98.dp).padding(13.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                                        Glyph(icon, Modifier.size(23.dp), tone.ink)
+                                        Glyph("arrow", Modifier.size(15.dp), tone.ink)
+                                    }
+                                    Text(w[label], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
-        Reveal(2) {
-            NasaqBoard {
-                SettingsRow("bell", w["notification_hub"], w["settings_alerts_body"]) { onSection("notifications") }
-                HorizontalDivider(color = c.outlineVariant)
-                SettingsRow("widgets", w["widgets"], w["settings_widgets_body"]) { onSection("integrations") }
-            }
-        }
-        NasaqBoard {
-            SettingsRow("shield", w["privacy"], w["settings_data_body"]) { onSection("privacy") }
-            HorizontalDivider(color = c.outlineVariant)
-            SettingsRow("backup", w["backup"]) { onSection("backup") }
-            HorizontalDivider(color = c.outlineVariant)
-            SettingsRow("info", w["about"]) { onSection("about") }
-        }
+        NasaqBoard { SettingsRow("info", w["about"]) { onSection("about") } }
         Text(w.f("version", "version" to BuildConfig.VERSION_NAME), style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
     }
 }

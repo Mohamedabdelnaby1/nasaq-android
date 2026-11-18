@@ -108,7 +108,7 @@ object JournalLanguage {
     },saveLabel=w["assistant_understand"]){
         PageIntro(w["assistant_title"],w["assistant_subtitle"],"spark")
         OutlinedTextField(input,{input=it.take(250);response=null;failed=false},label={Text(w["assistant_prompt"])},modifier=Modifier.fillMaxWidth(),maxLines=3)
-        OutlinedButton(onClick={
+        OutlineAction(onClick={
             voiceError=false
             runCatching{
                 voice.launch(Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
@@ -126,7 +126,7 @@ object JournalLanguage {
                 Text(w["assistant_review"],style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
                 Text(w[result.entry.kind]+" · "+entryTitle(result.entry,s,w))
                 if(result.entry.kind=="glucose")Text(w[result.entry.context],style=MaterialTheme.typography.bodySmall)
-                FilledTonalButton(onClick={onReview(result.entry)}){Text(w["assistant_edit_draft"])}
+                TonalAction(onClick={onReview(result.entry)}){Text(w["assistant_edit_draft"])}
             }
             is JournalRequest.Search->Panel(w["assistant_results"]){
                 val entries=s.entries.filter{it.kind==result.kind && it.time>=periodStart(result.days) &&

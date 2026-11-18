@@ -35,11 +35,11 @@ internal fun HydrationScreen(
     val records = remember(overview.entries) { overview.entries.filter { it.kind == "water" } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        ScreenTitle(w["water"], dateText(now, w)) {
-            IconButton(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
-                Glyph("back", Modifier.size(21.dp))
+        SectionBanner("water", w["water"], dateText(now, w), action = {
+            IconAction(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
+                Glyph("back", Modifier.size(21.dp), c.onTertiaryContainer)
             }
-        }
+        })
         HydrationInstrument(state, overview.waterMl, busy) { add("water") }
         if (state.preferences.waterGoal > 0) {
             Reveal(1) {
@@ -83,31 +83,41 @@ private fun HydrationInstrument(state: State, water: Double, busy: Boolean, reco
     val c = MaterialTheme.colorScheme
     val goal = state.preferences.waterGoal
     val progress = if (goal > 0) (water / goal).toFloat().coerceIn(0f, 1f) else 0f
-    Surface(Modifier.sharedDesk("water"), color = c.primary, contentColor = c.onPrimary, shape = RoundedCornerShape(32.dp)) {
+    val reservoir = androidx.compose.ui.graphics.Color(0xFF103E50)
+    val pale = androidx.compose.ui.graphics.Color(0xFFCCF3FE)
+    Surface(Modifier.sharedDesk("water"), color = reservoir, contentColor = pale, shape = BoardShape) {
         Box(Modifier.fillMaxWidth()) {
-            Contours(Modifier.matchParentSize(), c.onPrimary)
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        Glyph("water", Modifier.size(25.dp), c.onPrimary)
+            SectionArt("water", Modifier.matchParentSize(), pale)
+            Column(Modifier.padding(17.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(w["water_today"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        AnimatedNumber(water / 1000, digits = 2, color = c.onPrimary)
+                        AnimatedNumber(water / 1000, digits = 2,
+                            style = MaterialTheme.typography.displayMedium, color = pale)
                         Text(w["litres_short"], style = MaterialTheme.typography.labelLarge)
-                        if (goal > 0) Text(w["daily_target"] + " · " + number(goal / 1000.0, w, 2) + " " + w["litres_short"],
-                            style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (goal > 0) {
-                        Box(Modifier.size(163.dp, 177.dp), contentAlignment = Alignment.Center) {
-                            MeterRing(progress, Modifier.size(145.dp), color = c.onPrimary.copy(alpha = .78f))
-                            WaterVessel(progress, Modifier.size(70.dp, 128.dp))
+                        if (goal > 0) {
+                            Spacer(Modifier.height(3.dp))
+                            Text(w["daily_target"], style = MaterialTheme.typography.labelMedium)
+                            Text(number(goal / 1000.0, w, 2) + " " + w["litres_short"], style = MaterialTheme.typography.titleSmall)
                         }
                     }
+                    WaterVessel(progress, Modifier.width(108.dp).height(182.dp))
                 }
-                Button(onClick = record, enabled = !busy, shape = ControlShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = c.secondaryContainer, contentColor = c.onSecondaryContainer),
-                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-                    Glyph("plus", Modifier.size(18.dp), c.onSecondaryContainer)
-                    Spacer(Modifier.width(6.dp))
+                if (goal > 0) {
+                    val animated by androidx.compose.animation.core.animateFloatAsState(progress, if (LocalMotion.current)
+                        androidx.compose.animation.core.tween(750, easing = NasaqEase) else androidx.compose.animation.core.snap(), label = "goal fill")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        LinearProgressIndicator(progress = { animated }, modifier = Modifier.weight(1f).height(8.dp),
+                            color = pale, trackColor = pale.copy(alpha = .20f))
+                        AnimatedNumber(progress * 100.0, suffix = "%", style = MaterialTheme.typography.labelLarge, color = pale)
+                    }
+                }
+                ActionButton(onClick = record, enabled = !busy,
+                    colors = ButtonDefaults.buttonColors(containerColor = pale, contentColor = reservoir),
+                    modifier = Modifier.fillMaxWidth()) {
+                    Glyph("plus", Modifier.size(18.dp), reservoir)
+                    Spacer(Modifier.width(8.dp))
                     Text(w["custom_amount"])
                 }
             }

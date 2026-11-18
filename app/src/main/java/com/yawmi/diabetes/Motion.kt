@@ -65,7 +65,7 @@ fun WaterVessel(fraction: Float, modifier: Modifier = Modifier) {
             cubicTo(at(.13f, .25f).x, h*.25f, at(.32f, .28f).x, h*.28f, at(.33f, .22f).x, h*.22f)
             close()
         }
-        val body = listOf(Color(0xFFC3DFE5), Color(0xFFF1FBFC), Color(0xFFAED2DA))
+        val body = listOf(Color(0xFF789FAA), Color(0xFFD5F0F6), Color(0xFFEEF9FA), Color(0xFFA1CEDB))
         drawPath(outline, Brush.horizontalGradient(body, at(.13f, 0f).x, at(.87f, 0f).x))
         val phase = wave.value
         val level = h * (.94f - fill.value * .67f)
@@ -90,17 +90,37 @@ fun WaterVessel(fraction: Float, modifier: Modifier = Modifier) {
                         style = Stroke(1.dp.toPx()))
                 }
             }
-            drawRoundRect(Color.White.copy(alpha = .54f), at(.23f, .36f), Size(w*.048f, h*.46f), CornerRadius(w*.03f))
+            val side = Path().apply {
+                moveTo(at(.22f, .76f).x, h * .76f)
+                lineTo(at(.22f, .44f).x, h * .44f)
+                quadraticTo(at(.22f, .33f).x, h * .33f, at(.38f, .30f).x, h * .30f)
+            }
+            drawPath(side, Color.White.copy(alpha = .58f), style = Stroke(2.dp.toPx(), cap = StrokeCap.Round))
+            drawRoundRect(Color(0xFF073A54).copy(alpha = .16f), at(.67f, .33f), Size(w*.14f, h*.52f), CornerRadius(w*.06f))
+            val pour = surge * direction.coerceAtLeast(0f)
+            if (pour > .014f) {
+                val stream = Path().apply {
+                    moveTo(at(.51f, .23f).x, h * .23f)
+                    quadraticTo(at(.46f, .40f).x, h * .40f, at(.53f, .52f).x, max(level, h*.34f))
+                }
+                drawPath(stream, Color(0xFF96EFEE).copy(alpha = pour * .8f),
+                    style = Stroke((1.5f + 2f * pour).dp.toPx(), cap = StrokeCap.Round))
+            }
         }
-        val ink = Color(0xFF235664)
-        drawPath(outline, ink, style = Stroke(1.55.dp.toPx()))
+        val ink = Color(0xFF184E62)
+        drawPath(outline, Color(0xFFB5E1EE), style = Stroke(3.dp.toPx()))
+        drawPath(outline, ink, style = Stroke(1.4.dp.toPx()))
         repeat(4) { index ->
             val y = .40f + index * .122f
             drawLine(ink.copy(alpha = .75f), at(if (index % 2 == 0) .63f else .68f, y), at(.78f, y),
                 1.dp.toPx(), StrokeCap.Round)
         }
-        drawRoundRect(ink, at(.275f, .07f), Size(w*.45f, h*.09f), CornerRadius(w*.043f))
-        drawRoundRect(Color(0xFF6D9FA8), at(.31f, .077f), Size(w*.38f, h*.022f), CornerRadius(w*.016f))
+        drawRoundRect(ink, at(.265f, .06f), Size(w*.47f, h*.10f), CornerRadius(w*.055f))
+        drawRoundRect(Color(0xFFA7E9EE), at(.30f, .065f), Size(w*.40f, h*.021f), CornerRadius(w*.016f))
+        repeat(5) { index ->
+            val x = .36f + index * .07f
+            drawLine(Color(0xFF5C8C9A), at(x, .11f), at(x, .142f), 1.dp.toPx(), StrokeCap.Round)
+        }
         drawLine(ink, at(.34f, .192f), at(.66f, .192f), 1.dp.toPx())
     }
 }
@@ -131,8 +151,8 @@ internal fun WaterGlass(amount: Float, modifier: Modifier = Modifier) {
             quadraticTo(w*.24f,h*.90f,w*.23f,h*.81f)
             close()
         }
-        val ink = Color(0xFF2C6171)
-        val ice = Color(0xFFD8EEF2)
+        val ink = Color(0xFF285975)
+        val ice = Color(0xFFB3E0F2)
         drawPath(glass, Brush.horizontalGradient(listOf(Color(0xFFB6D6DF), Color(0xFFF3FBFC), ice)))
         if (fill.value > .001f) clipPath(glass) {
             val level = h * (.885f - fill.value * .64f)
@@ -143,7 +163,12 @@ internal fun WaterGlass(amount: Float, modifier: Modifier = Modifier) {
                 cubicTo(w*.32f, level - h*.07f, w*.66f, level + h*.06f, w, level - swing)
             }
             val water = Path().apply { addPath(surface); lineTo(w, h); lineTo(0f, h); close() }
-            drawPath(water, Brush.verticalGradient(listOf(Color(0xFF64D3D8), Color(0xFF298EA8)), level, h))
+            drawPath(water, Brush.verticalGradient(listOf(Color(0xFF7BE8ED), Color(0xFF208CBD)), level, h))
+            if (phase < .90f) repeat(3) { index ->
+                drawCircle(Color.White.copy(alpha = (1f - phase) * .65f), w * (.038f + index*.009f),
+                    Offset(w * (.36f + index*.14f), level + h * (.13f - phase*.105f + index*.029f)),
+                    style = Stroke(.7.dp.toPx()))
+            }
             drawPath(surface, Color(0xE4C9FBFB), style = Stroke(1.dp.toPx()))
         }
         drawPath(glass, ink, style = Stroke(1.25.dp.toPx()))

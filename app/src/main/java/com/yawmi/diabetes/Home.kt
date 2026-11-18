@@ -35,7 +35,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
         Surface(shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.primaryContainer) {Glyph("medication",Modifier.padding(10.dp).size(24.dp))}
         Column(Modifier.weight(1f)) {Text(med.name,fontWeight=FontWeight.SemiBold);Text("${med.dose} · ${timeText(r.due,w)}",style=MaterialTheme.typography.bodySmall)
             if(old) Text(w["not_recorded"],style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        TextButton(onClick={onClick(r)}) {Text(w["record_dose"])}
+        TextAction(onClick={onClick(r)}) {Text(w["record_dose"])}
     }
 }
 
@@ -84,7 +84,7 @@ fun GlucoseChart(entries: List<Entry>, p: Preferences, onOpenDay: ((java.time.Lo
                 }
             } else Text(w["chart_explore"], style = MaterialTheme.typography.bodySmall)
         }
-        if (point != null && onOpenDay != null) TextButton(onClick = {
+        if (point != null && onOpenDay != null) TextAction(onClick = {
             onOpenDay(java.time.Instant.ofEpochMilli(point.time).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
         }) { Text(w["open_selected_day"]) }
         Canvas(Modifier.fillMaxWidth().height(163.dp)

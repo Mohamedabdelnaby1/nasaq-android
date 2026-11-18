@@ -30,10 +30,10 @@ fun IntegrationPanel(repo: Repository, activity: MainActivity) {
     val resume = activity.permissionRevision
     val ids = remember(resume) { Widgets.ids(activity) }
     NasaqBoard {
-        ScreenTitle(w["widget_designs"]) { DomainMark("widgets") }
+        SectionBanner("widgets", w["widget_designs"])
         Text(w["widget_designs_body"], style = MaterialTheme.typography.bodySmall)
-        Button(onClick = { studio = WidgetLook() }, modifier = Modifier.fillMaxWidth()) { Text(w["widget_preview_pin"]) }
-        OutlinedButton(onClick = { studio = widgetPresets.first { it.name == "preset_water_mini" }.look },
+        ActionButton(onClick = { studio = WidgetLook() }, modifier = Modifier.fillMaxWidth()) { Text(w["widget_preview_pin"]) }
+        OutlineAction(onClick = { studio = widgetPresets.first { it.name == "preset_water_mini" }.look },
             modifier = Modifier.fillMaxWidth()) { Text(w["preset_water_mini"]) }
         ids.forEachIndexed { index, id ->
             SettingsRow("settings", w.f("widget_manage_number", "number" to number((index + 1).toDouble(), w))) {
@@ -45,7 +45,7 @@ fun IntegrationPanel(repo: Repository, activity: MainActivity) {
     NasaqBoard {
         Text(w["shortcuts"], fontWeight = FontWeight.Bold)
         Text(w["shortcuts_body"], style = MaterialTheme.typography.bodySmall)
-        TextButton(onClick = { repo.preferences { it.copy(setupVersion = 0) } }) { Text(w["setup_again"]) }
+        TextAction(onClick = { repo.preferences { it.copy(setupVersion = 0) } }) { Text(w["setup_again"]) }
     }
     studio?.let { initial ->
         androidx.compose.ui.window.Dialog(onDismissRequest = { studio = null },

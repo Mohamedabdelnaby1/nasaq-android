@@ -83,7 +83,7 @@ import androidx.compose.ui.unit.dp
                         else->{
                             PermissionTile(w["permission"],permissionAllowed,w["permission_reason"]){activity.notificationPermission()}
                             PermissionTile(w["exact"],exactAllowed,w["exact_reason"]){activity.exactPermission()}
-                            OutlinedButton(onClick={activity.testNotification()},modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}
+                            OutlineAction(onClick={activity.testNotification()},modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}
                             Notice(w["permission_optional"])
                             Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
                         }
@@ -93,9 +93,9 @@ import androidx.compose.ui.unit.dp
             }
         }
         Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-            if(step>0)OutlinedButton(onClick={step--;invalid=false},modifier=Modifier.weight(1f)){Text(w["back"])}
-            Button(onClick={
-                if(!validProfile()){invalid=true;return@Button}
+            if(step>0)OutlineAction(onClick={step--;invalid=false},modifier=Modifier.weight(1f)){Text(w["back"])}
+            ActionButton(onClick={
+                if(!validProfile()){invalid=true;return@ActionButton}
                 if(step<4){step++;invalid=false}else{
                     repo.preferences{current->current.copy(name=name.trim(),birthYear=if(birth.isBlank())0 else whole(birth),
                         profileWeight=if(weight.isBlank())0.0 else com.yawmi.diabetes.core.Planner.parseNumber(weight),fluidRestricted=restricted,
@@ -110,6 +110,6 @@ import androidx.compose.ui.unit.dp
 @Composable fun PermissionTile(title:String,enabled:Boolean,detail:String,action:()->Unit){
     val w=LocalWords.current
     Panel{Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Column(Modifier.weight(1f)){Text(title,fontWeight=FontWeight.Bold);Text(w[if(enabled)"enabled"else"disabled"],style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.primary)}
-        TextButton(onClick=action){Text(w[if(enabled)"open"else"allow"])}}
+        TextAction(onClick=action){Text(w[if(enabled)"open"else"allow"])}}
         Text(detail,style=MaterialTheme.typography.bodySmall)}
 }

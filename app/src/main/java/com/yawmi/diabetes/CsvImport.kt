@@ -111,7 +111,7 @@ internal object CsvImport {
 internal fun CsvReview(preview: CsvPreview, state: State, busy: Boolean, onDismiss: () -> Unit, onConfirm: () -> Unit) {
     val w = LocalWords.current
     val pending = preview.additions(state)
-    AlertDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(w["csv_import"]) }, text = {
+    BrandedDialog(onDismissRequest = { if (!busy) onDismiss() }, title = { Text(w["csv_import"]) }, text = {
         Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
             Text(w.f("csv_import_count", "added" to number(pending.size.toDouble(), w),
                 "duplicate" to number((preview.entries.size - pending.size).toDouble(), w),
@@ -121,6 +121,6 @@ internal fun CsvReview(preview: CsvPreview, state: State, busy: Boolean, onDismi
                 ActivityRow(entry, state)
             }
         }
-    }, confirmButton = { TextButton(onConfirm, enabled = pending.isNotEmpty() && !busy) { Text(w["csv_confirm"]) } },
-        dismissButton = { TextButton(onDismiss, enabled = !busy) { Text(w["close"]) } })
+    }, confirmButton = { TextAction(onConfirm, enabled = pending.isNotEmpty() && !busy) { Text(w["csv_confirm"]) } },
+        dismissButton = { TextAction(onDismiss, enabled = !busy) { Text(w["close"]) } })
 }

@@ -45,12 +45,12 @@ private class DeskWidget(
     private val bold = Typeface.createFromAsset(context.assets, "fonts/tajawal_bold.ttf")
     private val scale = when (look.font) { "compact" -> .86f; "large" -> 1.19f; else -> 1f }
     private val base = parse(look.background, when (look.style) {
-        "forest" -> 0xFF163936.toInt()
-        "cream" -> 0xFFF8F0E4.toInt()
-        "blue" -> 0xFFE3F0FF.toInt()
-        "widget_rose" -> 0xFFFFE6EC.toInt()
-        "widget_midnight" -> 0xFF222F50.toInt()
-        else -> if (darkSystem) 0xFF192A46.toInt() else 0xFFEDF2FA.toInt()
+        "forest" -> 0xFF163A30.toInt()
+        "cream" -> 0xFFFFF3D6.toInt()
+        "blue" -> 0xFFDBF3FF.toInt()
+        "widget_rose" -> 0xFFF8DFE7.toInt()
+        "widget_midnight" -> 0xFF1E243A.toInt()
+        else -> if (darkSystem) 0xFF182D29.toInt() else 0xFFF3F0E5.toInt()
     })
     private val dark = ColorUtils.calculateLuminance(base) < .25
     private val baseInk = ink(base)
@@ -73,12 +73,13 @@ private class DeskWidget(
     }
     private fun panelColor(kind: String, featured: Boolean): Int {
         val tone = when (kind) {
-            "water" -> 0xFF71C8D5.toInt()
-            "medication" -> 0xFFF4AB82.toInt()
-            "day_summary" -> 0xFFB5A6F2.toInt()
-            else -> accent
+            "water" -> 0xFF9BDFF2.toInt()
+            "medication" -> 0xFFFFBA93.toInt()
+            "day_summary" -> 0xFFD7F483.toInt()
+            else -> 0xFFC4ADF4.toInt()
         }
-        return merge(base, tone, if (featured) (if (dark) .56f else .86f) else if (dark) .25f else .18f)
+        val customized = if (look.accent.isNotBlank()) merge(tone, accent, .64f) else tone
+        return merge(base, customized, if (featured) .92f else if (dark) .54f else .62f)
     }
 
     private fun rect(area: RectF, color: Int, round: Float) {
@@ -86,6 +87,19 @@ private class DeskWidget(
         paint.style = Paint.Style.FILL
         paint.color = color
         canvas.drawRoundRect(area, round, round, paint)
+    }
+
+    private fun facet(area: RectF, color: Int, radius: Float, reverse: Boolean = rtl) {
+        paint.color = translucent(color)
+        paint.style = Paint.Style.FILL
+        val big = radius
+        val small = radius * .49f
+        val left = if (reverse) small else big
+        val right = if (reverse) big else small
+        val path = Path().apply {
+            addRoundRect(area, floatArrayOf(left, left, right, right, left, left, right, right), Path.Direction.CW)
+        }
+        canvas.drawPath(path, paint)
     }
     private fun text(value: String, x: Float, baseline: Float, size: Float, limit: Float, color: Int,
         strong: Boolean = false, align: Paint.Align = if (rtl) Paint.Align.RIGHT else Paint.Align.LEFT) {
@@ -241,11 +255,11 @@ private class DeskWidget(
     }
 
     private fun metricCard(kind: String, hit: RectF, featured: Boolean) {
-        val area = RectF(hit).apply { inset(5f, 4f) }
+        val area = RectF(hit).apply { inset(5f, if (geometry.body == WidgetBody.ROWS) 3f else 5f) }
         val bg = panelColor(kind, featured)
         val fg = ink(bg)
         val muted = merge(bg, fg, .75f)
-        rect(area, translucent(bg), if (featured) 17f else 14f)
+        facet(area, bg, if (featured) 22f else 17f)
         val item = metrics(kind)
         val pad = if (area.width() < 81f) 6f else 10f
         val start = if(rtl)area.right-pad else area.left+pad
@@ -255,7 +269,7 @@ private class DeskWidget(
         if (geometry.compactAction && area.height() <= 85f) {
             val x = area.centerX()
             text(item.label, x, area.top + 16f, 10f, space, fg, true, Paint.Align.CENTER)
-            text(item.amount, x, area.top + 37f, 19f, space, fg, true, Paint.Align.CENTER)
+            text(item.amount, x, area.top + 37f, 23f, space, fg, true, Paint.Align.CENTER)
             text(item.unit, x, area.top + 48f, 8.5f, space, muted, align = Paint.Align.CENTER)
             if (look.details)
                 text(item.detail, x, area.top + 62f, 8.5f, space, muted, align = Paint.Align.CENTER)
@@ -274,22 +288,28 @@ private class DeskWidget(
             text(item.unit,end,mid+13f,8.5f,amountSpace,muted,false,align)
             return
         }
-        val hasVisual = area.width() >= 141f && area.height() >= 64f
-        val chartSpace = if (hasVisual) (space*.42f).coerceAtMost(132f) else 0f
-        text(item.label, start, area.top+19, 12.5f, space, fg, true)
-        val size = if (area.height() > 100 && featured) 34f else if (area.height()>75f) 25f else 19f
-        val baseline = area.top + min(area.height() - 13f, if (size>25f) 61f else 46f)
-        text(item.amount,start,baseline,size,space-chartSpace,fg,true)
-        if(item.unit.isNotBlank() && baseline+11<=area.bottom)
-            text(item.unit,start,baseline+11,9.5f,space-chartSpace,muted)
-        if (look.details && baseline+25<=area.bottom && item.detail.isNotBlank())
-            text(item.detail,start,baseline+24,9.5f,space,muted)
+        val hasVisual = area.width() > 126f && area.height() >= 65f
+        val chartSpace = if (hasVisual) (space*.41f).coerceAtMost(134f) else 0f
+        val textArea = space - chartSpace
+        text(item.label, start, area.top + 17f, 12f, textArea, fg, true)
+        val amountSize = when {
+            area.height() >= 96f && featured -> 38f
+            area.height() >= 69f -> 24f
+            else -> 18f
+        }
+        val baseline = area.top + min(area.height() - 16f, if (amountSize > 30f) 58f else 40f)
+        text(item.amount, start, baseline, amountSize, textArea, fg, true)
+        if (item.unit.isNotBlank() && baseline + 13f <= area.bottom)
+            text(item.unit,start,baseline+10f,9f,textArea,muted)
+        if (look.details && baseline + 24f <= area.bottom && item.detail.isNotBlank())
+            text(item.detail,start,baseline+20f,8.5f,textArea,muted)
         if (hasVisual) {
-            val left = if(rtl)area.left+pad else area.right-pad-chartSpace+5
-            val right = if(rtl)area.left+pad+chartSpace-5 else area.right-pad
-            visual(kind,RectF(left,area.top+26,right,min(area.bottom-9,area.top+100)),fg)
-        } else if (kind == "water" && area.height() >= 90 && area.width() >= 92) {
-            visual(kind,RectF(area.left+14,baseline+12,area.right-14,area.bottom-7),fg)
+            val left = if (rtl) area.left+pad else area.right-pad-chartSpace+4
+            val right = if (rtl) area.left+pad+chartSpace-4 else area.right-pad
+            val chart = RectF(left, area.top + 10f, right, area.bottom - 9f)
+            facet(chart, merge(bg, fg, .095f), 13f, reverse = !rtl)
+            chart.inset(6f, 8f)
+            visual(kind, chart, fg)
         }
     }
 
@@ -303,8 +323,14 @@ private class DeskWidget(
             val from = if (rtl) w-12 else 12f
             val settings = if (rtl) 22f else w-22f
             val hold = if (geometry.cycle) 88f else 44f
+            val control = merge(base, baseInk, .11f)
+            facet(RectF(settings-15f, 7f, settings+15f, 37f), control, 11f)
             glyph("settings", settings,22f,baseInk)
-            if (geometry.cycle) glyph("cycle", if(rtl)66f else w-66f,22f,baseInk)
+            if (geometry.cycle) {
+                val cycleX = if (rtl) 66f else w - 66f
+                facet(RectF(cycleX-15f, 7f, cycleX+15f, 37f), control, 11f)
+                glyph("cycle", cycleX,22f,baseInk)
+            }
             if (look.title) text(words["app"],from,27f,18f,w-hold-18f,baseInk,true)
         }
         geometry.parts.zip(geometry.cells(w,h)).forEachIndexed { i, (kind, area) ->
@@ -312,22 +338,23 @@ private class DeskWidget(
         }
         if (geometry.compactAction) {
             val x = if (rtl) 5f else w-37f
-            val fill = panelColor("water",true)
+            val fill = merge(panelColor("water", true), 0xFF0D4459.toInt(), .87f)
             val split = if (geometry.undo) h / 2 else h
-            rect(RectF(x, 6f, x+32f, split-5f), translucent(fill), 12f)
+            facet(RectF(x, 5f, x+32f, split-4f), fill, 14f)
             glyph("plus", x + 16f, split / 2, ink(fill))
             if (geometry.undo) {
-                rect(RectF(x, split+3f, x+32f, h-6f), translucent(merge(base, fill, .45f)), 12f)
-                glyph("cycle", x + 16f, split + split / 2, baseInk)
+                val undoTone = merge(base, panelColor("day_summary", true), .65f)
+                facet(RectF(x, split+3f, x+32f, h-5f), undoTone, 13f, reverse = !rtl)
+                glyph("cycle", x + 16f, split + split / 2, ink(undoTone))
             }
         }
         if (geometry.footer) {
-            val active = panelColor(geometry.footerKind,true)
+            val active = merge(panelColor(geometry.footerKind,true), 0xFF16352E.toInt(), .86f)
             val fg = ink(active)
             val area = if (geometry.undo) {
                 if(rtl)RectF(49f,h-39f,w-6f,h-6f) else RectF(6f,h-39f,w-49f,h-6f)
             } else RectF(6f,h-39f,w-6f,h-6f)
-            rect(area,translucent(active),13f)
+            facet(area,active,15f)
             val label = words[when(geometry.footerKind) {
                 "water" -> if(look.quickWater) "widget_add_cup" else "widget_log_water"
                 "glucose" -> "add_reading"
@@ -336,7 +363,12 @@ private class DeskWidget(
             glyph(if(geometry.footerKind in listOf("water","glucose"))"plus" else "arrow",
                 if(rtl)area.right-14 else area.left+14,area.centerY(),fg)
             text(label,if(rtl)area.right-26 else area.left+26,h-17,11.5f,area.width()-36,fg,true)
-            if(geometry.undo) glyph("cycle",if(rtl)22f else w-22f,h-23,baseInk)
+            if (geometry.undo) {
+                val undoX = if (rtl) 22f else w - 22f
+                val undoTone = panelColor("day_summary", false)
+                facet(RectF(undoX - 16f, h-39f, undoX + 16f, h-6f), undoTone, 13f)
+                glyph("cycle", undoX, h - 23f, ink(undoTone))
+            }
         }
         canvas.restore()
     }

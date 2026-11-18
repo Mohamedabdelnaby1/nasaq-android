@@ -4,6 +4,7 @@ package com.yawmi.diabetes
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -145,10 +146,10 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
     Scaffold(containerColor = c.background) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ScreenTitle(w["day_detail_title"]) {
+            SectionBanner("log", w["day_detail_title"], action = {
                 Row {
                     if (onAdd != null) Box {
-                        IconButton(onClick = { addMenu = true },
+                        IconAction(onClick = { addMenu = true },
                             modifier = Modifier.semantics { contentDescription = w["timeline_add"] }) {
                             Glyph("plus", Modifier.size(22.dp))
                         }
@@ -158,29 +159,29 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
                             }
                         }
                     }
-                IconButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                IconAction(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("close", Modifier.size(22.dp))
                 }
                 }
-            }
-            Surface(shape = BoardShape, color = c.primary, contentColor = c.onPrimary) {
+            })
+            Surface(shape = ControlShape, color = c.primary, contentColor = c.onPrimary) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                    IconButton(onClick = { selection = date.minusDays(1).toString() },
+                    IconAction(onClick = { selection = date.minusDays(1).toString() },
                         modifier = Modifier.semantics { contentDescription = w["previous_day"] }) {
                         Glyph("back", Modifier.size(20.dp), c.onPrimary)
                     }
                     Text(dateText(date.atStartOfDay(zone).toInstant().toEpochMilli(), w),
                         style = MaterialTheme.typography.titleMedium, color = c.onPrimary)
-                    IconButton(enabled = date < today, onClick = { selection = date.plusDays(1).toString() },
+                    IconAction(enabled = date < today, onClick = { selection = date.plusDays(1).toString() },
                         modifier = Modifier.semantics { contentDescription = w["next_day"] }) {
                         Glyph("arrow", Modifier.size(20.dp), if (date < today) c.onPrimary else c.onPrimary.copy(alpha = .35f))
                     }
                 }
             }
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 filters.forEach { kind ->
-                    FilterChip(selected = filter == kind, onClick = { filter = kind },
+                    ChoiceChip(selected = filter == kind, onClick = { filter = kind },
                         label = { Text(w[if (kind == "dose") "medication" else kind]) })
                 }
             }
@@ -233,7 +234,7 @@ private fun Timeline(summary: DayOverview, state: State, filter: String, day: Lo
                     if (index > 0) HorizontalDivider()
                     event.entry?.let { entry ->
                         ActivityRow(entry, state, trailing = if (onEdit != null) {{
-                            IconButton(onClick = { onEdit(entry) }, modifier = Modifier.size(40.dp)
+                            IconAction(onClick = { onEdit(entry) }, modifier = Modifier.size(40.dp)
                                 .semantics { contentDescription = w["edit"] + " " + w[if (entry.kind == "dose") "medication" else entry.kind] }) {
                                 Glyph("edit", Modifier.size(16.dp))
                             }

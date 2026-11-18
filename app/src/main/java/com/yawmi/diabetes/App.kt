@@ -6,6 +6,8 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -126,12 +128,12 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                 !repo.ready -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
                 repo.error=="load_error" -> Column(Modifier.fillMaxSize().padding(28.dp),verticalArrangement=Arrangement.Center) {
                     Text(w["load_error"],style=MaterialTheme.typography.titleLarge)
-                    Button(onClick={repo.refresh()}) {Text(w["retry"])}
-                    OutlinedButton(onClick={backupMode="restore"}) {Text(w["backup_restore"])}
+                    ActionButton(onClick={repo.refresh()}) {Text(w["retry"])}
+                    OutlineAction(onClick={backupMode="restore"}) {Text(w["backup_restore"])}
                 }
                 activity.locked -> Column(Modifier.fillMaxSize().padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
                     Glyph("shield",Modifier.size(72.dp));Spacer(Modifier.height(24.dp));Text(w["locked"],style=MaterialTheme.typography.headlineSmall)
-                    Spacer(Modifier.height(20.dp));Button(onClick={activity.unlock()}) {Text(w["unlock"])}
+                    Spacer(Modifier.height(20.dp));ActionButton(onClick={activity.unlock()}) {Text(w["unlock"])}
                 }
                 (!p.onboarded || p.setupVersion<2) -> SetupFlow(repo,activity)
                 else -> BoxWithConstraints {
@@ -226,17 +228,17 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         }
         pendingDose?.let { r ->
             val med=s.medications.find { it.id==r.medicationId }
-            AlertDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            BrandedDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text(med?.dose ?: "");Text(w["dose_confirm"]);Text(w["missed_hint"],style=MaterialTheme.typography.bodySmall)
                 if(!med?.instructions.isNullOrBlank()) Text(med!!.instructions,style=MaterialTheme.typography.bodySmall)
-            }},confirmButton={TextButton(onClick={
+            }},confirmButton={TextAction(onClick={
                 record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="taken",note=med?.let {"${it.name} · ${it.dose}"} ?: ""));pendingDose=null
-            },enabled=!repo.busy){Text(w["taken"])}},dismissButton={TextButton(onClick={
+            },enabled=!repo.busy){Text(w["taken"])}},dismissButton={TextAction(onClick={
                 record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="skipped",note=med?.name ?: ""));pendingDose=null
             },enabled=!repo.busy){Text(w["skipped"])}})
         }
-        delete?.let { e -> AlertDialog(onDismissRequest={delete=null},title={Text(w["delete"])},text={Text(w["delete_confirm"])},
-            confirmButton={TextButton(onClick={repo.delete(e.id);delete=null}){Text(w["delete"])}},dismissButton={TextButton(onClick={delete=null}){Text(w["cancel"])}}) }
+        delete?.let { e -> BrandedDialog(onDismissRequest={delete=null},title={Text(w["delete"])},text={Text(w["delete_confirm"])},
+            confirmButton={TextAction(onClick={repo.delete(e.id);delete=null}){Text(w["delete"])}},dismissButton={TextAction(onClick={delete=null}){Text(w["cancel"])}}) }
         activity.backupPreview?.let { incoming ->
             BackupRestoreReview(s, incoming, repo.error == "load_error", repo.busy,
                 onDismiss = { activity.backupPreview = null }) { useSettings, review ->
@@ -248,16 +250,16 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         }
         backupMode?.let { mode -> BackupDialog(mode,onDismiss={backupMode=null},onConfirm={password->backupMode=null;activity.backup(mode,password)}) }
         info?.let { kind ->
-            AlertDialog(onDismissRequest={info=null},title={Text(w[if(kind=="low") "low_alert" else if(kind=="privacy") "privacy" else "sick_days"])},text={
+            BrandedDialog(onDismissRequest={info=null},title={Text(w[if(kind=="low") "low_alert" else if(kind=="privacy") "privacy" else "sick_days"])},text={
                 Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
                     Text(w[if(kind=="low") "low_body" else if(kind=="privacy") "privacy_detail" else "urgent_body"])
                     if(kind=="sick") Text(p.sickPlan.ifBlank { w["no_plan"] })
-                    if(kind=="sick") OutlinedButton(onClick={activity.oneShot("symptom",60);info=null}) {Text(w["followup_schedule"])}
+                    if(kind=="sick") OutlineAction(onClick={activity.oneShot("symptom",60);info=null}) {Text(w["followup_schedule"])}
                     Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
                     if(kind=="low") Text(w["timer_warning"],style=MaterialTheme.typography.bodySmall)
-                    if(p.carePhone.isNotBlank() && kind!="privacy") OutlinedButton(onClick={activity.dial(p.carePhone)}) {Text(w["call_care"])}
+                    if(p.carePhone.isNotBlank() && kind!="privacy") OutlineAction(onClick={activity.dial(p.carePhone)}) {Text(w["call_care"])}
                 }
-            },confirmButton={TextButton(onClick={info=null}){Text(w["close"])}},dismissButton={if(kind=="low") TextButton(onClick={activity.oneShot("glucose",15);info=null}) {Text(w["recheck"])}})
+            },confirmButton={TextAction(onClick={info=null}){Text(w["close"])}},dismissButton={if(kind=="low") TextAction(onClick={activity.oneShot("glucose",15);info=null}) {Text(w["recheck"])}})
         }
         }
         if(homeLayoutOpen && !activity.locked){
@@ -299,8 +301,8 @@ internal fun SectionMotion(section: String, content: @Composable (String) -> Uni
                     (fadeOut(tween(220)) + slideOutVertically(tween(365, easing = NasaqEase)) { it / 7 })
             } else {
                 val direction = (if (to >= from) 1 else -1) * (if (rtl) -1 else 1)
-                (fadeIn(tween(280, 70)) + slideInHorizontally(tween(520, easing = NasaqEase)) { direction * it / 5 } +
-                    scaleIn(tween(490, easing = NasaqEase), initialScale = .985f)) togetherWith
+                (fadeIn(tween(280, 70)) + slideInHorizontally(tween(540, easing = NasaqEase)) { direction * it / 3 } +
+                    scaleIn(tween(490, easing = NasaqEase), initialScale = .945f)) togetherWith
                     (fadeOut(tween(185)) + slideOutHorizontally(tween(360, easing = NasaqEase)) { -direction * it / 10 })
             }
             result.using(null)
@@ -327,7 +329,7 @@ internal fun SectionMotion(section: String, content: @Composable (String) -> Uni
         Notice(w["onboard_hint"])
         Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
         Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {AssistChip(onClick={},label={Text(w["offline"])});AssistChip(onClick={},label={Text(w["no_account"])})}
-        Button(onClick={repo.preferences {it.copy(onboarded=true)}},enabled=!repo.busy,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {Text(w["start"])}
+        ActionButton(onClick={repo.preferences {it.copy(onboarded=true)}},enabled=!repo.busy,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {Text(w["start"])}
         Text(w["sample_warning"],style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
@@ -351,19 +353,19 @@ internal fun SectionMotion(section: String, content: @Composable (String) -> Uni
     Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
         Text(title,style=MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-            values.forEach { value->FilterChip(selected=selected==value,onClick={onSelect(value)},label={Text(label(value))},modifier=Modifier.pressResponse()) }
+            values.forEach { value->ChoiceChip(selected=selected==value,onClick={onSelect(value)},label={Text(label(value))},modifier=Modifier.pressResponse()) }
         }
     }
 }
 @Composable fun Toggle(title:String,checked:Boolean,subtitle:String?=null,onChange:(Boolean)->Unit) {
-    Row(Modifier.fillMaxWidth().pressResponse(compression=.985f).clickable {onChange(!checked)}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+    Row(Modifier.fillMaxWidth().clip(ControlShape).toggleable(value = checked, role = Role.Switch, onValueChange = onChange).heightIn(min = 50.dp).padding(horizontal = 8.dp, vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
         Column(Modifier.weight(1f)) {Text(title,style=MaterialTheme.typography.bodyLarge);if(subtitle!=null) Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        Switch(checked=checked,onCheckedChange=onChange)
+        Switch(checked = checked, onCheckedChange = null, thumbContent = if (checked) {{ Glyph("check", Modifier.size(14.dp), MaterialTheme.colorScheme.onPrimaryContainer) }} else null)
     }
 }
 @Composable fun EmptyState(title:String,description:String=LocalWords.current["empty_detail"]) {
     Column(Modifier.fillMaxWidth().padding(vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
-        Glyph("log",Modifier.size(36.dp),MaterialTheme.colorScheme.onSurfaceVariant)
+        DomainMark("log", Modifier.size(50.dp))
         Text(title,style=MaterialTheme.typography.titleMedium);Text(description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

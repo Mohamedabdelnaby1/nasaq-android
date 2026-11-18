@@ -56,7 +56,7 @@ fun medicineNameCandidates(lines:List<String>):List<String> = lines.map{it.trim(
     }
     val picker=rememberLauncherForActivityResult(ActivityResultContracts.GetContent()){uri->if(uri!=null)read(uri)}
     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)){
-        FilledTonalButton(enabled=!busy,onClick={
+        TonalAction(enabled=!busy,onClick={
             runCatching{
                 val directory=File(context.cacheDir,"medicine_scan").apply{mkdirs()}
                 directory.listFiles()?.filter{System.currentTimeMillis()-it.lastModified()>86_400_000L}?.forEach{it.delete()}
@@ -65,14 +65,14 @@ fun medicineNameCandidates(lines:List<String>):List<String> = lines.map{it.trim(
                 photo.launch(FileProvider.getUriForFile(context,context.packageName+".exports",file))
             }.onFailure{capture.takeIf{it.isNotBlank()}?.let{File(it).delete()};capture="";error=true}
         },modifier=Modifier.weight(1f)){Text(w["scan_box"])}
-        OutlinedButton(enabled=!busy,onClick={picker.launch("image/*")},modifier=Modifier.weight(1f)){Text(w["scan_pick"])}
+        OutlineAction(enabled=!busy,onClick={picker.launch("image/*")},modifier=Modifier.weight(1f)){Text(w["scan_pick"])}
     }
     if(busy)LinearProgressIndicator(Modifier.fillMaxWidth())
     if(error)Notice(w["scan_failed"],true)
-    if(candidates.isNotEmpty())AlertDialog(
+    if(candidates.isNotEmpty())BrandedDialog(
         onDismissRequest={candidates=emptyList()},
         title={Text(w["scan_review"])},
-        text={Column{Text(w["scan_review_note"]);candidates.forEach{candidate->TextButton(onClick={onChoose(candidate);candidates=emptyList()}){Text(candidate)}}}},
-        confirmButton={TextButton(onClick={candidates=emptyList()}){Text(w["cancel"])}}
+        text={Column{Text(w["scan_review_note"]);candidates.forEach{candidate->TextAction(onClick={onChoose(candidate);candidates=emptyList()}){Text(candidate)}}}},
+        confirmButton={TextAction(onClick={candidates=emptyList()}){Text(w["cancel"])}}
     )
 }

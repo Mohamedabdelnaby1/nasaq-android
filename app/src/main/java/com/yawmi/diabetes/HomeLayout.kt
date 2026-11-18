@@ -35,7 +35,7 @@ fun movedOrder(order:List<String>,key:String,delta:Int):List<String>{
         Panel(w["saved_layouts"]){
             FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){
                 listOf("morning_layout","evening_layout","travel_layout").forEach{key->
-                    FilterChip(selected=false,onClick={
+                    ChoiceChip(selected=false,onClick={
                         draft=when(key){
                             "morning_layout"->draft.copy(order=Preferences().order,compactHome=false,theme="light",palette="mint",dynamicColors=false)
                             "evening_layout"->draft.copy(order=listOf("water","medications","glucose","meals","symptoms"),compactHome=false,theme="dark",palette="blue",dynamicColors=false)
@@ -46,13 +46,13 @@ fun movedOrder(order:List<String>,key:String,delta:Int):List<String>{
             }
             if(onLayouts!=null){
                 Field(w["layout_name"],name,{name=it.take(40)})
-                FilledTonalButton(enabled=name.isNotBlank() && (layouts.size<12 || layouts.any{it.name==name.trim()}),onClick={
+                TonalAction(enabled=name.isNotBlank() && (layouts.size<12 || layouts.any{it.name==name.trim()}),onClick={
                     layouts=layouts.filterNot{it.name==name.trim()}+DayLayout.capture(name.trim(),draft);name=""
                 }){Text(w["save_layout"])}
                 layouts.forEach{layout->
                     Row(horizontalArrangement=Arrangement.spacedBy(6.dp)){
-                        TextButton(onClick={draft=layout.apply(draft)},modifier=Modifier.weight(1f)){Text(layout.name)}
-                        TextButton(onClick={layouts=layouts.filterNot{it.name==layout.name}}){Text(w["delete"])}
+                        TextAction(onClick={draft=layout.apply(draft)},modifier=Modifier.weight(1f)){Text(layout.name)}
+                        TextAction(onClick={layouts=layouts.filterNot{it.name==layout.name}}){Text(w["delete"])}
                     }
                 }
             }
@@ -99,8 +99,8 @@ fun movedOrder(order:List<String>,key:String,delta:Int):List<String>{
                         }
                     },contentAlignment=Alignment.Center){Glyph("drag",Modifier.size(21.dp))}
                     Text(w[kind],Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium,fontWeight=FontWeight.Medium)
-                    IconButton(onClick={onMove(kind,-1)},enabled=order.first()!=kind,modifier=Modifier.size(40.dp).semantics{contentDescription=w["move_up"]+" "+w[kind]}){Glyph("up",Modifier.size(16.dp))}
-                    IconButton(onClick={onMove(kind,1)},enabled=order.last()!=kind,modifier=Modifier.size(40.dp).semantics{contentDescription=w["move_down"]+" "+w[kind]}){Glyph("down",Modifier.size(16.dp))}
+                    IconAction(onClick={onMove(kind,-1)},enabled=order.first()!=kind,modifier=Modifier.size(40.dp).semantics{contentDescription=w["move_up"]+" "+w[kind]}){Glyph("up",Modifier.size(16.dp))}
+                    IconAction(onClick={onMove(kind,1)},enabled=order.last()!=kind,modifier=Modifier.size(40.dp).semantics{contentDescription=w["move_down"]+" "+w[kind]}){Glyph("down",Modifier.size(16.dp))}
                     if(showVisibility)Switch(checked=kind !in hidden,onCheckedChange={onVisible(kind,it)})
                 }
             }

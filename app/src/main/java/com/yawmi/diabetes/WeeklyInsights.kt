@@ -75,7 +75,7 @@ fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.sy
         }
         val date = focus.date.format(formatter)
         Text(date + " · " + if (focus.hasData) summaryLine(focus, w) else w["missing_data"], style = MaterialTheme.typography.bodySmall)
-        if (onOpenDay != null) TextButton(onClick = { onOpenDay(focus.date) }) { Text(w["open_selected_day"]) }
+        if (onOpenDay != null) TextAction(onClick = { onOpenDay(focus.date) }) { Text(w["open_selected_day"]) }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)){
             Text(w["week_metric"],Modifier.weight(1.2f),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)
