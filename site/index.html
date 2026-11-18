@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="نَسَق تطبيق أندرويد مفتوح المصدر لمتابعة السكر والمياه والأدوية.">
+  <meta name="theme-color" content="#103e36">
+  <title>نَسَق — متابعة يومك مع السكري</title>
+  <link rel="icon" href="assets/mark.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+  <script src="demo.js" defer></script>
+</head>
+<body>
+  <svg class="symbols" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <symbol id="drop" viewBox="0 0 24 24"><path d="M12 2.5c3.5 5.1 7.2 8.1 7.2 12.4a7.2 7.2 0 1 1-14.4 0C4.8 10.6 8.5 7.6 12 2.5Z"/><path d="M8.4 15.7a3.7 3.7 0 0 0 3.6 2.8"/></symbol>
+    <symbol id="chart" viewBox="0 0 24 24"><path d="M4 19h16M5 15l4-4 4 2 6-7m-4 0h4v4"/></symbol>
+    <symbol id="grid" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18m-11 0v10"/></symbol>
+    <symbol id="shield" viewBox="0 0 24 24"><path d="M12 22c5-2 8-4.6 8-10V5l-8-3-8 3v7c0 5.4 3 8 8 10Zm-3-10 2 2 4-4"/></symbol>
+    <symbol id="arrow" viewBox="0 0 24 24"><path d="M19 12H5m6-6-6 6 6 6"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  </svg>
+
+  <header class="header">
+    <div class="shell bar">
+      <a class="brand" href="#top"><img src="assets/mark.svg" width="44" height="44" alt=""><span>نَسَق <small lang="en">NASAQ</small></span></a>
+      <nav aria-label="القائمة الرئيسية">
+        <a href="#features">المزايا</a><a href="#preview">الصور والتجربة</a>
+      </nav>
+      <a class="code-link" href="https://github.com/Mohamedabdelnaby1/nasaq-android">GitHub <svg class="icon"><use href="#arrow"/></svg></a>
+    </div>
+  </header>
+
+  <main id="top">
+    <section class="hero">
+      <div class="shell hero-grid">
+        <div>
+          <p class="platform">متابعة يومية على أندرويد</p>
+          <h1>يومك مع السكري<br><em>في نَسَق.</em></h1>
+          <p class="lead">سجّل قراءاتك وكوبايات المياه وجرعاتك. شوف متوسط السكر وملخص يومك في التطبيق أو من الشاشة الرئيسية.</p>
+          <div class="hero-actions">
+            <a class="button primary" href="#preview">استكشف الواجهة <svg class="icon"><use href="#arrow"/></svg></a>
+            <a class="button quiet" href="https://github.com/Mohamedabdelnaby1/nasaq-android">شوف الكود</a>
+          </div>
+          <p class="system">أندرويد 8 فأحدث · عربي وإنجليزي · حفظ محلي</p>
+        </div>
+        <div class="hero-visual">
+          <div class="hero-orbit" aria-hidden="true"></div>
+          <div class="phone"><img src="assets/screen-today.png" width="411" height="891" alt="الشاشة اليومية في تطبيق نَسَق" fetchpriority="high"></div>
+          <div class="widget-float"><img src="assets/screen-widget.png" width="450" height="375" alt="ويدجت السكر والمياه والدواء"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell" id="features">
+      <h2>سجّل يومك وراجعه</h2>
+      <div class="features">
+        <article><span class="feature-icon"><svg class="icon"><use href="#chart"/></svg></span><h3>متوسط قراءات اليوم</h3><p>احفظ سياق القياس ووحدته. يجمع نَسَق قراءات اليوم بعد توحيد الوحدات ويعرض المتوسط بوحدة العرض اللي اخترتها.</p></article>
+        <article><span class="feature-icon water"><svg class="icon"><use href="#drop"/></svg></span><h3>كوباية بضغطة</h3><p>حدد هدفك وحجم الكوباية. مع كل تسجيل يتغير مستوى المياه في الزجاجة، وتقدر تضيف كمية تانية يدويًا.</p></article>
+        <article><span class="feature-icon gold"><svg class="icon"><use href="#grid"/></svg></span><h3>كل بطاقة تفتح قسمها</h3><p>اختار شكل الويدجت ومحتواه. اضغط على السكر أو المياه أو الدواء للوصول للقسم الخاص بيه.</p></article>
+        <article><span class="feature-icon"><svg class="icon"><use href="#shield"/></svg></span><h3>بياناتك على جهازك</h3><p>سجلك محفوظ بتشفير محلي. تقدر تصدّر نسخة احتياطية مشفّرة بكلمة مرور وتسترجعها عند تغيير الهاتف.</p></article>
+      </div>
+    </section>
+
+    <section class="preview" id="preview">
+      <div class="shell section">
+        <h2>جولة في نَسَق</h2>
+        <div class="preview-grid">
+          <figure class="capture"><img src="assets/screen-water.png" width="411" height="891" loading="lazy" alt="شاشة المياه وفيها الزجاجة وأكواب تسجيل المياه"><figcaption>شاشة المياه في أندرويد · بيانات تجريبية</figcaption></figure>
+          <div class="demo">
+            <div class="demo-copy">
+              <h3>جرّب تسجيل كوباية</h3>
+              <p>المعاينة بتبدأ بهدف تجريبي قدره لتر. كل ضغطة تضيف 250 مل.</p>
+            </div>
+            <div class="demo-body">
+              <div class="bottle" aria-hidden="true"><div class="cap"></div><div class="glass"><div class="liquid"></div><div class="shine"></div><div class="marks"></div></div></div>
+              <div>
+                <p class="readout"><output id="amount" aria-live="polite">٠</output><span> مل</span></p>
+                <progress id="progress" value="0" max="1000" aria-label="الكمية المسجّلة من هدف المياه"></progress>
+                <div class="demo-actions"><button id="add" type="button" class="button primary"><svg class="icon"><use href="#plus"/></svg> سجّل كوباية</button><button id="reset" type="button" class="button quiet" disabled>إعادة</button></div>
+              </div>
+            </div>
+            <details class="motion-preview">
+              <summary>شاهد حركة التسجيل داخل تطبيق أندرويد</summary>
+              <img data-motion="assets/water-motion.webp" width="360" height="455" alt="معاينة حركة الزجاجة والكوبايات عند تسجيل ثلاث كوبايات">
+            </details>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section shell" aria-labelledby="widgets-title">
+      <h2 id="widgets-title">الويدجت بالشكل اللي يناسبك</h2>
+      <div class="widget-gallery">
+        <figure><img src="assets/screen-widget.png" width="450" height="375" loading="lazy" alt="ثلاث بطاقات للسكر والمياه والدواء"><figcaption>بطاقات جنب بعض</figcaption></figure>
+        <figure><img src="assets/widget-rows.png" width="450" height="375" loading="lazy" alt="صف مستقل لكل قسم وفيه الاسم والقياس"><figcaption>صفوف للقراءة السريعة</figcaption></figure>
+        <figure><img src="assets/widget-day.png" width="450" height="375" loading="lazy" alt="ملخص بمتوسط السكر والمياه المسجلة ومتوسط المياه"><figcaption>ملخص اليوم</figcaption></figure>
+      </div>
+    </section>
+
+    <footer class="shell footer">
+      <a class="brand" href="#top"><img src="assets/mark.svg" width="42" height="42" alt=""><span>نَسَق</span></a>
+      <p>تطوير <a href="https://fb.com/mohamedabdelnaby190">محمد عبدالنبي</a> · <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/blob/main/LICENSE">رخصة MIT</a></p>
+    </footer>
+  </main>
+</body>
+</html>

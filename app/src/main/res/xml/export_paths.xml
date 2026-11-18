@@ -1,0 +1,4 @@
+<paths>
+    <cache-path name="exports" path="exports/" />
+    <cache-path name="medicine_scan" path="medicine_scan/" />
+</paths>

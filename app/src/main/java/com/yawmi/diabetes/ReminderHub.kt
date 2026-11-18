@@ -1,0 +1,168 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+package com.yawmi.diabetes
+
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import java.time.*
+
+data class RoutineEvent(val time:Long,val kind:String,val reminder:Reminder?=null)
+fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId.systemDefault()):List<RoutineEvent>{
+    val day=Instant.ofEpochMilli(now).atZone(zone).toLocalDate();val until=now+86400000
+    val reminders=Reminders.plan(s,now,until).take(10).map{RoutineEvent(it.due,it.kind,it)}
+    val routine=listOf("wake" to s.preferences.quietEnd,"sleep" to s.preferences.quietStart).map{(kind,raw)->
+        var stamp=day.atTime(LocalTime.parse(raw)).atZone(zone).toInstant().toEpochMilli()
+        if(stamp<now)stamp=day.plusDays(1).atTime(LocalTime.parse(raw)).atZone(zone).toInstant().toEpochMilli()
+        RoutineEvent(stamp,kind)
+    }
+    return (reminders+routine).sortedBy{it.time}
+}
+
+@Composable fun ReminderHub(repo:Repository,activity:MainActivity){
+    val s=repo.state;val w=LocalWords.current
+    var edit by remember{mutableStateOf<String?>(null)}
+    var med by remember{mutableStateOf<Medication?>(null)}
+    var medications by remember{mutableStateOf(false)}
+    var audit by remember{mutableStateOf(false)}
+    var care by remember{mutableStateOf(false)}
+    val suggestion=remember(s.revision,s.preferences){waterSuggestion(s)}
+    val allowed=remember(activity.permissionRevision){Reminders.permitted(activity)}
+    val precise=remember(activity.permissionRevision){Reminders.exact(activity)}
+    ReminderHubContent(s,allowed,precise,edit={edit=it},event={e->
+        if(e.kind=="care")care=true
+        else if(e.reminder?.kind=="medication")med=s.medications.find{it.id==e.reminder.medicationId}
+        else edit=if(e.kind in setOf("wake","sleep"))"quiet"else e.kind
+    },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={activity.testNotification()},medications={medications=true},
+        suggestion=suggestion,onApply={
+            if(suggestion!=null)repo.preferences{
+                val wake=LocalTime.parse(it.quietEnd)
+                val offset=Math.floorMod(suggestion.time.toSecondOfDay()-wake.toSecondOfDay(),86400)/60
+                it.copy(waterOffset=offset.coerceIn(0,240))
+            }
+        },onReset={repo.preferences{it.copy(waterOffset=0)}},onRepair={activity.reschedule()},
+        onBattery={activity.batterySettings()},onCare={care=true})
+    if(care)CareTools(s,{care=false}){change->repo.change(block=change)}
+    edit?.let{kind->
+        if(kind in setOf("water","glucose"))ReminderScheduleEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null},channel={activity.channel(kind)},test={activity.testNotification(kind)})
+        else if(kind=="audit"){audit=true;edit=null}
+        else PreferencesEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null})
+    }
+    if(medications)AlertDialog(onDismissRequest={medications=false},title={Text(w["medications"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
+        if(s.medications.isEmpty())Text(w["no_meds"])
+        s.medications.forEach{m->TextButton(onClick={med=m;medications=false}){Text(m.name)}}
+    }},confirmButton={TextButton(onClick={medications=false}){Text(w["close"])}})
+    med?.let{m->MedicationEditor(m,s.preferences,{med=null},{repo.put(it);med=null})}
+    if(audit)AlertDialog(onDismissRequest={audit=false},title={Text(w["notification_log"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)){
+        if(s.audit.isEmpty())Text(w["no_audit"])
+        s.audit.takeLast(20).reversed().forEach{a->Text(dateText(a.time,w)+" "+timeText(a.time,w)+" · "+w[if(a.kind=="medication")"medication"else a.kind]+" · "+w[a.status],style=MaterialTheme.typography.bodySmall)}
+    }},confirmButton={TextButton(onClick={audit=false}){Text(w["close"])}})
+}
+
+@Composable fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
+    suggestion:WaterSuggestion?=null,onApply:()->Unit={},onReset:()->Unit={},onRepair:()->Unit={},onBattery:()->Unit={},onCare:()->Unit={}){
+    val w=LocalWords.current;val c=MaterialTheme.colorScheme
+    var now by remember{mutableLongStateOf(System.currentTimeMillis())}
+    LaunchedEffect(Unit){while(true){kotlinx.coroutines.delay(60000);now=System.currentTimeMillis()}}
+    val events=remember(s.revision,s.preferences,now/60000){routineEvents(s,now)}
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom=75.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
+        PageIntro(w["notification_hub"],w["notification_hub_body"],"bell")
+        Surface(color=LocalBrand.current,shape=RoundedCornerShape(24.dp)){Box{Pattern(Modifier.matchParentSize());Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
+            Text(w["reminder_readiness"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Color.White)
+            Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
+                ReadinessTile(w["permission"],allowed,Modifier.weight(1f),permission)
+                ReadinessTile(w["exact"],precise,Modifier.weight(1f),exact)
+            }
+            Button(onClick=test,colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),shape=RoundedCornerShape(13.dp),modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}
+        }}}
+        Panel{
+            SettingsRow("water",w["water_reminders"],w[if(s.preferences.waterEnabled)"enabled"else"disabled"]){edit("water")}
+            SettingsRow("glucose",w["glucose_reminders"],w[if(s.preferences.glucoseEnabled)"enabled"else"disabled"]){edit("glucose")}
+            SettingsRow("medication",w["medications"],w["per_medicine_policy"]){medications()}
+            SettingsRow("care",w["care_tools"],w["care_tools_subtitle"],onCare)
+        }
+        if(suggestion!=null || s.preferences.waterOffset>0)Panel(w["adaptive_water"]){
+            if(suggestion!=null){
+                Text(w.f("water_pattern","time" to suggestion.time.toString(),"days" to number(suggestion.respondingDays.toDouble(),w)))
+                FilledTonalButton(onClick=onApply){Text(w["apply_water_time"])}
+            }
+            if(s.preferences.waterOffset>0)TextButton(onClick=onReset){Text(w["reset_water_time"])}
+        }
+        SectionHeading(w["day_timeline"],w["sleep_card"]){edit("quiet")}
+        Panel{
+            Text(w["timeline_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+            events.forEachIndexed{index,e->
+                val kind=when(e.kind){"wake"->"sun";"sleep"->"moon";else->e.kind}
+                Row(Modifier.fillMaxWidth().clickable{event(e)}.padding(vertical=7.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){
+                    Column(horizontalAlignment=Alignment.CenterHorizontally){
+                        Surface(shape=CircleShape,color=if(e.kind=="water")Aqua.copy(alpha=.12f)else c.primaryContainer){Glyph(kind,Modifier.padding(9.dp).size(18.dp),if(e.kind=="water")Aqua else c.primary)}
+                        if(index<events.lastIndex)Box(Modifier.width(1.dp).height(13.dp).background(c.outlineVariant))
+                    }
+                    Column(Modifier.weight(1f)){
+                        Text(when(e.kind){"wake"->w["wake_time"];"sleep"->w["sleep_time"];"medication"->s.medications.find{it.id==e.reminder?.medicationId}?.name ?: w["medication"];"care"->s.care.items.find{it.id==e.reminder?.occurrence}?.title ?: w["care_tools"];else->w[e.kind]},style=MaterialTheme.typography.bodyMedium,fontWeight=FontWeight.Medium)
+                        Text(dateText(e.time,w),style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+                    }
+                    Text(timeText(e.time,w),style=MaterialTheme.typography.labelLarge,fontWeight=FontWeight.Bold);Glyph("edit",Modifier.size(16.dp))
+                }
+            }
+        }
+        Panel{
+            SettingsRow("bell",w["repeat_and_snooze"],w["policy_shared_hint"]){edit("repeat")}
+            SettingsRow("log",w["notification_log"]){edit("audit")}
+            SettingsRow("bell",w["repair_reminders"],onClick=onRepair)
+            SettingsRow("settings",w["battery_settings"],onClick=onBattery)
+        }
+        Text(w["notification_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+    }
+}
+
+@Composable private fun ReadinessTile(title:String,ready:Boolean,modifier:Modifier,onClick:()->Unit){
+    Surface(onClick=onClick,color=Color.White.copy(alpha=.08f),shape=RoundedCornerShape(14.dp),modifier=modifier){Column(Modifier.padding(12.dp),verticalArrangement=Arrangement.spacedBy(7.dp)){
+        Glyph(if(ready)"check"else"info",Modifier.size(20.dp),Gold)
+        Text(title,style=MaterialTheme.typography.labelMedium,color=Color.White)
+        Text(LocalWords.current[if(ready)"enabled"else"allow"],style=MaterialTheme.typography.labelSmall,color=Color(0xFFD5E6DB))
+    }}
+}
+
+@Composable fun ReminderScheduleEditor(kind:String,p:Preferences,onDismiss:()->Unit,onSave:(Preferences)->Unit,channel:()->Unit,test:()->Unit){
+    val water=kind=="water";val w=LocalWords.current
+    var enabled by remember{mutableStateOf(if(water)p.waterEnabled else p.glucoseEnabled)}
+    var days by remember{mutableStateOf(if(water)p.waterDays else p.glucoseDays)}
+    var smart by remember{mutableStateOf(p.waterSmart)}
+    var litres by remember{mutableStateOf((p.waterGoal/1000.0).toString())};var cup by remember{mutableStateOf(p.cup.toString())}
+    var interval by remember{mutableStateOf(p.waterEvery.toString())};var times by remember{mutableStateOf(p.glucoseTimes.joinToString(","))}
+    var after by remember{mutableStateOf(p.afterMealEnabled)};var delay by remember{mutableStateOf(p.afterMealMinutes.toString())}
+    var invalid by remember{mutableStateOf(false)}
+    EditorShell(w[if(water)"water_reminders"else"glucose_reminders"],onDismiss,{
+        try{
+            val next=if(water)p.copy(waterEnabled=enabled,waterDays=days,waterSmart=smart,waterGoal=litresToMl(litres),cup=whole(cup),waterEvery=whole(interval))
+                else p.copy(glucoseEnabled=enabled,glucoseDays=days,glucoseTimes=parseTimes(times),afterMealEnabled=after,afterMealMinutes=whole(delay))
+            require(!enabled || days.isNotEmpty());require(!water || !enabled || !smart || next.waterGoal>0)
+            Codec.validate(State(preferences=next));onSave(next)
+        }catch(e:Exception){invalid=true}
+    }){
+        Toggle(w["enabled"],enabled){enabled=it}
+        Text(w["reminder_days"],style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){(1..7).forEach{day->FilterChip(selected=day in days,onClick={days=if(day in days)days-day else days+day},label={Text(w[dayKey(day)])},shape=RoundedCornerShape(50))}}
+        if(water){
+            Toggle(w["smart_water_reminders"],smart,w["smart_water_hint"]){smart=it}
+            Field(w["daily_litres"],litres,{litres=it;invalid=false},true)
+            Field(w["cup_size"],cup,{cup=it;invalid=false},true)
+            if(!smart)Field(w["minutes"],interval,{interval=it;invalid=false},true)
+            else Text(w["wake_time"]+": "+p.quietEnd+" · "+w["sleep_time"]+": "+p.quietStart,style=MaterialTheme.typography.bodySmall)
+        }else{
+            TimesEditor(w["time"],times,{times=it;invalid=false})
+            Toggle(w["after_meal_reminders"],after){after=it}
+            if(after)Field(w["minutes"],delay,{delay=it;invalid=false},true)
+        }
+        Panel{SettingsRow("bell",w["channel"],w["notification_sound_note"],channel);OutlinedButton(onClick=test,modifier=Modifier.fillMaxWidth()){Text(w["test_notification"])}}
+        if(invalid)Notice(w["schedule_error"],true)
+        Text(w["policy_shared_hint"],style=MaterialTheme.typography.bodySmall)
+    }
+}

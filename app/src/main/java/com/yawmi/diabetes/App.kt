@@ -1,0 +1,254 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class,androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+package com.yawmi.diabetes
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.animation.*
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import java.text.NumberFormat
+import java.time.*
+import java.time.format.DateTimeFormatter
+import java.time.format.FormatStyle
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+
+fun number(value:Double,w:Words,digits:Int=0):String=NumberFormat.getNumberInstance(w.locale).apply {
+    maximumFractionDigits=digits;minimumFractionDigits=0
+}.format(value)
+fun dateText(time:Long,w:Words):String=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
+    .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(w.locale))
+fun timeText(time:Long,w:Words):String=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
+    .format(DateTimeFormatter.ofPattern("HH:mm").withLocale(w.locale))
+fun isToday(time:Long)=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()==LocalDate.now()
+fun periodStart(days:Int)=LocalDate.now().minusDays((days-1).toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
+
+@Composable fun YawmiApp(repo:Repository,activity:MainActivity) {
+    val s=repo.state;val p=s.preferences
+    YawmiTheme(p) {
+        val w=LocalWords.current
+        var tab by rememberSaveable { mutableStateOf("today") }
+        var form by rememberSaveable { mutableStateOf<String?>(null) }
+        var medEdit by remember { mutableStateOf<Medication?>(null) }
+        var recordEdit by remember { mutableStateOf<Entry?>(null) }
+        var draftEntry by remember { mutableStateOf<Entry?>(null) }
+        var pendingDose by remember { mutableStateOf<Reminder?>(null) }
+        var delete by remember { mutableStateOf<Entry?>(null) }
+        var backupMode by remember { mutableStateOf<String?>(null) }
+        var info by remember { mutableStateOf<String?>(null) }
+        val snackbar=remember { SnackbarHostState() }
+        val scope=rememberCoroutineScope();val feedback=rememberFeedback()
+        var homeLayoutOpen by remember{mutableStateOf(false)}
+        var saveNotice by remember { mutableStateOf<Job?>(null) }
+        fun saved(entry:Entry,previous:Entry?,actual:State){
+            val stored=actual.entries.find{it.id==entry.id} ?: return
+            feedback()
+            if(entry.kind=="glucose" && mg(entry)<70)info="low"
+            saveNotice?.cancel()
+            saveNotice = scope.launch {
+                val action = withTimeoutOrNull(8_000) {
+                    snackbar.showSnackbar(w["record_saved"], w["undo"], withDismissAction = true, duration = SnackbarDuration.Long)
+                }
+                if(action==SnackbarResult.ActionPerformed)
+                    repo.change{RecordUndo.revert(it,stored,previous)}
+            }
+        }
+        fun record(entry:Entry){repo.add(entry){saved(entry,null,it)}}
+        LaunchedEffect(activity.requestedScreen, activity.requestedEntry, activity.locked, p.setupVersion) {
+            val screen = activity.requestedScreen
+            val entry = activity.requestedEntry
+            if (!activity.locked && p.setupVersion >= 2 && (screen.isNotBlank() || entry.isNotBlank())) {
+                if (screen.isNotBlank()) tab = screen
+                recordEdit = null
+                draftEntry = null
+                medEdit = null
+                pendingDose = null
+                homeLayoutOpen = false
+                form = entry.takeIf { it in setOf("glucose", "water", "meal", "symptom", "care_tools", "day_summary") }
+                activity.requestedScreen = ""
+                activity.requestedEntry = ""
+            }
+        }
+        LaunchedEffect(repo.error) { repo.error?.takeIf { it!="load_error" }?.let { snackbar.showSnackbar(w[it]);repo.clearError() } }
+        BackHandler(enabled=form!=null || medEdit!=null || tab!="today") { if(form!=null) {form=null;recordEdit=null;draftEntry=null} else if(medEdit!=null) medEdit=null else tab="today" }
+        Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
+            when {
+                !repo.ready -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
+                repo.error=="load_error" -> Column(Modifier.fillMaxSize().padding(28.dp),verticalArrangement=Arrangement.Center) {
+                    Text(w["load_error"],style=MaterialTheme.typography.titleLarge)
+                    Button(onClick={repo.refresh()}) {Text(w["retry"])}
+                    OutlinedButton(onClick={backupMode="restore"}) {Text(w["backup_restore"])}
+                }
+                activity.locked -> Column(Modifier.fillMaxSize().padding(32.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.Center) {
+                    Glyph("shield",Modifier.size(72.dp));Spacer(Modifier.height(24.dp));Text(w["locked"],style=MaterialTheme.typography.headlineSmall)
+                    Spacer(Modifier.height(20.dp));Button(onClick={activity.unlock()}) {Text(w["unlock"])}
+                }
+                (!p.onboarded || p.setupVersion<2) -> SetupFlow(repo,activity)
+                else -> BoxWithConstraints {
+                    val wide=maxWidth>=840.dp
+                    Row(Modifier.fillMaxSize()) {
+                        if(wide) NavigationRail(Modifier.fillMaxHeight().windowInsetsPadding(WindowInsets.statusBars),containerColor=MaterialTheme.colorScheme.surfaceContainerLow) {
+                            Spacer(Modifier.height(24.dp))
+                            Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(40.dp))
+                            Spacer(Modifier.height(24.dp))
+                            listOf("today","log","medications","insights","settings").forEach { key ->
+                                NavigationRailItem(selected=tab==key,onClick={tab=key},icon={Glyph(key,Modifier.size(24.dp))},label={Text(w[key])})
+                            }
+                        }
+                        AppChrome(tab,p,onTab={tab=it},onQuick={form="quick"},notifications={tab="settings";activity.openNotifications=true},snackbar=snackbar) { insets ->
+                            val content:@Composable (String)->Unit={destination->
+                                Box(Modifier.fillMaxSize().padding(insets),contentAlignment=Alignment.TopCenter) {
+                                    Box(Modifier.widthIn(max=1000.dp).fillMaxSize()) {
+                                        when(destination) {
+                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={tab="day_summary"})
+                                            "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
+                                                initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"})
+                                            "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
+                                                portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))})
+                                            "day_summary" -> DayOverviewScreen(s) { tab="today" }
+                                            "medications"->Medicines(s,add={form="new_med"},edit={medEdit=it},dose={pendingDose=it},manual={form="dose"})
+                                            "insights"->Insights(s,add={form=it},export={days,type->activity.export(s,days,type)})
+                                            else->SettingsScreen(repo,activity,backup={backupMode=it},info={info=it})
+                                        }
+                                    }
+                                }
+                            }
+                            val sections = listOf("today","log","medications","insights","settings")
+                            if (p.reduceMotion) content(tab) else AnimatedContent(targetState=tab,transitionSpec={
+                                val from = sections.indexOf(initialState)
+                                val to = sections.indexOf(targetState)
+                                if (from < 0 || to < 0) {
+                                    val direction = if (to < 0) 1 else -1
+                                    (fadeIn(tween(280,60)) + slideInVertically(tween(350,easing=FastOutSlowInEasing)){direction*it/8}) togetherWith
+                                        (fadeOut(tween(190)) + slideOutVertically(tween(260)){-direction*it/18})
+                                } else {
+                                    val direction = (if(to>=from)1 else -1) * (if(w.rtl)-1 else 1)
+                                    (fadeIn(tween(280,45)) + slideInHorizontally(tween(350,easing=FastOutSlowInEasing)){direction*it/5}) togetherWith
+                                        (fadeOut(tween(170)) + slideOutHorizontally(tween(250)){-direction*it/9})
+                                }
+                            },label="section") { destination -> content(destination) }
+                        }
+                    }
+                    if(repo.busy) LinearProgressIndicator(Modifier.fillMaxWidth().align(Alignment.TopCenter))
+                }
+            }
+        }
+        if(!activity.locked || repo.error=="load_error") {
+        if(form=="quick")QuickActionsSheet(onDismiss={form=null},choose={form=it})
+        else if(form=="assistant_title")ArabicAssistant(s,{form=null}){entry->draftEntry=entry;form=entry.kind}
+        else if(form=="day_summary") androidx.compose.ui.window.Dialog(
+            onDismissRequest={form=null},
+            properties=androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth=false,decorFitsSystemWindows=false)
+        ) { DayOverviewScreen(s) { form=null } }
+        else if(form=="care_tools")CareTools(s,{form=null}){change->repo.change(block=change)}
+        else if(form=="new_med" || medEdit!=null) MedicationEditor(medEdit,p,onDismiss={form=null;medEdit=null},onSave={repo.put(it);form=null;medEdit=null})
+        else form?.let { kind -> val commit:(Entry)->Unit={entry ->
+            val old=recordEdit
+            if(old!=null)repo.change(onSuccess={saved(entry,old,it)}){Records.add(Records.remove(it,entry.id),entry)}else record(entry)
+            form=null;recordEdit=null;draftEntry=null
+        }
+        if(kind in setOf("glucose","water"))QuickEntrySheet(kind,recordEdit,s,onDismiss={form=null;recordEdit=null;draftEntry=null},onSave=commit,draft=draftEntry)
+        else EntryEditor(kind,recordEdit,s,onDismiss={form=null;recordEdit=null},onSave=commit)
+        }
+        pendingDose?.let { r ->
+            val med=s.medications.find { it.id==r.medicationId }
+            AlertDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
+                Text(med?.dose ?: "");Text(w["dose_confirm"]);Text(w["missed_hint"],style=MaterialTheme.typography.bodySmall)
+                if(!med?.instructions.isNullOrBlank()) Text(med!!.instructions,style=MaterialTheme.typography.bodySmall)
+            }},confirmButton={TextButton(onClick={
+                record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="taken",note=med?.let {"${it.name} · ${it.dose}"} ?: ""));pendingDose=null
+            },enabled=!repo.busy){Text(w["taken"])}},dismissButton={TextButton(onClick={
+                record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="skipped",note=med?.name ?: ""));pendingDose=null
+            },enabled=!repo.busy){Text(w["skipped"])}})
+        }
+        delete?.let { e -> AlertDialog(onDismissRequest={delete=null},title={Text(w["delete"])},text={Text(w["delete_confirm"])},
+            confirmButton={TextButton(onClick={repo.delete(e.id);delete=null}){Text(w["delete"])}},dismissButton={TextButton(onClick={delete=null}){Text(w["cancel"])}}) }
+        backupMode?.let { mode -> BackupDialog(mode,onDismiss={backupMode=null},onConfirm={password->backupMode=null;activity.backup(mode,password)}) }
+        info?.let { kind ->
+            AlertDialog(onDismissRequest={info=null},title={Text(w[if(kind=="low") "low_alert" else if(kind=="privacy") "privacy" else "sick_days"])},text={
+                Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(14.dp)) {
+                    Text(w[if(kind=="low") "low_body" else if(kind=="privacy") "privacy_detail" else "urgent_body"])
+                    if(kind=="sick") Text(p.sickPlan.ifBlank { w["no_plan"] })
+                    if(kind=="sick") OutlinedButton(onClick={activity.oneShot("symptom",60);info=null}) {Text(w["followup_schedule"])}
+                    Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
+                    if(kind=="low") Text(w["timer_warning"],style=MaterialTheme.typography.bodySmall)
+                    if(p.carePhone.isNotBlank() && kind!="privacy") OutlinedButton(onClick={activity.dial(p.carePhone)}) {Text(w["call_care"])}
+                }
+            },confirmButton={TextButton(onClick={info=null}){Text(w["close"])}},dismissButton={if(kind=="low") TextButton(onClick={activity.oneShot("glucose",15);info=null}) {Text(w["recheck"])}})
+        }
+        }
+        if(homeLayoutOpen && !activity.locked){
+            var layouts by remember{mutableStateOf(s.care.layouts)}
+            HomeLayoutEditor(s,onDismiss={homeLayoutOpen=false},onSave={next->repo.saveLayout(next,layouts);homeLayoutOpen=false},onLayouts={layouts=it})
+        }
+    }
+}
+
+@Composable fun Welcome(repo:Repository) {
+    val w=LocalWords.current;val p=repo.state.preferences
+    Column(Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(28.dp),verticalArrangement=Arrangement.spacedBy(22.dp)) {
+        Spacer(Modifier.height(18.dp))
+        Surface(shape=RoundedCornerShape(32.dp),color=MaterialTheme.colorScheme.primaryContainer) {Glyph("glucose",Modifier.padding(22.dp).size(64.dp))}
+        Text(w["welcome"],style=MaterialTheme.typography.headlineLarge,fontWeight=FontWeight.Bold)
+        Text(w["welcome_body"],style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        ChoiceRow(w["language"],listOf("system","ar","en"),p.language,{when(it){"ar"->"العربية";"en"->"English";else->w["system"]}}) { choice->repo.preferences {it.copy(language=choice)} }
+        ChoiceRow(w["theme"],listOf("system","light","dark"),p.theme,{w[it]}) {choice->repo.preferences {it.copy(theme=choice)} }
+        Notice(w["onboard_hint"])
+        Text(w["medical_notice"],style=MaterialTheme.typography.bodySmall)
+        Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {AssistChip(onClick={},label={Text(w["offline"])});AssistChip(onClick={},label={Text(w["no_account"])})}
+        Button(onClick={repo.preferences {it.copy(onboarded=true)}},enabled=!repo.busy,modifier=Modifier.fillMaxWidth().heightIn(min=56.dp)) {Text(w["start"])}
+        Text(w["sample_warning"],style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable fun Panel(title:String?=null,tone:Color=MaterialTheme.colorScheme.surfaceContainerLow,content:@Composable ColumnScope.()->Unit) {
+    Surface(modifier=Modifier.fillMaxWidth().animateContentSize(if(LocalMotion.current)spring(stiffness=450f)else snap()),shape=RoundedCornerShape(22.dp),color=tone) {
+        Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(10.dp)) {
+            if(title!=null) Text(title,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
+            content()
+        }
+    }
+}
+@Composable fun Notice(text:String,error:Boolean=false) {
+    val colors=MaterialTheme.colorScheme
+    Surface(shape=RoundedCornerShape(18.dp),color=if(error) colors.errorContainer else colors.secondaryContainer.copy(alpha=.6f)) {
+        Row(Modifier.padding(14.dp),horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+            Glyph(if(error) "info" else "shield",Modifier.size(22.dp),if(error) colors.onErrorContainer else colors.onSecondaryContainer)
+            Text(text,style=MaterialTheme.typography.bodySmall,color=if(error) colors.onErrorContainer else colors.onSecondaryContainer)
+        }
+    }
+}
+@Composable fun ChoiceRow(title:String,values:List<String>,selected:String,label:(String)->String,onSelect:(String)->Unit) {
+    Column(verticalArrangement=Arrangement.spacedBy(6.dp)) {
+        Text(title,style=MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+            values.forEach { value->FilterChip(selected=selected==value,onClick={onSelect(value)},label={Text(label(value))},modifier=Modifier.pressResponse()) }
+        }
+    }
+}
+@Composable fun Toggle(title:String,checked:Boolean,subtitle:String?=null,onChange:(Boolean)->Unit) {
+    Row(Modifier.fillMaxWidth().pressResponse(compression=.985f).clickable {onChange(!checked)}.padding(vertical=4.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+        Column(Modifier.weight(1f)) {Text(title,style=MaterialTheme.typography.bodyLarge);if(subtitle!=null) Text(subtitle,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        Switch(checked=checked,onCheckedChange=onChange)
+    }
+}
+@Composable fun EmptyState(title:String,description:String=LocalWords.current["empty_detail"]) {
+    Column(Modifier.fillMaxWidth().padding(vertical=20.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(10.dp)) {
+        Glyph("log",Modifier.size(36.dp),MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title,style=MaterialTheme.typography.titleMedium);Text(description,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}

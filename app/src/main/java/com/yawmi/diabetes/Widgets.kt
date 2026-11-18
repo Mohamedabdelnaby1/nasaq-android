@@ -1,0 +1,85 @@
+package com.yawmi.diabetes
+
+import android.app.*
+import android.appwidget.*
+import android.content.*
+import android.content.res.Configuration
+import android.os.Bundle
+import android.view.View
+import android.graphics.*
+import android.util.TypedValue
+import androidx.core.graphics.ColorUtils
+import android.widget.RemoteViews
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+
+object Widgets {
+    fun valuesVisible(locked:Boolean,optIn:Boolean)=optIn && !locked
+    private fun config(c:Context)=c.getSharedPreferences("home-widgets",Context.MODE_PRIVATE)
+    fun pin(c:Context):Boolean {
+        val manager=AppWidgetManager.getInstance(c)
+        return manager.isRequestPinAppWidgetSupported && manager.requestPinAppWidget(ComponentName(c,YawmiWidget::class.java),null,null)
+    }
+    fun updateAll(c:Context,s:State) {
+        val manager=AppWidgetManager.getInstance(c)
+        manager.getAppWidgetIds(ComponentName(c,YawmiWidget::class.java)).forEach{render(c,s,it)}
+    }
+    fun render(c:Context,s:State,id:Int)=GraphicalWidgets.render(c,s,id)
+    fun save(c:Context,id:Int,mode:String,style:String,visible:Boolean,parts:List<String>,opacity:Int,font:String,title:Boolean,time:Boolean,action:Boolean,background:String,accent:String,waterVisual:String="ring",radius:Int=24,quickWater:Boolean=false,layout:String="widget_focus"){
+        require(waterVisual in widgetWaterVisuals && radius in 12..32 && layout in widgetLayouts)
+        require(mode in widgetModes && style in widgetStyles)
+        require(parts.isNotEmpty() && parts.distinct().size==parts.size && parts.all{it in widgetParts})
+        require(opacity in 0..100 && font in setOf("compact","comfortable","large"))
+        if(background.isNotBlank())Color.parseColor(background);if(accent.isNotBlank())Color.parseColor(accent)
+        config(c).edit().putString("${id}_mode",mode).putString("${id}_style",style).putBoolean("${id}_visible",visible)
+            .putString("${id}_parts",parts.joinToString(",")).putInt("${id}_opacity",opacity).putString("${id}_font",font)
+            .putBoolean("${id}_title",title).putBoolean("${id}_time",time).putBoolean("${id}_action",action)
+            .putString("${id}_background",background).putString("${id}_accent",accent).putString("${id}_waterVisual",waterVisual).putInt("${id}_radius",radius)
+            .putString("${id}_layout",layout).putBoolean("${id}_quickWater",quickWater).putInt("${id}_cycle",0).remove("${id}_token").apply()
+        render(c,Store.get(c).read(),id)
+    }
+    fun look(c: Context, id: Int): WidgetLook {
+        val config = config(c)
+        fun str(key: String, fallback: String) = config.getString("${id}_$key", fallback) ?: fallback
+        fun bool(key: String, default: Boolean) = config.getBoolean("${id}_$key", default)
+        return WidgetLook(
+            mode = str("mode", "summary"), style = str("style", "auto"),
+            visible = bool("visible", false), parts = str("parts", widgetParts.joinToString(","))
+                .split(',').filter { it in widgetParts }.distinct().ifEmpty { widgetParts },
+            opacity = config.getInt("${id}_opacity", 100), font = str("font", "comfortable"),
+            title = bool("title", true), details = bool("time", true), action = bool("action", true),
+            background = str("background", ""), accent = str("accent", ""),
+            waterVisual = str("waterVisual", "ring"), radius = config.getInt("${id}_radius", 24),
+            quickWater = bool("quickWater", false), layout = str("layout", "widget_focus")
+        )
+    }
+    fun remove(c:Context,ids:IntArray){val edit=config(c).edit();ids.forEach{id->listOf("mode","style","visible","parts","opacity","font","title","time","action","background","accent","waterVisual","radius","quickWater","layout","cycle","token").forEach{edit.remove("${id}_$it")}};edit.apply()}
+}
+
+class YawmiWidget:AppWidgetProvider(){
+    override fun onUpdate(c:Context,m:AppWidgetManager,ids:IntArray){runCatching{val s=Store.get(c).read();ids.forEach{Widgets.render(c,s,it)}}}
+    override fun onAppWidgetOptionsChanged(c:Context,m:AppWidgetManager,id:Int,options:Bundle){onUpdate(c,m,intArrayOf(id))}
+    override fun onDeleted(c:Context,ids:IntArray){Widgets.remove(c,ids)}
+}
+
+class WidgetConfigActivity:ComponentActivity(){
+    override fun onCreate(savedInstanceState:Bundle?){
+        super.onCreate(savedInstanceState);setResult(RESULT_CANCELED)
+        val id=intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,AppWidgetManager.INVALID_APPWIDGET_ID)
+        val info=AppWidgetManager.getInstance(this).getAppWidgetInfo(id)
+        if(id==AppWidgetManager.INVALID_APPWIDGET_ID || info?.provider!=ComponentName(this,YawmiWidget::class.java)){finish();return}
+        val s=runCatching{Store.get(this).read()}.getOrElse{finish();return}
+        setContent { YawmiTheme(s.preferences) { WidgetStudio(s, Widgets.look(this@WidgetConfigActivity, id), onDismiss={finish()}, onSave={next->
+            Widgets.save(this@WidgetConfigActivity,id,next.mode,next.style,next.visible,next.parts,next.opacity,next.font,next.title,next.details,next.action,next.background.trim(),next.accent.trim(),next.waterVisual,next.radius,next.quickWater,next.layout)
+            setResult(RESULT_OK,Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id));finish()
+        })}}
+    }
+}
