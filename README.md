@@ -5,8 +5,8 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.8.0/Nasaq-v0.8.0.apk"><img src="https://img.shields.io/badge/Android-تنزيل_APK-253D61?style=for-the-badge" alt="تنزيل APK"></a>
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-كل_الإصدارات-334360?style=for-the-badge" alt="كل الإصدارات"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.8.0/Nasaq-v0.8.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-253D61?style=for-the-badge" alt="تنزيل APK"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="كل الإصدارات"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
 
