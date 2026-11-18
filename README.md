@@ -2,7 +2,7 @@
 
 تطبيق أندرويد عربي وإنجليزي لتسجيل قراءات السكر والمياه والأدوية ومراجعة اليوم. اسمه في الإصدارات السابقة «يومي». مشروع مفتوح المصدر من تطوير [محمد عبدالنبي](https://fb.com/mohamedabdelnaby190).
 
-[صفحة العرض](https://mohamedabdelnaby1.github.io/nasaq-android/) · [إصدارات أندرويد](https://github.com/Mohamedabdelnaby1/nasaq-android/releases)
+[صفحة العرض](https://mohamedabdelnaby1.github.io/nasaq-android/) · [تنزيل نَسَق 0.7.0 لأندرويد](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.7.0/Nasaq-v0.7.0.apk)
 
 ![الشاشة اليومية](site/assets/screen-today.png) ![الويدجت المجمع](site/assets/screen-widget.png)
 
