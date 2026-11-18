@@ -2,6 +2,10 @@
 package com.yawmi.diabetes
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,12 +19,14 @@ import java.time.format.DateTimeFormatter
 
 data class DaySummary(val date:LocalDate,val readings:Int,val water:Double,val doses:Int,val sleepHours:Double,val hasData:Boolean,val glucoseMg: Double = 0.0)
 
-fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.systemDefault(), context: String = "all"):List<DaySummary> {
+fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.systemDefault(), context: String = "all", period: Int = 7):List<DaySummary> {
     fun day(millis:Long)=Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
-    val first=today.minusDays(13)
+    require(period in setOf(7, 14, 28))
+    val oldest = period * 2 - 1
+    val first = today.minusDays(oldest.toLong())
     val entries=s.entries.filter{day(it.time) in first..today}.groupBy{day(it.time)}
     val sleep=s.care.items.filter{it.kind=="sleep"}.groupBy{day(it.end)}
-    return (13 downTo 0).map{offset->
+    return (oldest downTo 0).map{offset->
         val date=today.minusDays(offset.toLong())
         val records=entries[date].orEmpty()
         val sessions=sleep[date].orEmpty()
@@ -30,40 +36,51 @@ fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.sy
     }
 }
 
-@Composable fun WeeklyInsights(s:State, context: String = "all"){
-    val w=LocalWords.current
-    val colors=MaterialTheme.colorScheme
-    val summaries=remember(s.revision,s.entries,s.care.items,LocalDate.now(),context){dailySummaries(s, context = context)}
-    var selected by rememberSaveable{mutableStateOf(LocalDate.now().toString())}
-    val current=summaries.takeLast(7)
-    val previous=summaries.take(7)
-    val focus=summaries.firstOrNull{it.date.toString()==selected} ?: current.last()
-    Panel(w["weekly_review"]){
-        Text(w["calendar_hint"],style=MaterialTheme.typography.labelMedium,color=colors.onSurfaceVariant)
-        listOf(previous,current).forEach{week->
-            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(3.dp)){
-                week.forEach{day->
-                    val color=when{
-                        day.date==focus.date->colors.primary
-                        day.hasData->colors.primaryContainer
-                        else->colors.surfaceContainer
+@Composable fun WeeklyInsights(s: State, context: String = "all", onOpenDay: ((LocalDate) -> Unit)? = null) {
+    val w = LocalWords.current
+    val colors = MaterialTheme.colorScheme
+    val periods = listOf(7, 14, 28)
+    var period by rememberSaveable { mutableIntStateOf(7) }
+    val today = LocalDate.now()
+    val summaries = remember(s.entries, s.care.items, today, context, period) { dailySummaries(s, today, context = context, period = period) }
+    var selected by rememberSaveable { mutableStateOf(today.toString()) }
+    val current = summaries.takeLast(period)
+    val previous = summaries.take(period)
+    val focus = summaries.firstOrNull { it.date.toString() == selected } ?: current.last()
+    val formatter = DateTimeFormatter.ofPattern("d MMM", w.locale)
+    fun dates(days: List<DaySummary>) = days.first().date.format(formatter) + " – " + days.last().date.format(formatter)
+    Panel(w["weekly_review"]) {
+        SegmentedRail(periods.map { w.f("compare_days", "days" to number(it.toDouble(), w)) }, periods.indexOf(period), { period = periods[it] })
+        Text(w["calendar_hint"], style = MaterialTheme.typography.labelMedium, color = colors.onSurfaceVariant)
+        for ((index, week) in listOf(previous, current).withIndex()) {
+            Text(w[if (index == 0) "compare_previous" else "compare_current"] + " · " + dates(week),
+                style = MaterialTheme.typography.labelMedium)
+            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                week.forEach { day ->
+                    val color = when {
+                        day.date == focus.date -> colors.primary
+                        day.hasData -> colors.primaryContainer
+                        else -> colors.surfaceContainer
                     }
-                    Surface(onClick={selected=day.date.toString()},modifier=Modifier.weight(1f).heightIn(min=45.dp),
-                        shape=RoundedCornerShape(9.dp),color=color){
-                        Box(contentAlignment=Alignment.Center){
-                            Text(number(day.date.dayOfMonth.toDouble(),w),color=if(day.date==focus.date)colors.onPrimary else colors.onSurface,style=MaterialTheme.typography.labelMedium)
+                    val label = day.date.format(formatter) + " · " + if (day.hasData) summaryLine(day, w) else w["missing_data"]
+                    Surface(onClick = { selected = day.date.toString() }, modifier = Modifier.sizeIn(minWidth = 42.dp, minHeight = 46.dp)
+                        .semantics { contentDescription = label }, shape = RoundedCornerShape(9.dp), color = color) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(number(day.date.dayOfMonth.toDouble(), w), color = if (day.date == focus.date) colors.onPrimary else colors.onSurface,
+                                style = MaterialTheme.typography.labelMedium)
                         }
                     }
                 }
             }
         }
-        val date=focus.date.format(DateTimeFormatter.ofPattern("d MMM",w.locale))
-        Text(date+" · "+if(focus.hasData)summaryLine(focus,w)else w["missing_data"],style=MaterialTheme.typography.bodySmall)
+        val date = focus.date.format(formatter)
+        Text(date + " · " + if (focus.hasData) summaryLine(focus, w) else w["missing_data"], style = MaterialTheme.typography.bodySmall)
+        if (onOpenDay != null) TextButton(onClick = { onOpenDay(focus.date) }) { Text(w["open_selected_day"]) }
         HorizontalDivider()
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp)){
             Text(w["week_metric"],Modifier.weight(1.2f),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)
-            Text(w["previous_7"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
-            Text(w["recent_7"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
+            Text(w["compare_previous"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
+            Text(w["compare_current"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
         }
         fun average(week: List<DaySummary>): String {
             val count = week.sumOf { it.readings }

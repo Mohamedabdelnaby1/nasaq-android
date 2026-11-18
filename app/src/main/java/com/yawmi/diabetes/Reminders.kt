@@ -34,6 +34,16 @@ object Records {
         }
         return s.copy(entries=s.entries+next,medications=meds)
     }
+    fun replace(s: State, previous: Entry, changed: Entry): State {
+        require(previous.id == changed.id && previous.kind == changed.kind)
+        require(s.entries.firstOrNull { it.id == previous.id } == previous)
+        if (previous.kind == "dose" && previous.medicationId == changed.medicationId && previous.status == changed.status) {
+            val sameDose = changed.copy(value = previous.value, second = previous.second)
+            return s.copy(entries = s.entries.map { if (it.id == previous.id) sameDose else it })
+        }
+        return add(remove(s, previous.id), changed)
+    }
+
     fun remove(s:State,id:String):State {
         val entry=s.entries.find { it.id==id } ?: return s
         val meds=if(entry.kind=="dose" && entry.status=="taken" && entry.value>0) s.medications.map {
@@ -134,7 +144,7 @@ object Reminders {
     @Synchronized fun reschedule(c:Context,s:State=Store.get(c).read()) {
         channels(c,s.preferences)
         s.medications.filter{it.active && it.customAlert}.forEach{medicationChannel(c,it,s.preferences)}
-        saved(c,"scheduled").forEach { alarms(c).cancel(token(c,it)) }
+        val previouslyScheduled = saved(c, "scheduled")
         val now=System.currentTimeMillis(); val recorded=s.entries.filter { it.kind=="dose" }.map { it.occurrence }.toSet()
         val manual=saved(c,"oneshots").filter { it.due>now && it.occurrence !in recorded &&
             (it.kind!="care" || s.care.items.any{item->item.id==it.occurrence && item.alert && !item.done && item.time==it.original}) &&
@@ -149,12 +159,23 @@ object Reminders {
                 NotificationManagerCompat.from(c).cancel(active.id)
         }
         val maintenance=Reminder("maintenance","maintenance",now+43_200_000)
-        (reminders+maintenance).forEach { schedule(c,it) }
-        prefs(c).edit().putString("scheduled",JSONArray((reminders+maintenance).map { it.json() }).toString()).apply()
+        val next = reminders + maintenance
+        next.forEach { schedule(c, it) }
+        val ids = next.mapTo(mutableSetOf()) { it.id }
+        previouslyScheduled.filterNot { it.id in ids }.forEach { alarms(c).cancel(token(c, it)) }
+        prefs(c).edit().putString("scheduled", JSONArray(next.map { it.json() }).toString())
+            .putBoolean("planned_exact", exact(c)).apply()
         // Old ledger entries are only deduplication metadata; never medical values.
         val old=prefs(c).all.filter { it.key.startsWith("fired_") }
         if(old.size>3000) prefs(c).edit().also { editor -> old.keys.take(old.size-2000).forEach { editor.remove(it) } }.apply()
     }
+    @Synchronized
+    internal fun reconcile(c: Context) {
+        val now = System.currentTimeMillis()
+        if (prefs(c).getBoolean("planned_exact", !exact(c)) != exact(c) ||
+            saved(c, "scheduled").none { it.kind == "maintenance" && it.due > now }) reschedule(c)
+    }
+
     private fun schedule(c:Context,r:Reminder) {
         if(r.kind=="maintenance") { alarms(c).setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP,r.due,token(c,r)); return }
         try {
@@ -171,12 +192,19 @@ object Reminders {
     fun audit(c:Context,r:Reminder,status:String) { Store.get(c).update {
         it.copy(audit=(it.audit+Audit(r.id,System.currentTimeMillis(),r.kind,status)).takeLast(500))
     } }
-    fun test(c:Context,kind:String="glucose") {
+    fun test(c:Context,kind:String="glucose"): String {
         require(kind in setOf("glucose","water","medication","symptom"))
         val s=Store.get(c).read();channels(c,s.preferences)
-        post(c,Reminder("test",kind,System.currentTimeMillis()),s,test=true)
+        return post(c, Reminder("test", kind, System.currentTimeMillis()), s, test = true)
     }
-    fun scheduledCount(c:Context)=saved(c,"scheduled").count { it.kind!="maintenance" && it.due>System.currentTimeMillis() }
+
+    internal fun upcoming(c: Context, now: Long = System.currentTimeMillis()): List<Reminder> =
+        saved(c, "scheduled").filter { it.kind != "maintenance" && it.due >= now }.sortedBy { it.due }
+
+    fun scheduledCount(c:Context) = upcoming(c).size
+
+    internal fun channelFor(s: State, r: Reminder) =
+        s.medications.firstOrNull { it.id == r.medicationId }?.channelId() ?: r.kind
     private fun notificationId(c:Context,id:String):Int {
         val key="nid_$id"; val p=prefs(c); if(p.contains(key)) return p.getInt(key,1)
         val next=p.getInt("next-id",100)+1; p.edit().putInt("next-id",next).putInt(key,next).apply();return next
@@ -186,10 +214,15 @@ object Reminders {
             .putExtra("screen",if(r.kind=="medication") "medications" else "today")
             .putExtra("entry",if(r.kind=="care")"care_tools"else""),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-    private fun post(c:Context,r:Reminder,s:State,test:Boolean=false) {
+    private fun post(c:Context,r:Reminder,s:State,test:Boolean=false): String {
         val p=s.preferences; val w=Words(p.language); val med=s.medications.find { it.id==r.medicationId }
-        val channel=med?.channelId() ?: r.kind
-        if(!permitted(c) || !channelEnabled(c,channel)) { audit(c,r,"blocked"); return }
+        val channel = channelFor(s, r)
+        fun finish(status: String): String {
+            runCatching { audit(c, r, status) }
+            return status
+        }
+        if (!permitted(c)) return finish("reminder_no_permission")
+        if (!channelEnabled(c, channel)) return finish("reminder_channel_disabled")
         val care=s.care.items.find{it.id==r.occurrence && r.kind=="care"}
         val title=if(p.lock || test) w["reminder_title"] else med?.name ?: care?.let{w[it.kind]} ?: w[if(r.kind=="symptom") "followup" else r.kind]
         val body=if(test) w["test_body"] else if(p.lock) w["privacy_hidden"] else w[when(r.kind) {
@@ -207,11 +240,18 @@ object Reminders {
             if(r.kind=="water") notification.addAction(0,w["add_cup"],token(c,r,"water"))
             if(r.attempt<repeatFor(s,r).second) notification.addAction(0,w["snooze"],token(c,r,"snooze"))
         }
-        try { NotificationManagerCompat.from(c).notify(notificationId(c,r.id.substringBefore("~")),notification.build());audit(c,r,"posted") }
-        catch(e:SecurityException) { audit(c,r,"blocked") }
+        return try {
+            NotificationManagerCompat.from(c).notify(notificationId(c,r.id.substringBefore("~")),notification.build())
+            finish("posted")
+        } catch (_: SecurityException) { finish("blocked") }
     }
     @Synchronized fun receive(c:Context,r:Reminder,operation:String) {
-        if(r.kind=="maintenance") { reschedule(c);return }
+        if (operation == "show" && saved(c, "scheduled").none { it.id == r.id && it.due == r.due }) return
+        if(r.kind=="maintenance") {
+            Widgets.updateAll(c, Store.get(c).read())
+            reschedule(c)
+            return
+        }
         var state=Store.get(c).read(); val now=System.currentTimeMillis()
         if(r.kind=="care" && state.care.items.none{it.id==r.occurrence && !it.done && it.alert && it.time==r.original})return
         if(r.kind=="medication") {
@@ -224,11 +264,15 @@ object Reminders {
             if(prefs(c).getBoolean("fired_${r.id}",false)) return
             prefs(c).edit().putBoolean("fired_${r.id}",true).apply()
             // Do not prompt for stale medication reminders after an extended delivery delay.
-            if(now-r.due>2*3_600_000L) { reschedule(c);return }
+            if(now-r.due>2*3_600_000L) {
+                audit(c, r, "reminder_expired")
+                reschedule(c)
+                return
+            }
             if(r.kind=="care" || !isQuiet(now,state.preferences) || (r.kind=="medication" && !state.preferences.medicationQuiet)) {
                 post(c,r,state)
                 if(r.kind=="medication" && r.attempt<repeatFor(state,r).second) snooze(c,r,state,automatic=true)
-            }
+            } else audit(c, r, "reminder_quiet")
         } else {
             if(state.preferences.lock) return
             if(operation=="taken") {
@@ -276,6 +320,14 @@ class ReminderReceiver:BroadcastReceiver() {
 }
 class RescheduleReceiver:BroadcastReceiver() {
     override fun onReceive(context:Context,intent:Intent) {
-        val pending=goAsync();Reminders.worker.execute { try { Reminders.reschedule(context) } catch(e:Exception) { } finally { pending.finish() } }
+        val pending = goAsync()
+        Reminders.worker.execute {
+            try {
+                val state = Store.get(context).read()
+                runCatching { Widgets.updateAll(context, state) }
+                Reminders.reschedule(context, state)
+            } catch (_: Exception) {
+            } finally { pending.finish() }
+        }
     }
 }

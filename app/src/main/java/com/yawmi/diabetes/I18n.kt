@@ -354,6 +354,36 @@ password_repeat|تأكيد كلمة المرور|Confirm password
 password_hint|10 أحرف على الأقل. احفظها؛ لا يمكن استرجاع النسخة بدونها.|At least 10 characters. Keep it safe; the backup cannot be recovered without it.
 restore_warning|الاستعادة تستبدل بيانات هذا الجهاز وتلغي التذكيرات القديمة. أنشئ نسخة من بياناتك الحالية أولًا.|Restore replaces this device's data and cancels old reminders. Back up your current data first.
 backup_saved|تم حفظ النسخة المشفرة|Encrypted backup saved
+restore_preview|معاينة استرجاع النسخة|Preview backup restore
+restore_added|جديد في النسخة · {entries} تسجيل · {medicine} دواء · {care} عنصر رعاية · {layouts} تخطيط|New in backup · {entries} entries · {medicine} medicines · {care} care items · {layouts} layouts
+restore_duplicates|{duplicates} عنصر مكرر و{conflicts} نسخة مختلفة. هتفضل النسخة الحالية للعناصر دي.|{duplicates} duplicates and {conflicts} differing copies. Your current versions are kept.
+restore_settings|استيراد إعدادات النسخة|Import settings from backup
+restore_settings_hint|يشمل شكل التطبيق ووحداته وخيارات التنبيه.|Includes appearance, units and reminder preferences.
+restore_recovery|السجل المحلي غير قابل للقراءة. استرجاع النسخة هيستبدل الملف المحلي.|The local record is unreadable. Restoring will replace the local file.
+restore_limit|مجموع البيانات أكبر من سعة السجل.|The combined backup exceeds the journal limits.
+restore_confirm|استرجع البيانات|Restore data
+restore_changed|السجل اتغير بعد المعاينة. راجع الأعداد الجديدة وأكّد مرة تانية.|The journal changed after preview. Review the new counts and confirm again.
+timeline_add|سجّل في اليوم ده|Add an entry for this day
+quick_log_cup|سجّل كوب {amount} مل|Log a {amount} mL cup
+reminder_recent_issues|آخر التنبيهات اللي ما ظهرتش|Recently suppressed notifications
+reminder_status|حالة التذكيرات|Reminder status
+reminder_next_scheduled|التالي · {kind} · {time}|Next scheduled · {kind} · {time}
+reminder_no_schedule|مافيش تنبيه مجدول حاليًا|No reminder is currently scheduled
+reminder_no_permission|إشعارات نَسَق مقفولة من إعدادات الهاتف.|Notifications for Nasaq are off in Android settings.
+reminder_channel_disabled|نوع الإشعار ده مقفول.|This notification category is turned off.
+reminder_approximate|أندرويد ممكن يأخّر التنبيه مع إيقاف إذن المواعيد الدقيقة.|Android may delay reminders when exact alarm access is off.
+reminder_latest_result|آخر محاولة · {status} · {time}|Last attempt · {status} · {time}
+reminder_expired|تخطّى وقت العرض|Delivery window expired
+reminder_quiet|اتخطّى بسبب ساعات الهدوء|Suppressed during quiet hours
+pin_shortcut|ثبّت اختصار في الأول|Pin a shortcut first
+reset_adaptation|صفّر تخصيص الاقتراحات|Reset personalization
+habit_water_reason|سجّلت الكمية دي {count} مرة في الفترة الأخيرة.|You logged this amount {count} times recently.
+hide_suggestion|اخفِ الكمية دي|Hide this amount
+compare_days|{days} يوم|{days} days
+compare_previous|الفترة السابقة|Previous period
+compare_current|الفترة الحالية|Current period
+open_selected_day|افتح تفاصيل اليوم|Open this day
+report_message|ملاحظة تُضاف للتقرير|Note to include in the report
 restore_done|تم استرجاع البيانات|Data restored
 backup_error|تعذر إكمال العملية. راجع الملف وكلمة المرور والمساحة المتاحة.|Could not complete the operation. Check the file, password and available space.
 privacy|الخصوصية والأمان|Privacy and security
@@ -545,7 +575,8 @@ day_detail_title|يومك بالتفصيل|Your day in detail
 day_activity|نشاط اليوم|Today's activity
 day_glucose_average|متوسط سكر اليوم|Today's glucose average
 widget_glucose_average|متوسط السكر|Glucose avg.
-widget_goal_short|الهدف {amount}|Goal {amount}
+widget_water_average|متوسط المياه|Water average
+widget_water_today|اليوم {amount}|Today {amount}
 widget_no_dose|مفيش جرعة مجدولة|No dose scheduled
 widget_doses_short|جرعات مأخوذة|Doses taken
 widget_sample|أرقام تجريبية|Sample numbers

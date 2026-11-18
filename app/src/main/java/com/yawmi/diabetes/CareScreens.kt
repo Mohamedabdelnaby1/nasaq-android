@@ -201,7 +201,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     }
 }
 
-@Composable fun Insights(s:State,add:(String)->Unit,export:(Int,String)->Unit){
+@Composable fun Insights(s:State,add:(String)->Unit,export:(Int,String)->Unit, onOpenDay: ((java.time.LocalDate) -> Unit)? = null){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme;val p=s.preferences
     var days by rememberSaveable{mutableIntStateOf(14)}
     var context by rememberSaveable{mutableStateOf("all")}
@@ -212,6 +212,8 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
         PageIntro(w["insights"],w["insights_subtitle"],"insights")
         val periods = listOf(1, 7, 14, 30)
         SegmentedRail(periods.map { w[if (it == 1) "today_only" else "last${it}"] }, periods.indexOf(days), { days = periods[it] })
+        Text(dateText(periodStart(days), w) + " – " + dateText(System.currentTimeMillis(), w),
+            style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
         Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
             MetricTile(w["average_short"],if(glucose.isEmpty())"—"else number(com.yawmi.diabetes.core.Planner.fromMg(glucose.map{mg(it)}.average(),p.unit),w,1),Modifier.weight(1f),c.primaryContainer.copy(alpha=.6f))
             MetricTile(w["readings"],number(glucose.size.toDouble(),w),Modifier.weight(1f))
@@ -221,11 +223,11 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                 SectionHeading(w["glucose_trend"])
             }
             Text(p.unit, style = MaterialTheme.typography.labelLarge)
-            GlucoseChart(glucose, p)
+            GlucoseChart(glucose, p, onOpenDay)
         }
         NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
             context, { w[it] }) { context = it } }
-        WeeklyInsights(s, context)
+        WeeklyInsights(s, context, onOpenDay)
         Panel{
             SectionHeading(w["range_distribution"])
             if(glucose.isNotEmpty()){

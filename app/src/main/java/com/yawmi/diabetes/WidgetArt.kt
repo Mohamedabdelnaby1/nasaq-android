@@ -153,16 +153,16 @@ private class DeskWidget(
     }
 
     private fun metrics(kind: String): WidgetMetric {
-        val key = when (kind) { "glucose" -> "widget_glucose_average"; "day_summary" -> "day_overview"; else -> kind }
+        val key = when (kind) { "glucose" -> "widget_glucose_average"; "water" -> "widget_water_average"; "day_summary" -> "day_overview"; else -> kind }
         val label = words[key]
         if (!visible) return WidgetMetric(label, "•••", "", words["widget_values_off"])
         return when (kind) {
             "water" -> {
-                val goal = state.preferences.waterGoal
-                val average = day.waterAverageMl?.let { number(it / 1000, words, 2) + " " + words["litres_short"] }
-                WidgetMetric(label, number(day.waterMl / 1000, words, 2), words["litres_short"],
-                    average?.let { words["water_week"] + " · " + it }
-                        ?: if (goal > 0) words.f("widget_goal_short", "amount" to (number(goal / 1000.0, words, 2) + " " + words["litres_short"])) else "")
+                val litres = words["litres_short"]
+                val average = day.waterAverageMl?.let { number(it / 1000, words, 2) }
+                val today = number(day.waterMl / 1000, words, 2) + " " + litres
+                WidgetMetric(label, average ?: "—", if (average != null) litres else "",
+                    words.f("widget_water_today", "amount" to today))
             }
             "medication" -> {
                 val next = Reminders.plan(state, now, now + 86_400_000).firstOrNull { it.kind == "medication" }
@@ -252,6 +252,15 @@ private class DeskWidget(
         val end = if(rtl)area.left+pad else area.right-pad
         val direction = if (rtl) -1 else 1
         val space = area.width()-2*pad
+        if (geometry.compactAction && area.height() <= 85f) {
+            val x = area.centerX()
+            text(item.label, x, area.top + 16f, 10f, space, fg, true, Paint.Align.CENTER)
+            text(item.amount, x, area.top + 37f, 19f, space, fg, true, Paint.Align.CENTER)
+            text(item.unit, x, area.top + 48f, 8.5f, space, muted, align = Paint.Align.CENTER)
+            if (look.details)
+                text(item.detail, x, area.top + 62f, 8.5f, space, muted, align = Paint.Align.CENTER)
+            return
+        }
         if (area.height() < 61f && area.width() >= 120f) {
             val mid = area.centerY()
             val amountSpace = (space * .40f).coerceAtLeast(31f)
@@ -304,8 +313,13 @@ private class DeskWidget(
         if (geometry.compactAction) {
             val x = if (rtl) 5f else w-37f
             val fill = panelColor("water",true)
-            rect(RectF(x,8f,x+32f,h-8),translucent(fill),14f)
-            glyph("plus",x+16,h/2,ink(fill))
+            val split = if (geometry.undo) h / 2 else h
+            rect(RectF(x, 6f, x+32f, split-5f), translucent(fill), 12f)
+            glyph("plus", x + 16f, split / 2, ink(fill))
+            if (geometry.undo) {
+                rect(RectF(x, split+3f, x+32f, h-6f), translucent(merge(base, fill, .45f)), 12f)
+                glyph("cycle", x + 16f, split + split / 2, baseInk)
+            }
         }
         if (geometry.footer) {
             val active = panelColor(geometry.footerKind,true)

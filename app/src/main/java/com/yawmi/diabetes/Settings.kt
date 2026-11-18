@@ -33,6 +33,10 @@ import java.time.ZoneId
             Toggle(w["large_text"],p.largeText){v->repo.preferences{it.copy(largeText=v)}}
             Toggle(w["reduce_motion"],p.reduceMotion){v->repo.preferences{it.copy(reduceMotion=v)}}
             Toggle(w["adaptive_actions"], p.adaptive, w["adaptive_actions_body"]) { value -> repo.preferences { it.copy(adaptive = value) } }
+            ChoiceRow(w["pin_shortcut"], listOf("") + journalActions, p.pinnedShortcut,
+                { w[if (it.isBlank()) "none" else it] }) { key -> repo.preferences { it.copy(pinnedShortcut = key) } }
+            TextButton(onClick = { repo.preferences { it.copy(adaptiveSince = System.currentTimeMillis(),
+                pinnedShortcut = "", ignoredWaterAmounts = emptySet()) } }) { Text(w["reset_adaptation"]) }
             Toggle(w["haptics"],p.haptics,w["haptics_hint"]){v->repo.preferences{it.copy(haptics=v)}}
             TextButton(onClick={repo.preferences {it.copy(theme="system",palette="mint",dynamicColors=false,largeText=false,reduceMotion=false)}}){Text(w["reset_appearance"])}
             Text(w["reset_appearance_hint"],style=MaterialTheme.typography.bodySmall)

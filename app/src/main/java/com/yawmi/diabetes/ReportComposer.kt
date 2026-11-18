@@ -28,6 +28,9 @@ internal fun ReportComposer(initialDays: Int, onDismiss: () -> Unit, onCreate: (
                 Toggle(w["log"], options.journal) { options = options.copy(journal = it) }
                 Toggle(w["current_plans"], options.plans) { options = options.copy(plans = it) }
                 Toggle(w["report_include_notes"], options.notes) { options = options.copy(notes = it) }
+                MotionExpand(options.notes) {
+                    Field(w["report_message"], options.message, { options = options.copy(message = it.take(1400)) }, multiline = true)
+                }
             }
             Button(onClick = { onCreate(days, options) }, modifier = Modifier.fillMaxWidth().heightIn(min = 49.dp),
                 enabled = options.summary || options.chart || options.journal || options.plans) { Text(w["export_pdf"]) }

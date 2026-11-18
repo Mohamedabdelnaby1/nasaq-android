@@ -4,9 +4,25 @@
     <LinearLayout android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="vertical">
         <include layout="@layout/widget_chrome_header" />
         <LinearLayout android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1" android:orientation="horizontal">
-            <TextView android:id="@+id/widget_mini_add_rtl" android:layout_width="42dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground"/>
+            <LinearLayout android:id="@+id/widget_mini_controls_rtl" android:layout_width="42dp"
+                android:layout_height="match_parent" android:orientation="vertical">
+                <TextView android:id="@+id/widget_mini_add_rtl" android:layout_width="match_parent"
+                    android:layout_height="0dp" android:layout_weight="1" android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground"/>
+                <TextView android:id="@+id/widget_mini_undo_rtl" android:layout_width="match_parent"
+                    android:layout_height="0dp" android:layout_weight="1" android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground" android:visibility="gone"/>
+            </LinearLayout>
             <TextView android:id="@+id/widget_primary" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="true" android:background="?android:attr/selectableItemBackground"/>
-            <TextView android:id="@+id/widget_mini_add" android:layout_width="42dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground"/>
+            <LinearLayout android:id="@+id/widget_mini_controls" android:layout_width="42dp"
+                android:layout_height="match_parent" android:orientation="vertical">
+                <TextView android:id="@+id/widget_mini_add" android:layout_width="match_parent"
+                    android:layout_height="0dp" android:layout_weight="1" android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground"/>
+                <TextView android:id="@+id/widget_mini_undo" android:layout_width="match_parent"
+                    android:layout_height="0dp" android:layout_weight="1" android:focusable="true"
+                    android:background="?android:attr/selectableItemBackground" android:visibility="gone"/>
+            </LinearLayout>
         </LinearLayout>
         <include layout="@layout/widget_chrome_footer" />
     </LinearLayout>

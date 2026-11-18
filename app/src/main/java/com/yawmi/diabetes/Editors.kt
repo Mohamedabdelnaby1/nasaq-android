@@ -142,13 +142,13 @@ fun parseTimes(raw:String):List<String> {
 }
 fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0==0.0);return value.toInt()}
 
-@Composable fun EntryEditor(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit) {
+@Composable fun EntryEditor(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit, initialTime: Long? = null) {
     val w=LocalWords.current;val p=s.preferences
     val recordId=remember {existing?.id ?: java.util.UUID.randomUUID().toString()}
     var value by remember {mutableStateOf(existing?.value?.takeIf {it!=0.0}?.toString() ?: if(kind=="water")p.cup.toString() else "")}
     var second by remember {mutableStateOf(existing?.second?.takeIf {it!=0.0}?.toString() ?: "")}
     var unit by remember {mutableStateOf(existing?.unit ?: if(kind=="glucose")p.unit else "")}
-    var time by remember {mutableLongStateOf(existing?.time ?: System.currentTimeMillis())}
+    var time by remember {mutableLongStateOf(existing?.time ?: initialTime ?: System.currentTimeMillis())}
     var context by remember {mutableStateOf(existing?.context ?: when(kind){"glucose"->"other";"meal"->"breakfast";"symptom"->"diarrhea";else->""})}
     var note by remember {mutableStateOf(existing?.note ?: "")}
     var status by remember {mutableStateOf(existing?.status ?: if(kind=="symptom")"mild" else "taken")}
@@ -172,8 +172,9 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
         val m=s.medications.find {it.id==medicationId}
         return Entry(id=recordId,kind=kind,time=time,value=n,second=n2,
             unit=when(kind){"glucose"->unit;"water"->"mL";"meal"->"g";"weight"->"kg";"a1c"->"%";"pressure"->"mmHg";else->""},
-            context=context,note=if(kind=="dose") "${m?.name.orEmpty()} · ${m?.dose.orEmpty()}${if(note.isNotBlank()) " · $note" else ""}" else note,
-            medicationId=medicationId,status=status,created=existing?.created ?: System.currentTimeMillis())
+            context=context,note=if(kind=="dose" && existing==null) "${m?.name.orEmpty()} · ${m?.dose.orEmpty()}${if(note.isNotBlank()) " · $note" else ""}" else note,
+            medicationId=medicationId,status=status,created=existing?.created ?: System.currentTimeMillis(),
+            occurrence=existing?.occurrence.orEmpty(),planned=existing?.planned ?: 0L)
     }
     EditorShell(w[if(kind=="dose")"record_dose" else kind],onDismiss,onSave={
         try {val entry=prepare();if(kind=="glucose" && (mg(entry)<20 || mg(entry)>600)) unusual=entry else onSave(entry)}catch(e:Exception){invalid=true}
@@ -210,7 +211,7 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
                 Notice(w["urgent_body"],true);Text(w["symptom_hint"],style=MaterialTheme.typography.bodySmall)
             }
             "dose" -> {
-                ChoiceRow(w["medication"],s.medications.filter {it.active}.map {it.id},medicationId,{id->s.medications.find {it.id==id}?.name.orEmpty()}){medicationId=it}
+                if (existing?.occurrence.isNullOrBlank()) ChoiceRow(w["medication"],s.medications.filter {it.active}.map {it.id},medicationId,{id->s.medications.find {it.id==id}?.name.orEmpty()}){medicationId=it}
                 ChoiceRow(w["status"],listOf("taken","skipped"),status,{w[it]}){status=it}
                 Notice(w["manual_hint"])
             }

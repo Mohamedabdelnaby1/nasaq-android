@@ -8,7 +8,7 @@ import java.time.*
 
 internal data class ReportOptions(
     val showName: Boolean = true, val summary: Boolean = true, val chart: Boolean = true,
-    val journal: Boolean = true, val plans: Boolean = true, val notes: Boolean = true
+    val journal: Boolean = true, val plans: Boolean = true, val notes: Boolean = true, val message: String = ""
 )
 
 /** A dedicated print layout, with embedded Tajawal and no remote assets. */
@@ -76,7 +76,7 @@ object Reports {
             <h1>${label("report")}</h1><div class='meta'><div>${if (options.showName) h(p.name) else ""}</div><div>${h(dateText(from,w))} — ${h(dateText(System.currentTimeMillis(),w))}</div></div>
             <p class='muted'>${label("generated")}: ${h(dateText(System.currentTimeMillis(),w))} ${h(timeText(System.currentTimeMillis(),w))} · <bdi>${h(zone.id)}</bdi></p></header>
             ${if (options.summary) """<div class='summary'>$summary</div><p class='muted'>${label("range_hint")}</p>
-            ${if(p.targetNote.isNotBlank())"<p class='muted'>${label("target_source")}: ${h(p.targetNote)}</p>"else""}
+            ${if(options.notes && p.targetNote.isNotBlank())"<p class='muted'>${label("target_source")}: ${h(p.targetNote)}</p>"else""}
             <div class='columns'><div class='box'><h3>${label("medications")}</h3><p>${label("taken")}: ${h(number(doses.count {it.status=="taken"}.toDouble(),w))}</p><p>${label("skipped")}: ${h(number(doses.count {it.status=="skipped"}.toDouble(),w))}</p><p class='muted'>${label("dose_summary_hint")}</p></div>
             <div class='box'><h3>${label("water")}</h3><p>${label("recorded_days")}: ${h(number(waterDays.toDouble(),w))} / ${h(number(days.toDouble(),w))}</p><p>${label("recorded_total")}: ${h(number(water.sumOf {it.value},w))} ${label("ml")}</p><p class='muted'>${label("water_missing_hint")}</p></div></div>
             <div class='box'><p>${label("meals")}: ${h(number(mealCount.toDouble(),w))} · ${label("symptoms")}: ${h(number(symptomCount.toDouble(),w))}</p><p class='muted'>${label("correlation_hint")}</p></div>""" else ""}
@@ -85,6 +85,7 @@ object Reports {
             ${if(glucose.isNotEmpty())"<h3>${label("context_analysis")}</h3><table><thead><tr><th>${label("context")}</th><th>${label("count")}</th><th>${label("average")}</th></tr></thead><tbody>$contextRows</tbody></table>"else""}""" else ""}
             ${if (options.journal) """<section class='journal'><h2>${label("log")}</h2><p class='muted'>${label("value_original")} · ${label("manual_source")}</p><table><thead><tr><th style='width:20%'>${label("date_time")}</th><th style='width:16%'>${label("context_type")}</th><th style='width:25%'>${label("value")}</th><th>${label("notes")}</th></tr></thead><tbody>$journal</tbody></table></section>""" else ""}
             ${if(options.plans && meds.isNotEmpty())"<section><h2>${label("current_plans")}</h2><p class='muted'>${label("current_plans_hint")}</p><table><thead><tr><th>${label("medication")}</th><th>${label("dose_text")}</th><th>${label("schedule")}</th><th>${label("instructions")}</th></tr></thead><tbody>$meds</tbody></table></section>"else""}
+            ${if (options.notes && options.message.isNotBlank()) "<section><h2>${label("report_message")}</h2><p class='note'>${h(options.message.take(1400)).replace("\n","<br/>")}</p></section>" else ""}
             <footer class='report-footer'><p>${label("medical_notice")}</p><p>${label("privacy_export")}</p><p>${label("app")} ${BuildConfig.VERSION_NAME} · Tajawal</p></footer></body></html>""".trimIndent()
     }
     private fun chart(entries:List<Entry>,p:Preferences,w:Words):String {

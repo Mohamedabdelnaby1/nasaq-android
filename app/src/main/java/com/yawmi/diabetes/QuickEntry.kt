@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RecordingSheet(
     page: String, onDismiss: () -> Unit, onSelect: (String) -> Unit,
-    state: State? = null, onDraft: ((Entry) -> Unit)? = null,
+    state: State? = null, onDraft: ((Entry) -> Unit)? = null, onQuickWater: (() -> Unit)? = null, onHideWater: ((Double) -> Unit)? = null,
     editor: @Composable (String, close: (() -> Unit) -> Unit) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -46,17 +46,17 @@ internal fun RecordingSheet(
             (fadeIn(tween(270,100)) + slideInVertically(tween(580,easing=NasaqEase)) { it / 6 } togetherWith
                 fadeOut(tween(185))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
         }, label = "quick-record-page") { current ->
-            if (current == "quick") QuickActions(state, onDraft) { kind ->
+            if (current == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater) { kind ->
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
             } else editor(current, ::close)
         } else key(page) {
-            if (page == "quick") QuickActions(state, onDraft, onSelect) else editor(page, ::close)
+            if (page == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater, onSelect) else editor(page, ::close)
         }
     }
 }
 
 @Composable
-private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, choose: (String) -> Unit) {
+private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWater: (() -> Unit)?, onHideWater: ((Double) -> Unit)?, choose: (String) -> Unit) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val feedback = rememberFeedback()
@@ -71,6 +71,14 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, choose: (St
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             ScreenTitle(w["quick_add"]) { DomainMark("plus") }
+            if (state != null && onQuickWater != null) {
+                val amount = number(state.preferences.cup.toDouble(), w)
+                Button(onClick = onQuickWater, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+                    Glyph("water", Modifier.size(19.dp), c.onPrimary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(w.f("quick_log_cup", "amount" to amount))
+                }
+            }
             if (state != null && onDraft != null) {
                 OutlinedTextField(phrase, { phrase = it.take(250) }, modifier = Modifier.fillMaxWidth(),
                     shape = ControlShape, label = { Text(w["quick_phrase"]) }, singleLine = true,
@@ -84,9 +92,16 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, choose: (St
                         }
                     }
                 }
-                if (phrase.isBlank()) habits?.waterAmount?.let { amount ->
-                    SuggestionChip(onClick = { onDraft(Entry(kind = "water", value = amount, unit = "mL")) },
-                        label = { Text(w.f("habit_water", "amount" to number(amount, w, 2))) })
+                MotionExpand(phrase.isBlank() && habits?.waterAmount != null) {
+                    habits?.waterAmount?.let { amount ->
+                        NasaqBoard {
+                            SuggestionChip(onClick = { onDraft(Entry(kind = "water", value = amount, unit = "mL")) },
+                                label = { Text(w.f("habit_water", "amount" to number(amount, w, 2))) })
+                            Text(w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w)),
+                                style = MaterialTheme.typography.bodySmall)
+                            if (onHideWater != null) TextButton(onClick = { onHideWater(amount) }) { Text(w["hide_suggestion"]) }
+                        }
+                    }
                 }
             }
             Surface(

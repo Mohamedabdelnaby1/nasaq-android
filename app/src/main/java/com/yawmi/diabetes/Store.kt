@@ -37,20 +37,38 @@ class Store private constructor(private val context: Context) {
     @Synchronized fun write(state: State): State {
         Codec.validate(state)
         val cipher=Cipher.getInstance("AES/GCM/NoPadding"); cipher.init(Cipher.ENCRYPT_MODE,key())
-        val bytes=cipher.iv+cipher.doFinal(Codec.encode(state).toByteArray(Charsets.UTF_8))
+        val encoded = Codec.encode(state)
+        require(encoded.length <= 12_000_000)
+        val bytes = cipher.iv + cipher.doFinal(encoded.toByteArray(Charsets.UTF_8))
+        require(bytes.size <= 16_000_000)
         val stream=file.startWrite()
         try { stream.write(bytes); file.finishWrite(stream) } catch(e:Exception) { file.failWrite(stream); throw e }
         runCatching{Widgets.updateAll(context,state)}
         return state
     }
     @Synchronized fun update(change: (State)->State): State {
-        val current=read(); return write(change(current).copy(revision=current.revision+1))
+        val current = read()
+        val next = change(current)
+        return if (next == current) current else write(next.copy(revision = current.revision + 1))
     }
+
+    @Synchronized internal fun restore(backup: State, settings: Boolean, recovery: Boolean, expected: RestoreCounts): State {
+        val current = try { read() } catch (error: Exception) {
+            if (!recovery) throw error
+            State()
+        }
+        val plan = prepareRestore(current, backup, settings)
+        if (plan.counts != expected) throw StaleRestorePreview()
+        return if (plan.state == current && !recovery) current else write(plan.state.copy(revision = current.revision + 1))
+    }
+
     companion object {
         @Volatile private var instance: Store?=null
         fun get(context:Context):Store=instance ?: synchronized(this) { instance ?: Store(context.applicationContext).also { instance=it } }
     }
 }
+
+private class StaleRestorePreview : IllegalStateException()
 
 class Repository(private val context:Context) {
     var state by mutableStateOf(State()); private set
@@ -61,18 +79,36 @@ class Repository(private val context:Context) {
     private val main=Handler(Looper.getMainLooper())
     private var pendingWrites=0
     fun refresh() { executor.execute {
-        try { val loaded=Store.get(context).read();runCatching{PhoneShortcuts.publish(context,loaded.preferences);Widgets.updateAll(context,loaded)};main.post { state=loaded; ready=true; error=null } }
+        try { val loaded=Store.get(context).read();runCatching{PhoneShortcuts.publish(context,loaded.preferences);Widgets.updateAll(context,loaded)}
+            runCatching { Reminders.reconcile(context) }
+            main.post { state=loaded; ready=true; error=null } }
         catch(e:Exception) { main.post { error="load_error"; ready=true } }
     } }
     fun change(onSuccess:(State)->Unit={},block:(State)->State) {
         if(!ready || error=="load_error") return
-        pendingWrites++;busy=true
+        submit(onSuccess) { Store.get(context).update(block) }
+    }
+
+    internal fun restore(backup: State, useSettings: Boolean, expected: RestoreCounts, onSuccess: () -> Unit) {
+        if (!ready || busy) return
+        val recovery = error == "load_error"
+        submit({ onSuccess() }, failure = if (recovery) "load_error" else "backup_error") {
+            Store.get(context).restore(backup, useSettings, recovery, expected)
+        }
+    }
+
+    private fun submit(onSuccess: (State) -> Unit, failure: String = "save_error", write: () -> State) {
+        pendingWrites++
+        busy = true
         executor.execute {
             try {
-                val next=Store.get(context).update(block)
-                main.post { state=next; pendingWrites--;busy=pendingWrites>0; error=null;onSuccess(next) }
-                try { Reminders.reschedule(context,next) } catch(e:Exception) { main.post { error="reminder_error" } }
-            } catch(e:Exception) { main.post { error="save_error"; pendingWrites--;busy=pendingWrites>0 } }
+                val next = write()
+                main.post { state = next; pendingWrites--; busy = pendingWrites > 0; error = null; onSuccess(next) }
+                try { Reminders.reschedule(context) } catch (_: Exception) { main.post { error = "reminder_error" } }
+            } catch (_: StaleRestorePreview) {
+                val latest = runCatching { Store.get(context).read() }.getOrNull()
+                main.post { latest?.let { state = it }; pendingWrites--; busy = pendingWrites > 0; error = "restore_changed" }
+            } catch (_: Exception) { main.post { error = failure; pendingWrites--; busy = pendingWrites > 0 } }
         }
     }
     fun preferences(block:(Preferences)->Preferences)=change { it.copy(preferences=block(it.preferences)) }

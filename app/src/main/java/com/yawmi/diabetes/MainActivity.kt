@@ -25,6 +25,7 @@ class MainActivity:ComponentActivity() {
     var requestedEntry by mutableStateOf("")
     var openNotifications by mutableStateOf(false)
     var permissionRevision by mutableIntStateOf(0);private set
+    internal var reminderTestResult by mutableStateOf<String?>(null); private set
     var locked by mutableStateOf(true);private set
     private var authenticated=false
     private var authenticating=false
@@ -36,6 +37,7 @@ class MainActivity:ComponentActivity() {
         authenticating=false;authenticated=result.resultCode==RESULT_OK;locked=!authenticated
         if(!authenticated)message("lock_failure")
     }
+    internal var backupPreview by mutableStateOf<State?>(null)
     internal var csvPreview by mutableStateOf<CsvPreview?>(null)
     internal var reportDays by mutableStateOf<Int?>(null)
     private val csvOpen = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -69,10 +71,9 @@ class MainActivity:ComponentActivity() {
                 while(true){val n=stream.read(buffer);if(n<0)break;total+=n;require(total<=16_000_000);output.write(buffer,0,n)};output.toByteArray()
             } ?: error("No input")
             val restored=Codec.decode(String(BackupCipher.decrypt(bytes,password),Charsets.UTF_8))
-            // Device authentication and zone acknowledgement are deliberately re-established on this phone.
-            Store.get(this).write(restored.copy(preferences=restored.preferences.copy(lock=false,lastZone=java.time.ZoneId.systemDefault().id),revision=restored.revision+1))
-            Reminders.clearAll(this);Reminders.reschedule(this)
-            runOnUiThread {authenticated=false;locked=false;repository.refresh();message("restore_done")}
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) backupPreview = restored
+            }
         }catch(e:Exception){runOnUiThread {message("backup_error")}}finally{password.fill('\u0000')}}
     }
     override fun onCreate(savedInstanceState:Bundle?) {
@@ -121,8 +122,27 @@ class MainActivity:ComponentActivity() {
     }
     fun exactPermission() {if(Build.VERSION.SDK_INT>=31)startActivity(Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,Uri.parse("package:$packageName")))}
     fun channel(id:String) {startActivity(Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE,packageName).putExtra(Settings.EXTRA_CHANNEL_ID,id))}
-    fun testNotification(kind:String="glucose") {Reminders.worker.execute {try{Reminders.test(this,kind);runOnUiThread{repository.refresh();message("notification_test_sent")}}catch(e:Exception){runOnUiThread{message("reminder_error")}}}}
-    fun reschedule() {Reminders.worker.execute {try{Reminders.reschedule(this);runOnUiThread{repository.refresh()}}catch(e:Exception){runOnUiThread{message("reminder_error")}}}}
+    fun testNotification(kind: String = "glucose") {
+        Reminders.worker.execute {
+            val result = runCatching { Reminders.test(this, kind) }.getOrDefault("reminder_error")
+            runOnUiThread {
+                if (!isDestroyed) {
+                    reminderTestResult = result
+                    repository.refresh()
+                    message(if (result == "posted") "notification_test_sent" else result)
+                }
+            }
+        }
+    }
+    fun reschedule() {
+        Reminders.worker.execute {
+            val refreshed = runCatching { Reminders.reschedule(this) }.isSuccess
+            runOnUiThread {
+                permissionRevision++
+                if (refreshed) repository.refresh() else message("reminder_error")
+            }
+        }
+    }
     fun oneShot(kind:String,minutes:Int) {Reminders.worker.execute {try{Reminders.once(this,kind,minutes);runOnUiThread{message(if(kind=="symptom")"followup_scheduled"else"recheck_scheduled")}}catch(e:Exception){runOnUiThread{message("reminder_error")}}}}
     fun dial(phone:String) {startActivity(Intent(Intent.ACTION_DIAL,Uri.fromParts("tel",phone,null)))}
     fun batterySettings() {

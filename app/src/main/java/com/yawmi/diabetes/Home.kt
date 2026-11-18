@@ -40,7 +40,7 @@ import androidx.compose.ui.graphics.drawscope.clipRect
 }
 
 @Composable
-fun GlucoseChart(entries: List<Entry>, p: Preferences) {
+fun GlucoseChart(entries: List<Entry>, p: Preferences, onOpenDay: ((java.time.LocalDate) -> Unit)? = null) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val points = remember(entries) { entries.filter { it.kind == "glucose" }.sortedBy { it.time }.takeLast(120) }
@@ -84,6 +84,9 @@ fun GlucoseChart(entries: List<Entry>, p: Preferences) {
                 }
             } else Text(w["chart_explore"], style = MaterialTheme.typography.bodySmall)
         }
+        if (point != null && onOpenDay != null) TextButton(onClick = {
+            onOpenDay(java.time.Instant.ofEpochMilli(point.time).atZone(java.time.ZoneId.systemDefault()).toLocalDate())
+        }) { Text(w["open_selected_day"]) }
         Canvas(Modifier.fillMaxWidth().height(163.dp)
             .pointerInput(points) {
                 detectTapGestures { position -> selected = nearest(position.x, size.width.toFloat(), 10.dp.toPx()) }

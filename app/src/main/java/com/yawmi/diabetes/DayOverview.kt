@@ -130,7 +130,8 @@ private fun OverviewMetric(kind: String, title: String, value: String, note: Str
 }
 
 @Composable
-fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(), onClose: () -> Unit) {
+fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
+    onEdit: ((Entry) -> Unit)? = null, onAdd: ((String, LocalDate) -> Unit)? = null, onClose: () -> Unit) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val motion = LocalMotion.current
@@ -139,13 +140,27 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(), onClos
     var selection by rememberSaveable(initialDate.toString()) { mutableStateOf(initialDate.toString()) }
     var filter by rememberSaveable { mutableStateOf("all") }
     val date = LocalDate.parse(selection)
-    val filters = listOf("all", "glucose", "water", "meal", "dose")
+    val filters = listOf("all", "glucose", "water", "meal", "dose", "symptom")
+    var addMenu by remember { mutableStateOf(false) }
     Scaffold(containerColor = c.background) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             ScreenTitle(w["day_detail_title"]) {
+                Row {
+                    if (onAdd != null) Box {
+                        IconButton(onClick = { addMenu = true },
+                            modifier = Modifier.semantics { contentDescription = w["timeline_add"] }) {
+                            Glyph("plus", Modifier.size(22.dp))
+                        }
+                        DropdownMenu(expanded = addMenu, onDismissRequest = { addMenu = false }) {
+                            journalActions.forEach { kind ->
+                                DropdownMenuItem(text = { Text(w[kind]) }, onClick = { addMenu = false; onAdd(kind, date) })
+                            }
+                        }
+                    }
                 IconButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("close", Modifier.size(22.dp))
+                }
                 }
             }
             Surface(shape = BoardShape, color = c.primary, contentColor = c.onPrimary) {
@@ -182,7 +197,7 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(), onClos
                 val summary = remember(s, day) { dayOverview(s, at, zone) }
                 Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    Timeline(summary, s, filter, local, zone)
+                    Timeline(summary, s, filter, local, zone, onEdit)
                     DayOverviewCard(s, summary)
                 }
             }
@@ -193,7 +208,7 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(), onClos
 private data class TimelineEvent(val time: Long, val entry: Entry? = null, val item: CareItem? = null)
 
 @Composable
-private fun Timeline(summary: DayOverview, state: State, filter: String, day: LocalDate, zone: ZoneId) {
+private fun Timeline(summary: DayOverview, state: State, filter: String, day: LocalDate, zone: ZoneId, onEdit: ((Entry) -> Unit)?) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val records = summary.entries.filter { filter == "all" || it.kind == filter }.map { TimelineEvent(it.time, entry = it) }
@@ -216,7 +231,14 @@ private fun Timeline(summary: DayOverview, state: State, filter: String, day: Lo
             NasaqBoard(Modifier.weight(1f)) {
                 events.forEachIndexed { index, event ->
                     if (index > 0) HorizontalDivider()
-                    event.entry?.let { ActivityRow(it, state) }
+                    event.entry?.let { entry ->
+                        ActivityRow(entry, state, trailing = if (onEdit != null) {{
+                            IconButton(onClick = { onEdit(entry) }, modifier = Modifier.size(40.dp)
+                                .semantics { contentDescription = w["edit"] + " " + w[if (entry.kind == "dose") "medication" else entry.kind] }) {
+                                Glyph("edit", Modifier.size(16.dp))
+                            }
+                        }} else null)
+                    }
                     event.item?.let { item ->
                         val sleep = item.kind == "sleep"
                         val note = if (sleep) timeText(item.time, w) + " → " + timeText(item.end, w)

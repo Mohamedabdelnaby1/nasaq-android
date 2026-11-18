@@ -42,7 +42,7 @@ class ExperienceUiTests{
     }
     @Test fun todayOverviewShowsDosesAndAverages() {
         val s = sample().let { it.copy(entries = it.entries + listOf(Entry(kind="dose", status="taken"), Entry(kind="water", value=1500.0, unit="mL", time=System.currentTimeMillis()-86_400_000L))) }
-        compose.setContent { YawmiTheme(s.preferences) { DayOverviewScreen(s) {} } }
+        compose.setContent { YawmiTheme(s.preferences) { DayOverviewScreen(s, onEdit = {}, onAdd = { _, _ -> }) {} } }
         val w = Words("ar")
         compose.onNodeWithText(w["day_glucose_average"]).assertExists()
         compose.onNodeWithText(w["day_water_average"]).assertExists()

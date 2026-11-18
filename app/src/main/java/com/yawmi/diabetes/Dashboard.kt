@@ -193,7 +193,7 @@ private fun DeskMetricLine(kind: String, summary: DayOverview, state: State, bus
             DomainMark(kind)
             Column(Modifier.weight(1f)) {
                 Text(deskLabel(kind), style = MaterialTheme.typography.labelMedium)
-                Text(listOf(value, unit).filter(String::isNotEmpty).joinToString(" "), style = MaterialTheme.typography.titleLarge)
+                DeskAmount(listOf(value, unit).filter(String::isNotEmpty).joinToString(" "), MaterialTheme.typography.titleLarge)
             }
         }
         IconButton(onClick = add, enabled = !busy, modifier = Modifier.semantics { contentDescription = w["add"] + " " + w[kind] }) {
@@ -225,8 +225,7 @@ private fun DeskInstrument(kind: String, summary: DayOverview, s: State, busy: B
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Column(Modifier.weight(1f)) {
-                        Text(value, style = if (size == "small") MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge,
-                            fontWeight = FontWeight.Bold, maxLines = 1)
+                        DeskAmount(value, if (size == "small") MaterialTheme.typography.displaySmall else MaterialTheme.typography.displayLarge)
                         if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelLarge)
                     }
                     if (size != "small") when (kind) {
@@ -265,10 +264,24 @@ private fun DeskTile(kind: String, summary: DayOverview, s: State, size: String?
                     Glyph("arrow", Modifier.size(17.dp), tone.ink)
                 }
                 Text(deskLabel(kind), style = MaterialTheme.typography.labelMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                Text(value, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+                DeskAmount(value, MaterialTheme.typography.headlineMedium)
                 if (unit.isNotBlank()) Text(unit, style = MaterialTheme.typography.labelMedium)
             }
         }
+    }
+}
+
+@Composable
+private fun DeskAmount(value: String, style: androidx.compose.ui.text.TextStyle) {
+    if (!LocalMotion.current) {
+        Text(value, style = style, fontWeight = FontWeight.Bold, maxLines = 1)
+        return
+    }
+    AnimatedContent(value, transitionSpec = {
+        ((slideInVertically(tween(310, easing = NasaqEase)) { it / 2 } + fadeIn(tween(230, 80))) togetherWith
+            (slideOutVertically(tween(210)) { -it / 3 } + fadeOut(tween(155)))).using(SizeTransform(clip = true))
+    }, label = "desk-value") { amount ->
+        Text(amount, style = style, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 

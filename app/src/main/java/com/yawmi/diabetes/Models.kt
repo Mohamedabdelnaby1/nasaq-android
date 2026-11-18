@@ -23,7 +23,9 @@ data class Preferences(
     val fluidRestricted:Boolean = false, val waterSmart:Boolean = true,
     val compactHome:Boolean=false,val haptics:Boolean=true,
     val waterDays:Set<Int> = (1..7).toSet(),val glucoseDays:Set<Int> = (1..7).toSet(),val snoozeMinutes:Int=10,
-    val cardSizes:Map<String,String> = emptyMap(),val waterOffset:Int=0, val adaptive: Boolean = true
+    val cardSizes:Map<String,String> = emptyMap(),val waterOffset:Int=0, val adaptive: Boolean = true,
+    val pinnedShortcut: String = "", val adaptiveSince: Long = 0,
+    val ignoredWaterAmounts: Set<Double> = emptySet()
 )
 
 data class Entry(
@@ -75,6 +77,8 @@ object Codec {
             put("compactHome",p.compactHome);put("haptics",p.haptics);put("waterDays",strings(p.waterDays));put("glucoseDays",strings(p.glucoseDays));put("snoozeMinutes",p.snoozeMinutes)
         }
         settings.put("cardSizes",JSONObject(p.cardSizes)).put("waterOffset",p.waterOffset).put("adaptive",p.adaptive)
+            .put("pinnedShortcut", p.pinnedShortcut).put("adaptiveSince", p.adaptiveSince)
+            .put("ignoredWaterAmounts", strings(p.ignoredWaterAmounts))
         val entries=JSONArray(s.entries.map { e -> JSONObject().apply {
             put("id",e.id); put("kind",e.kind); put("time",e.time); put("value",e.value); put("second",e.second)
             put("unit",e.unit); put("context",e.context); put("note",e.note); put("medicationId",e.medicationId)
@@ -130,7 +134,9 @@ object Codec {
         val audit=root.array("audit").let { a -> (0 until minOf(a.length(),500)).map { i ->
             val e=a.getJSONObject(i); Audit(e.str("id"),e.getLong("time"),e.str("kind"),e.str("status"))
         } }
-        return State(preferences.copy(cardSizes=readSizes(p.optJSONObject("cardSizes")),waterOffset=p.optInt("waterOffset"), adaptive=p.optBoolean("adaptive",true)),
+        return State(preferences.copy(cardSizes=readSizes(p.optJSONObject("cardSizes")),waterOffset=p.optInt("waterOffset"), adaptive=p.optBoolean("adaptive",true),
+            pinnedShortcut = p.str("pinnedShortcut"), adaptiveSince = p.optLong("adaptiveSince"),
+            ignoredWaterAmounts = p.array("ignoredWaterAmounts").let { a -> (0 until a.length()).map(a::getDouble).toSet() }),
             entries,meds,audit,root.optLong("revision"),CareData.decode(root.optJSONObject("care"))).also { validate(it) }
     }
 
@@ -138,6 +144,9 @@ object Codec {
         val p=s.preferences
         checkLayout(p.order,p.hiddenCards,p.cardSizes)
         require(p.waterOffset in 0..240)
+        require(p.pinnedShortcut.isEmpty() || p.pinnedShortcut in journalActions)
+        require(p.adaptiveSince >= 0 && p.ignoredWaterAmounts.size <= 20 &&
+            p.ignoredWaterAmounts.all { it in 1.0..5000.0 })
         require(s.care.items.size<=500 && s.care.items.distinctBy{it.id}.size==s.care.items.size && s.care.layouts.size<=12)
         s.care.items.forEach {
             require(it.kind in setOf("visit","lab","question","sleep","refill") && it.id.length in 1..60 && it.title.length in 1..240)
@@ -159,6 +168,7 @@ object Codec {
         java.time.LocalTime.parse(p.quietStart); java.time.LocalTime.parse(p.quietEnd)
         require(p.glucoseTimes.size<=12); p.glucoseTimes.forEach { java.time.LocalTime.parse(it) }
         require(p.name.length<=80 && p.sickPlan.length<=10000 && p.carePhone.length<=40)
+        require(s.entries.size <= 100_000 && s.medications.size <= 500)
         require(s.entries.map { it.id }.distinct().size==s.entries.size)
         require(s.medications.map { it.id }.distinct().size==s.medications.size)
         s.entries.forEach {

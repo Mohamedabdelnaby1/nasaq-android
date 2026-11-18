@@ -65,11 +65,17 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         val scope=rememberCoroutineScope();val feedback=rememberFeedback()
         var homeLayoutOpen by remember{mutableStateOf(false)}
         var timelineDate by rememberSaveable { mutableStateOf<String?>(null) }
+        var timelineOrigin by rememberSaveable { mutableStateOf("today") }
+        fun openDay(date: LocalDate?, origin: String = "today") {
+            timelineDate = date?.toString()
+            timelineOrigin = origin
+            tab = "day_summary"
+        }
         var saveNotice by remember { mutableStateOf<Job?>(null) }
         fun saved(entry:Entry,previous:Entry?,actual:State){
             val stored=actual.entries.find{it.id==entry.id} ?: return
             feedback()
-            if(entry.kind=="glucose" && mg(entry)<70)info="low"
+            if (previous == null && entry.kind == "glucose" && System.currentTimeMillis() - entry.time in 0..600_000 && mg(entry) < 70) info = "low"
             saveNotice?.cancel()
             saveNotice = scope.launch {
                 val action = withTimeoutOrNull(8_000) {
@@ -80,12 +86,22 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             }
         }
         fun record(entry:Entry){repo.add(entry){saved(entry,null,it)}}
+        fun editRecord(entry: Entry) { draftEntry = null; recordEdit = entry; form = entry.kind }
+        fun addToDay(kind: String, date: LocalDate) {
+            val local = java.time.LocalTime.now()
+            val time = date.atTime(local).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            recordEdit = null
+            draftEntry = Entry(kind = kind, time = time, value = if (kind == "water") p.cup.toDouble() else 0.0,
+                unit = if (kind == "water") "mL" else p.unit)
+            form = kind
+        }
         LaunchedEffect(activity.requestedScreen, activity.requestedEntry, activity.locked, p.setupVersion) {
             val screen = activity.requestedScreen
             val entry = activity.requestedEntry
             if (!activity.locked && p.setupVersion >= 2 && (screen.isNotBlank() || entry.isNotBlank())) {
                 if (screen.isNotBlank()) tab = screen
                 timelineDate = null
+                timelineOrigin = "today"
                 recordEdit = null
                 draftEntry = null
                 medEdit = null
@@ -97,7 +113,14 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             }
         }
         LaunchedEffect(repo.error) { repo.error?.takeIf { it!="load_error" }?.let { snackbar.showSnackbar(w[it]);repo.clearError() } }
-        BackHandler(enabled=form!=null || medEdit!=null || tab!="today") { if(form!=null) {form=null;recordEdit=null;draftEntry=null} else if(medEdit!=null) medEdit=null else tab="today" }
+        BackHandler(enabled=form!=null || medEdit!=null || tab!="today") {
+            when {
+                form != null -> { form = null; recordEdit = null; draftEntry = null }
+                medEdit != null -> medEdit = null
+                tab == "day_summary" -> tab = timelineOrigin
+                else -> tab = "today"
+            }
+        }
         Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
             when {
                 !repo.ready -> Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center) { CircularProgressIndicator() }
@@ -127,15 +150,17 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                                 Box(Modifier.fillMaxSize().padding(insets),contentAlignment=Alignment.TopCenter) {
                                     Box(Modifier.widthIn(max=1000.dp).fillMaxSize()) {
                                         when(destination) {
-                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={timelineDate=null;tab="day_summary"},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
-                                                openMedicines={tab="medications"},openDay={timelineDate=it.toString();tab="day_summary"})
+                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={openDay(null)},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
+                                                openMedicines={tab="medications"},openDay={openDay(it)})
                                             "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
                                                 initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"},onImport={activity.openCsv()})
                                             "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
                                                 portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))})
-                                            "day_summary" -> DayOverviewScreen(s, timelineDate?.let(LocalDate::parse) ?: LocalDate.now()) { tab="today" }
+                                            "day_summary" -> DayOverviewScreen(s, timelineDate?.let(LocalDate::parse) ?: LocalDate.now(),
+                                                onEdit = ::editRecord, onAdd = ::addToDay) { tab=timelineOrigin }
                                             "medications"->Medicines(s,add={form="new_med"},edit={medEdit=it},dose={pendingDose=it},manual={form="dose"})
-                                            "insights"->Insights(s,add={form=it},export={days,type->activity.export(s,days,type)})
+                                            "insights"->Insights(s,add={form=it},export={days,type->activity.export(s,days,type)},
+                                                onOpenDay={openDay(it, "insights")})
                                             else->SettingsScreen(repo,activity,backup={backupMode=it},info={info=it})
                                         }
                                     }
@@ -156,14 +181,19 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         }
         fun saveEntry(entry: Entry) {
             val old = recordEdit
-            if (old != null) repo.change(onSuccess = { saved(entry, old, it) }) { Records.add(Records.remove(it, entry.id), entry) }
+            if (old != null) repo.change(onSuccess = { saved(entry, old, it) }) { Records.replace(it, old, entry) }
             else record(entry)
             dismissEntry()
         }
         val activeForm = form
         if (activeForm == "quick" || activeForm == "glucose" || activeForm == "water") {
             RecordingSheet(activeForm, ::dismissEntry, onSelect = { form = it }, state = s,
-                onDraft = { draftEntry = it; form = it.kind }) { kind, close ->
+                onDraft = { draftEntry = it; form = it.kind }, onQuickWater = if (!repo.busy) {{
+                    dismissEntry()
+                    record(Entry(kind = "water", value = p.cup.toDouble(), unit = "mL"))
+                }} else null, onHideWater = { amount -> repo.preferences { prefs ->
+                    prefs.copy(ignoredWaterAmounts = (prefs.ignoredWaterAmounts.toList() + amount).takeLast(20).toSet())
+                } }) { kind, close ->
                 QuickEntryContent(kind, recordEdit, s, onDismiss = { close(::dismissEntry) },
                     onSave = { entry -> close { saveEntry(entry) } }, draft = draftEntry)
             }
@@ -176,7 +206,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         ) { DayOverviewScreen(s) { form = null } }
         else if (activeForm == "care_tools") CareTools(s, { form = null }) { change -> repo.change(block = change) }
         else if (activeForm == "new_med" || medEdit != null) MedicationEditor(medEdit,p,onDismiss={form=null;medEdit=null},onSave={repo.put(it);form=null;medEdit=null})
-        else if (activeForm != null) EntryEditor(activeForm, recordEdit, s, onDismiss = ::dismissEntry, onSave = ::saveEntry)
+        else if (activeForm != null) EntryEditor(activeForm, recordEdit, s, onDismiss = ::dismissEntry, onSave = ::saveEntry, initialTime = draftEntry?.time)
         if (!activity.locked) {
             activity.csvPreview?.let { preview ->
                 CsvReview(preview, s, repo.busy, onDismiss = { activity.csvPreview = null }) {
@@ -207,6 +237,15 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         }
         delete?.let { e -> AlertDialog(onDismissRequest={delete=null},title={Text(w["delete"])},text={Text(w["delete_confirm"])},
             confirmButton={TextButton(onClick={repo.delete(e.id);delete=null}){Text(w["delete"])}},dismissButton={TextButton(onClick={delete=null}){Text(w["cancel"])}}) }
+        activity.backupPreview?.let { incoming ->
+            BackupRestoreReview(s, incoming, repo.error == "load_error", repo.busy,
+                onDismiss = { activity.backupPreview = null }) { useSettings, review ->
+                repo.restore(incoming, useSettings, review) {
+                    activity.backupPreview = null
+                    activity.message("restore_done")
+                }
+            }
+        }
         backupMode?.let { mode -> BackupDialog(mode,onDismiss={backupMode=null},onConfirm={password->backupMode=null;activity.backup(mode,password)}) }
         info?.let { kind ->
             AlertDialog(onDismissRequest={info=null},title={Text(w[if(kind=="low") "low_alert" else if(kind=="privacy") "privacy" else "sick_days"])},text={

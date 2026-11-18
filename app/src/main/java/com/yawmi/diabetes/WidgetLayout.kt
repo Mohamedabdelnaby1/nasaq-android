@@ -80,7 +80,7 @@ internal data class WidgetLayout(
             val footerKind = if (look.quickWater && "water" in displayed) "water" else parts.first()
             val compactAction = !header && !footer && look.action && look.quickWater && parts == listOf("water")
             return WidgetLayout(body, header, header && parts.size > 1, footer, footerKind,
-                footer && footerKind == "water" && look.quickWater && look.undoWater, displayed, compactAction, rtl)
+                (footer || compactAction) && footerKind == "water" && look.quickWater && look.undoWater, displayed, compactAction, rtl)
         }
     }
 }

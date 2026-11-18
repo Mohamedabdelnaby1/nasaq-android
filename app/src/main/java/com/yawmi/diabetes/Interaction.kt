@@ -77,7 +77,6 @@ object RecordUndo{
     /** Do not undo over a newer edit, or a different occurrence already recorded. */
     fun revert(s:State,recorded:Entry,previous:Entry?):State{
         if(s.entries.find{it.id==recorded.id}!=recorded)return s
-        val removed=Records.remove(s,recorded.id)
-        return if(previous==null)removed else Records.add(removed,previous)
+        return if (previous == null) Records.remove(s, recorded.id) else Records.replace(s, recorded, previous)
     }
 }

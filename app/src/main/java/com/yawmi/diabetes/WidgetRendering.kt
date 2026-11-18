@@ -78,11 +78,15 @@ object GraphicalWidgets {
         val readValues = Widgets.valuesVisible(s.preferences.lock, look.visible)
         val summary by lazy { dayOverview(s, System.currentTimeMillis()) }
         fun description(kind: String): String {
-            val name = w[when (kind) { "glucose" -> "day_glucose_average"; "day_summary" -> "day_overview"; else -> kind }]
+            val name = w[when (kind) { "glucose" -> "day_glucose_average"; "water" -> "water_week"; "day_summary" -> "day_overview"; else -> kind }]
             if (!readValues) return "$name. ${w["widget_values_off"]}"
             val detail = when (kind) {
                 "glucose" -> summary.glucoseValue(s.preferences.unit, w)?.let { it + " " + s.preferences.unit } ?: w["no_reading"]
-                "water" -> number(summary.waterMl, w) + " " + w["ml"]
+                "water" -> {
+                    val average = summary.waterAverageMl?.let { number(it, w) + " " + w["ml"] } ?: w["no_reading"]
+                    val today = number(summary.waterMl, w) + " " + w["ml"]
+                    "$average. ${w.f("widget_water_today", "amount" to today)}"
+                }
                 "day_summary" -> w.f("day_event_count", "count" to number(summary.activityCount.toDouble(), w))
                 else -> w["next_reminder"]
             }
@@ -101,11 +105,16 @@ object GraphicalWidgets {
         val settingsId = if (w.rtl) R.id.widget_settings_rtl else R.id.widget_settings
         val cycleId = if (w.rtl) R.id.widget_cycle_rtl else R.id.widget_cycle
         val addId = if (geometry.compactAction) {
-            show(R.id.widget_mini_add_rtl, w.rtl)
-            show(R.id.widget_mini_add, !w.rtl)
+            show(R.id.widget_mini_controls_rtl, w.rtl)
+            show(R.id.widget_mini_controls, !w.rtl)
             if (w.rtl) R.id.widget_mini_add_rtl else R.id.widget_mini_add
         } else if (w.rtl) R.id.widget_add_rtl else R.id.widget_add
-        val undoId = if (w.rtl) R.id.widget_undo_rtl else R.id.widget_undo
+        val undoId = when {
+            geometry.compactAction && w.rtl -> R.id.widget_mini_undo_rtl
+            geometry.compactAction -> R.id.widget_mini_undo
+            w.rtl -> R.id.widget_undo_rtl
+            else -> R.id.widget_undo
+        }
         show(R.id.widget_header, geometry.header)
         show(R.id.widget_header_rtl, w.rtl)
         show(R.id.widget_header_ltr, !w.rtl)

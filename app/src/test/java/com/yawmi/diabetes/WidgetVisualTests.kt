@@ -89,6 +89,31 @@ class WidgetVisualTests{
         }
     }
     @Test fun smallWidget(){render("12-widget-small",110,80,WidgetLook(mode="water",visible=true))}
+    @Test fun compactCupSeparatesAddAndUndoAfterARecord() {
+        val look = WidgetLook(mode = "water", visible = true, quickWater = true, title = false, undoWater = true)
+        val stamp = System.currentTimeMillis()
+        val entry = Entry(id = "widget_record", kind = "water", unit = "mL", value = 250.0, time = stamp)
+        for (lang in listOf("ar", "en")) {
+            val base = state()
+            val s = base.copy(preferences = base.preferences.copy(language = lang), entries = base.entries + entry)
+            val card = GraphicalWidgets.layout(c, s, 46, look, 110, 80, true, 1f, 0, entry).apply(c, FrameLayout(c))
+            val mode = View.MeasureSpec.EXACTLY
+            card.measure(View.MeasureSpec.makeMeasureSpec(110, mode), View.MeasureSpec.makeMeasureSpec(80, mode))
+            card.layout(0, 0, 110, 80)
+            val plus = card.findViewById<View>(if (lang == "ar") R.id.widget_mini_add_rtl else R.id.widget_mini_add)
+            val undo = card.findViewById<View>(if (lang == "ar") R.id.widget_mini_undo_rtl else R.id.widget_mini_undo)
+            assertTrue(plus.hasOnClickListeners() && undo.hasOnClickListeners())
+            assertEquals(View.VISIBLE, undo.visibility)
+            assertEquals(plus.bottom, undo.top)
+            assertEquals(80, undo.bottom)
+            val w = Words(lang)
+            val summary = dayOverview(s, stamp)
+            val spoken = card.findViewById<View>(R.id.widget_primary).contentDescription.toString()
+            assertTrue(spoken.startsWith(w["water_week"] + ". " + number(summary.waterAverageMl!!, w)))
+            assertTrue(spoken.endsWith(w.f("widget_water_today", "amount" to (number(summary.waterMl, w) + " " + w["ml"]))))
+        }
+        render("nasaq-water-mini-undo", 110, 80, look)
+    }
     @Test fun compactCupKeepsItsOwnTouchTargetWhenMirrored() {
         val look = WidgetLook(mode = "water", visible = true, quickWater = true, title = false, style = "blue")
         render("nasaq-water-compact-active", 110, 80, look)
@@ -104,7 +129,7 @@ class WidgetVisualTests{
             val action = picture.findViewById<View>(if (rtl) R.id.widget_mini_add_rtl else R.id.widget_mini_add)
             assertTrue(primary.hasOnClickListeners() && action.hasOnClickListeners())
             assertEquals(42, action.width)
-            assertEquals(if (rtl) 0 else 68, action.left)
+            assertEquals(if (rtl) 0 else 68, (action.parent as View).left)
             assertEquals(if (rtl) 42 else 0, primary.left)
         }
     }

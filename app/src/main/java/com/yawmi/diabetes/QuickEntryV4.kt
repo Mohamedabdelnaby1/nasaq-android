@@ -37,18 +37,18 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
     val initial=existing ?: draft
     val id=remember{initial?.id ?: java.util.UUID.randomUUID().toString()}
     val last=remember(s.entries){s.entries.filter{it.kind=="water"}.maxByOrNull{it.time}?.value}
-    var value by remember{mutableStateOf(initial?.value?.toString() ?: if(water)p.cup.toString()else "")}
+    var value by remember{mutableStateOf(initial?.value?.takeIf { it > 0 }?.toString() ?: if(water)p.cup.toString()else "")}
     var unit by remember{mutableStateOf(initial?.unit ?: p.unit)}
     var context by remember{mutableStateOf(initial?.context ?: "other")}
-    var note by remember{mutableStateOf(existing?.note.orEmpty())}
-    var time by remember{mutableLongStateOf(existing?.time ?: System.currentTimeMillis())}
-    var details by remember{mutableStateOf(false)};var error by remember{mutableStateOf<String?>(null)}
+    var note by remember{mutableStateOf(initial?.note.orEmpty())}
+    var time by remember{mutableLongStateOf(initial?.time ?: System.currentTimeMillis())}
+    var details by remember{mutableStateOf(existing != null || initial?.time?.let { !isToday(it) } == true)};var error by remember{mutableStateOf<String?>(null)}
     var unusual by remember{mutableStateOf<Entry?>(null)}
     val maxHeight=(LocalConfiguration.current.screenHeightDp-64).coerceAtLeast(240).dp
     fun save(){
         error=quickEntryError(value,water,unit,time)
         if(error!=null){if(error=="time_value_error")details=true;return}
-        val entry=Entry(id=id,kind=kind,time=time,value=Planner.parseNumber(value),unit=if(water)"mL"else unit,context=if(water)""else context,note=note,created=existing?.created ?: System.currentTimeMillis())
+        val entry=Entry(id=id,kind=kind,time=time,value=Planner.parseNumber(value),unit=if(water)"mL"else unit,context=if(water) existing?.context.orEmpty() else context,note=note,created=existing?.created ?: System.currentTimeMillis())
         if(!water && (mg(entry)<20 || mg(entry)>600))unusual=entry else onSave(entry)
     }
         Column(Modifier.fillMaxWidth().heightIn(max=maxHeight).imePadding()){
