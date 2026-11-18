@@ -40,9 +40,9 @@ class ReferenceDesignTests{
             file.outputStream().use{assertTrue(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
         }
     }
-    @Test fun homeArabic(){show{Home(it,false,{},{},{},{},{},{_,_,_->})};screenshot("01-home-ar")}
-    @Test fun homeDark(){show(theme="dark"){Home(it,false,{},{},{},{},{},{_,_,_->})};screenshot("02-home-dark")}
-    @Test fun homeEnglish(){show(language="en"){Home(it,false,{},{},{},{},{},{_,_,_->})};screenshot("03-home-en")}
+    @Test fun homeArabic(){show{Home(it,false,{},{},{},{},{},{_,_,_->},openGlucose={},openHydration={},openMedicines={},openDay={})};screenshot("01-home-ar")}
+    @Test fun homeDark(){show(theme="dark"){Home(it,false,{},{},{},{},{},{_,_,_->},openGlucose={},openHydration={},openMedicines={},openDay={})};screenshot("02-home-dark")}
+    @Test fun homeEnglish(){show(language="en"){Home(it,false,{},{},{},{},{},{_,_,_->},openGlucose={},openHydration={},openMedicines={},openDay={})};screenshot("03-home-en")}
     @Test fun journal(){show("log"){Journal(it,{},{})};screenshot("04-journal")}
     @Test fun medicines(){show("medications"){Medicines(it,{},{},{},{})};screenshot("05-medicines")}
     @Test fun analytics(){show("insights"){Insights(it,{},{_,_->})};screenshot("06-analytics")}

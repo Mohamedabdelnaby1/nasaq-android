@@ -65,8 +65,12 @@ fun movedOrder(order:List<String>,key:String,delta:Int):List<String>{
     val w=LocalWords.current;val p=s.preferences
     Column(verticalArrangement=Arrangement.spacedBy(14.dp)){
         Text(w["layout_preview"],style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
-        HomeLayoutPreview(s)
-        ChoiceRow(w["home_density"],listOf("compact","detailed"),if(p.compactHome)"compact"else"detailed",{w[if(it=="compact")"compact_home"else it]}){onChange(p.copy(compactHome=it=="compact"))}
+        SegmentedRail(listOf(w["compact_home"], w["detailed"]), if (p.compactHome) 0 else 1, { onChange(p.copy(compactHome = it == 0)) })
+        val motion = LocalMotion.current
+        AnimatedContent(p, transitionSpec = { fadeIn(if (motion) tween(230) else snap()) togetherWith
+            fadeOut(if (motion) tween(170) else snap()) }, label = "layout-live-preview") { look ->
+            HomeLayoutPreview(s.copy(preferences = look))
+        }
         Text(w["drag_cards_hint"],style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         ReorderCards(p.order,p.hiddenCards,onMove={key,delta->onChange(p.copy(order=movedOrder(p.order,key,delta)))},onVisible={key,show->onChange(p.copy(hiddenCards=if(show)p.hiddenCards-key else p.hiddenCards+key))})
         Panel(w["card_sizes"]){

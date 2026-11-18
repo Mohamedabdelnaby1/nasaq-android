@@ -23,16 +23,37 @@ object PhoneShortcuts {
     }
 }
 
-@Composable fun IntegrationPanel(repo:Repository,activity:MainActivity){
-    val w=LocalWords.current
-    Panel(w["widget_designs"]){
-        Text(w["widget_designs_body"],style=MaterialTheme.typography.bodySmall)
-        WidgetPreview(repo.state,WidgetLook())
-        Row(horizontalArrangement=Arrangement.spacedBy(14.dp)){Glyph("today",Modifier.size(30.dp));Column(Modifier.weight(1f)){Text(w["widgets"],fontWeight=FontWeight.Bold);Text(w["widget_size_hint"],style=MaterialTheme.typography.bodySmall)}}
-        Button(onClick={if(!Widgets.pin(activity))activity.message("widget_manual")},modifier=Modifier.fillMaxWidth()){Text(w["widget_pin"])}
-        Text(w["widget_manual"],style=MaterialTheme.typography.bodySmall)
-        HorizontalDivider()
-        Text(w["shortcuts"],fontWeight=FontWeight.Bold);Text(w["shortcuts_body"],style=MaterialTheme.typography.bodySmall)
-        TextButton(onClick={repo.preferences{it.copy(setupVersion=0)}}){Text(w["setup_again"])}
+@Composable
+fun IntegrationPanel(repo: Repository, activity: MainActivity) {
+    val w = LocalWords.current
+    var studio by remember { mutableStateOf<WidgetLook?>(null) }
+    val resume = activity.permissionRevision
+    val ids = remember(resume) { Widgets.ids(activity) }
+    NasaqBoard {
+        ScreenTitle(w["widget_designs"]) { DomainMark("widgets") }
+        Text(w["widget_designs_body"], style = MaterialTheme.typography.bodySmall)
+        Button(onClick = { studio = WidgetLook() }, modifier = Modifier.fillMaxWidth()) { Text(w["widget_preview_pin"]) }
+        OutlinedButton(onClick = { studio = widgetPresets.first { it.name == "preset_water_mini" }.look },
+            modifier = Modifier.fillMaxWidth()) { Text(w["preset_water_mini"]) }
+        ids.forEachIndexed { index, id ->
+            SettingsRow("settings", w.f("widget_manage_number", "number" to number((index + 1).toDouble(), w))) {
+                activity.startActivity(Widgets.configIntent(activity, id))
+            }
+        }
+        Text(w["widget_manual"], style = MaterialTheme.typography.bodySmall)
+    }
+    NasaqBoard {
+        Text(w["shortcuts"], fontWeight = FontWeight.Bold)
+        Text(w["shortcuts_body"], style = MaterialTheme.typography.bodySmall)
+        TextButton(onClick = { repo.preferences { it.copy(setupVersion = 0) } }) { Text(w["setup_again"]) }
+    }
+    studio?.let { initial ->
+        androidx.compose.ui.window.Dialog(onDismissRequest = { studio = null },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+            WidgetStudio(repo.state, initial, { studio = null }, onSave = { look ->
+                if (!Widgets.pin(activity, look)) activity.message("widget_manual")
+                studio = null
+            }, pinning = true)
+        }
     }
 }

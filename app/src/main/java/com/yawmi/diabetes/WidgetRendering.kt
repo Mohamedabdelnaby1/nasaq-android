@@ -62,7 +62,7 @@ object GraphicalWidgets {
         val w = Words(s.preferences.language)
         val quick = look.quickWater
         val geometry = WidgetLayout.calculate(width, height, look, w.rtl)
-        val resource = when (geometry.body) {
+        val resource = if (geometry.compactAction) R.layout.home_widget_mini else when (geometry.body) {
             WidgetBody.SINGLE -> R.layout.home_widget
             WidgetBody.FOCUS -> R.layout.home_widget_focus
             WidgetBody.ROWS -> R.layout.home_widget_rows
@@ -100,7 +100,11 @@ object GraphicalWidgets {
         }
         val settingsId = if (w.rtl) R.id.widget_settings_rtl else R.id.widget_settings
         val cycleId = if (w.rtl) R.id.widget_cycle_rtl else R.id.widget_cycle
-        val addId = if (w.rtl) R.id.widget_add_rtl else R.id.widget_add
+        val addId = if (geometry.compactAction) {
+            show(R.id.widget_mini_add_rtl, w.rtl)
+            show(R.id.widget_mini_add, !w.rtl)
+            if (w.rtl) R.id.widget_mini_add_rtl else R.id.widget_mini_add
+        } else if (w.rtl) R.id.widget_add_rtl else R.id.widget_add
         val undoId = if (w.rtl) R.id.widget_undo_rtl else R.id.widget_undo
         show(R.id.widget_header, geometry.header)
         show(R.id.widget_header_rtl, w.rtl)
@@ -109,7 +113,7 @@ object GraphicalWidgets {
         if (geometry.header) {
             view.setContentDescription(settingsId, w["widget_customise"])
             view.setOnClickPendingIntent(settingsId, PendingIntent.getActivity(c, id,
-                Intent(c, WidgetConfigActivity::class.java).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id),
+                Widgets.configIntent(c, id),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE))
         }
         if (geometry.cycle) {
@@ -120,7 +124,7 @@ object GraphicalWidgets {
         show(R.id.widget_footer_rtl, w.rtl)
         show(R.id.widget_footer_ltr, !w.rtl)
         show(undoId, geometry.undo)
-        if (geometry.footer) {
+        if (geometry.footer || geometry.compactAction) {
             val kind = geometry.footerKind
             val actionKey = when (kind) {
                 "water" -> if (quick) "widget_add_cup" else "widget_log_water"
@@ -149,7 +153,7 @@ object GraphicalWidgets {
 fun WidgetPreview(s: State, look: WidgetLook, width: Int = 300, height: Int = 230, fitBox: Boolean = false, announce: Boolean = true) {
     val c = LocalContext.current
     val dark = MaterialTheme.colorScheme.background.red < .3f
-    val bitmap = remember(s.revision, s.preferences, look, width, height, dark) {
+    val bitmap = remember(s, look, width, height, dark) {
         WidgetArt.bitmap(c, s, width, height, look, dark, pixelScale = c.resources.displayMetrics.density)
     }
     val description = if (announce) LocalWords.current["widget_preview"] else null

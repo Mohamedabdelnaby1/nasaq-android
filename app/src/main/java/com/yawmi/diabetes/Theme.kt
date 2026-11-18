@@ -25,32 +25,32 @@ import androidx.compose.ui.text.font.FontWeight
         "violet" -> Color(0xFF513D91)
         "coral" -> Color(0xFF943F37)
         "blue" -> Color(0xFF2453A6)
-        else -> Color(0xFF173C39)
+        else -> Color(0xFF253D61)
     }
     val tint = when (preferences.palette) {
         "violet" -> Color(0xFFEAE1FF)
         "coral" -> Color(0xFFFFDFD8)
         "blue" -> Color(0xFFDCE8FF)
-        else -> Color(0xFFDAF4C0)
+        else -> Color(0xFFDFE8FF)
     }
     val colors = if (preferences.dynamicColors && Build.VERSION.SDK_INT >= 31) {
         if (dark) dynamicDarkColorScheme(LocalContext.current) else dynamicLightColorScheme(LocalContext.current)
     } else if (dark) darkColorScheme(
-        primary = tint, onPrimary = Color(0xFF172A22), primaryContainer = Color(0xFF243F38), onPrimaryContainer = tint,
+        primary = tint, onPrimary = Color(0xFF172A22), primaryContainer = Color(0xFF27395C), onPrimaryContainer = tint,
         secondary = Color(0xFFFFC790), secondaryContainer = Color(0xFF463329), onSecondaryContainer = Color(0xFFFFDEB8),
         tertiary = Color(0xFF9DDDF8), tertiaryContainer = Color(0xFF1B3A51), onTertiaryContainer = Color(0xFFD9F2FF),
-        surface = Color(0xFF111B1D), background = Color(0xFF111B1D), surfaceContainer = Color(0xFF202B2B),
-        surfaceContainerLow = Color(0xFF182223), surfaceContainerHigh = Color(0xFF31413E),
+        surface = Color(0xFF111A28), background = Color(0xFF111A28), surfaceContainer = Color(0xFF202B2B),
+        surfaceContainerLow = Color(0xFF182538), surfaceContainerHigh = Color(0xFF293A52),
         onSurface = Color(0xFFEDF2EA), onSurfaceVariant = Color(0xFFB9C9C4),
         outline = Color(0xFF95A9A1), outlineVariant = Color(0xFF435550)
     ) else lightColorScheme(
-        primary = seed, onPrimary = Color.White, primaryContainer = tint, onPrimaryContainer = Color(0xFF172F26),
+        primary = seed, onPrimary = Color.White, primaryContainer = tint, onPrimaryContainer = Color(0xFF1B2E50),
         secondary = Color(0xFF845630), secondaryContainer = Color(0xFFFFE3C5), onSecondaryContainer = Color(0xFF472C16),
-        tertiary = Color(0xFF1D5F89), tertiaryContainer = Color(0xFFDCEFFC), onTertiaryContainer = Color(0xFF153D59),
-        surface = Color(0xFFF3F5EF), background = Color(0xFFF3F5EF), surfaceContainer = Color(0xFFE9EEE8),
-        surfaceContainerLow = Color(0xFFFCFDF8), surfaceContainerHigh = Color(0xFFE2EBE2),
-        onSurface = Color(0xFF192B26), onSurfaceVariant = Color(0xFF485B53),
-        outline = Color(0xFF63796B), outlineVariant = Color(0xFFD1DFD1)
+        tertiary = Color(0xFF1D5F89), tertiaryContainer = Color(0xFFD7F1F1), onTertiaryContainer = Color(0xFF164955),
+        surface = Color(0xFFF2F4FA), background = Color(0xFFF2F4FA), surfaceContainer = Color(0xFFE9EDF5),
+        surfaceContainerLow = Color(0xFFFFFBF6), surfaceContainerHigh = Color(0xFFE3E9F5),
+        onSurface = Color(0xFF192C45), onSurfaceVariant = Color(0xFF485973),
+        outline = Color(0xFF63796B), outlineVariant = Color(0xFFD2DCEF)
     )
     val words=remember(preferences.language) { Words(preferences.language) };val density=LocalDensity.current
     val baseContext=LocalContext.current

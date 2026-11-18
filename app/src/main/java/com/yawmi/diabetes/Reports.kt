@@ -6,6 +6,11 @@ import android.util.Base64
 import java.io.File
 import java.time.*
 
+internal data class ReportOptions(
+    val showName: Boolean = true, val summary: Boolean = true, val chart: Boolean = true,
+    val journal: Boolean = true, val plans: Boolean = true, val notes: Boolean = true
+)
+
 /** A dedicated print layout, with embedded Tajawal and no remote assets. */
 object Reports {
     private fun filtered(s:State,days:Int):List<Entry> {
@@ -25,10 +30,10 @@ object Reports {
             writeText("\uFEFF"+(listOf(headers)+rows).joinToString("\r\n"){row->row.joinToString(","){csvCell(it)}}+"\r\n",Charsets.UTF_8)
         }
     }
-    fun html(c:Context,s:State,days:Int):String=buildHtml(s,days) {weight->
+    internal fun html(c:Context,s:State,days:Int, options: ReportOptions = ReportOptions()):String=buildHtml(s,days,options) {weight->
         Base64.encodeToString(c.assets.open("fonts/tajawal_${weight}.ttf").use {it.readBytes()},Base64.NO_WRAP)
     }
-    fun buildHtml(s:State,days:Int,font:(String)->String):String {
+    internal fun buildHtml(s:State,days:Int, options: ReportOptions = ReportOptions(), font:(String)->String):String {
         val w=Words(s.preferences.language);val p=s.preferences;val entries=filtered(s,days)
         val glucose=entries.filter {it.kind=="glucose"};val doses=entries.filter {it.kind=="dose"}
         val water=entries.filter {it.kind=="water"};val zone=ZoneId.systemDefault()
@@ -48,11 +53,11 @@ object Reports {
         val journal=entries.joinToString("") {e->
             val kind=w[if(e.kind=="dose")"medication"else e.kind]
             val v=when(e.kind){"glucose","water","weight","a1c","pressure"->entryTitle(e,s,w);"symptom"->w[e.context]+if(e.value>0)" · "+number(e.value,w)else "";"meal"->w[e.context]+if(e.value>0)" · "+number(e.value,w)+" "+w["grams"]else "";else->w[e.status]}
-            "<tr><td class='when'><bdi>${h(dateText(e.time,w))}</bdi><br/><bdi>${h(timeText(e.time,w))}</bdi></td><td>${h(kind)}</td><td>${h(v)}${if(e.kind=="glucose")"<br/><small>${h(w[e.context])}</small>"else ""}</td><td class='note'>${h(e.note).replace("\n","<br/>")}</td></tr>"
+            "<tr><td class='when'><bdi>${h(dateText(e.time,w))}</bdi><br/><bdi>${h(timeText(e.time,w))}</bdi></td><td>${h(kind)}</td><td>${h(v)}${if(e.kind=="glucose")"<br/><small>${h(w[e.context])}</small>"else ""}</td><td class='note'>${if (options.notes) h(e.note).replace("\n","<br/>") else ""}</td></tr>"
         }
         val meds=s.medications.filter {it.active}.joinToString("") {m->
-            val schedule=when(m.mode){"interval"->w.f("hours_every","n" to number(m.intervalHours.toDouble(),w));"meal"->w[m.relation]+" · "+w[m.meal];"weekly"->m.weekdays.sorted().joinToString(" · "){w[dayKey(it)]}+" · "+m.times.joinToString(", ");else->m.times.joinToString(", ")}
-            "<tr><td><strong>${h(m.name)}</strong><br/>${h(m.strength)}</td><td>${h(m.dose)}</td><td>${h(schedule)}</td><td class='note'>${h(m.instructions)}</td></tr>"
+            val schedule=when(m.mode){"interval"->w.f("hours_every","n" to number(m.intervalHours.toDouble(),w));"meal"->w[m.relation]+" · "+w[m.meal];"weekly"->m.weekdays.sorted().joinToString(" · "){w[dayKey(it)]}+" · "+m.times.joinToString(", ") { clockText(it, w) };else->m.times.joinToString(", ") { clockText(it, w) }}
+            "<tr><td><strong>${h(m.name)}</strong><br/>${h(m.strength)}</td><td>${h(m.dose)}</td><td>${h(schedule)}</td><td class='note'>${if (options.notes) h(m.instructions) else ""}</td></tr>"
         }
         val symptomCount=entries.count {it.kind=="symptom"};val mealCount=entries.count {it.kind=="meal"}
         return """<!doctype html><html lang='${w.language}' dir='${if(w.rtl)"rtl"else"ltr"}'><head><meta charset='utf-8'/>
@@ -68,19 +73,19 @@ object Reports {
             .journal{break-before:page}.report-footer{font-size:8.5pt;color:#617168;margin-top:20px}.chart{width:100%;height:auto;margin:10px 0}.table-title{break-after:avoid}.no-split{break-inside:avoid}bdi{unicode-bidi:isolate}
             a{color:#006c58}svg text{font-family:Tajawal,sans-serif} @media screen{body{padding:24px;max-width:1000px;margin:auto}} @media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
             </style></head><body><header class='header'><div class='brand'>${label("app")}</div><div class='eyebrow'>${label("report")}</div>
-            <h1>${label("report")}</h1><div class='meta'><div>${h(p.name.ifBlank {w["app"]})}</div><div>${h(dateText(from,w))} — ${h(dateText(System.currentTimeMillis(),w))}</div></div>
+            <h1>${label("report")}</h1><div class='meta'><div>${if (options.showName) h(p.name) else ""}</div><div>${h(dateText(from,w))} — ${h(dateText(System.currentTimeMillis(),w))}</div></div>
             <p class='muted'>${label("generated")}: ${h(dateText(System.currentTimeMillis(),w))} ${h(timeText(System.currentTimeMillis(),w))} · <bdi>${h(zone.id)}</bdi></p></header>
-            <div class='summary'>$summary</div><p class='muted'>${label("range_hint")}</p>
+            ${if (options.summary) """<div class='summary'>$summary</div><p class='muted'>${label("range_hint")}</p>
             ${if(p.targetNote.isNotBlank())"<p class='muted'>${label("target_source")}: ${h(p.targetNote)}</p>"else""}
-            <h2>${label("glucose_trend")}</h2>${if(glucose.isEmpty())"<div class='box'>${label("no_analysis")}</div>"else chart(glucose,p,w)}
-            <p class='muted'>${label("chart_not_prediction")}</p>
-            ${if(glucose.isNotEmpty())"<h3>${label("context_analysis")}</h3><table><thead><tr><th>${label("context")}</th><th>${label("count")}</th><th>${label("average")}</th></tr></thead><tbody>$contextRows</tbody></table>"else""}
             <div class='columns'><div class='box'><h3>${label("medications")}</h3><p>${label("taken")}: ${h(number(doses.count {it.status=="taken"}.toDouble(),w))}</p><p>${label("skipped")}: ${h(number(doses.count {it.status=="skipped"}.toDouble(),w))}</p><p class='muted'>${label("dose_summary_hint")}</p></div>
             <div class='box'><h3>${label("water")}</h3><p>${label("recorded_days")}: ${h(number(waterDays.toDouble(),w))} / ${h(number(days.toDouble(),w))}</p><p>${label("recorded_total")}: ${h(number(water.sumOf {it.value},w))} ${label("ml")}</p><p class='muted'>${label("water_missing_hint")}</p></div></div>
-            <div class='box'><p>${label("meals")}: ${h(number(mealCount.toDouble(),w))} · ${label("symptoms")}: ${h(number(symptomCount.toDouble(),w))}</p><p class='muted'>${label("correlation_hint")}</p></div>
-            <section class='journal'><h2>${label("log")}</h2><p class='muted'>${label("value_original")} · ${label("manual_source")}</p><table><thead><tr><th style='width:20%'>${label("date_time")}</th><th style='width:16%'>${label("context_type")}</th><th style='width:25%'>${label("value")}</th><th>${label("notes")}</th></tr></thead><tbody>$journal</tbody></table></section>
-            ${if(meds.isNotEmpty())"<section><h2>${label("current_plans")}</h2><p class='muted'>${label("current_plans_hint")}</p><table><thead><tr><th>${label("medication")}</th><th>${label("dose_text")}</th><th>${label("schedule")}</th><th>${label("instructions")}</th></tr></thead><tbody>$meds</tbody></table></section>"else""}
-            <footer class='report-footer'><p>${label("medical_notice")}</p><p>${label("privacy_export")}</p><p>Yawmi 0.4.0 · Tajawal</p></footer></body></html>""".trimIndent()
+            <div class='box'><p>${label("meals")}: ${h(number(mealCount.toDouble(),w))} · ${label("symptoms")}: ${h(number(symptomCount.toDouble(),w))}</p><p class='muted'>${label("correlation_hint")}</p></div>""" else ""}
+            ${if (options.chart) """<h2>${label("glucose_trend")}</h2>${if(glucose.isEmpty())"<div class='box'>${label("no_analysis")}</div>"else chart(glucose,p,w)}
+            <p class='muted'>${label("chart_not_prediction")}</p>
+            ${if(glucose.isNotEmpty())"<h3>${label("context_analysis")}</h3><table><thead><tr><th>${label("context")}</th><th>${label("count")}</th><th>${label("average")}</th></tr></thead><tbody>$contextRows</tbody></table>"else""}""" else ""}
+            ${if (options.journal) """<section class='journal'><h2>${label("log")}</h2><p class='muted'>${label("value_original")} · ${label("manual_source")}</p><table><thead><tr><th style='width:20%'>${label("date_time")}</th><th style='width:16%'>${label("context_type")}</th><th style='width:25%'>${label("value")}</th><th>${label("notes")}</th></tr></thead><tbody>$journal</tbody></table></section>""" else ""}
+            ${if(options.plans && meds.isNotEmpty())"<section><h2>${label("current_plans")}</h2><p class='muted'>${label("current_plans_hint")}</p><table><thead><tr><th>${label("medication")}</th><th>${label("dose_text")}</th><th>${label("schedule")}</th><th>${label("instructions")}</th></tr></thead><tbody>$meds</tbody></table></section>"else""}
+            <footer class='report-footer'><p>${label("medical_notice")}</p><p>${label("privacy_export")}</p><p>${label("app")} ${BuildConfig.VERSION_NAME} · Tajawal</p></footer></body></html>""".trimIndent()
     }
     private fun chart(entries:List<Entry>,p:Preferences,w:Words):String {
         val points=entries.sortedBy {it.time};val values=points.map {mg(it)}

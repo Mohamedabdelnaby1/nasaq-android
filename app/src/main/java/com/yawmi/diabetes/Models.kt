@@ -23,7 +23,7 @@ data class Preferences(
     val fluidRestricted:Boolean = false, val waterSmart:Boolean = true,
     val compactHome:Boolean=false,val haptics:Boolean=true,
     val waterDays:Set<Int> = (1..7).toSet(),val glucoseDays:Set<Int> = (1..7).toSet(),val snoozeMinutes:Int=10,
-    val cardSizes:Map<String,String> = emptyMap(),val waterOffset:Int=0
+    val cardSizes:Map<String,String> = emptyMap(),val waterOffset:Int=0, val adaptive: Boolean = true
 )
 
 data class Entry(
@@ -74,7 +74,7 @@ object Codec {
             put("waterSmart",p.waterSmart)
             put("compactHome",p.compactHome);put("haptics",p.haptics);put("waterDays",strings(p.waterDays));put("glucoseDays",strings(p.glucoseDays));put("snoozeMinutes",p.snoozeMinutes)
         }
-        settings.put("cardSizes",JSONObject(p.cardSizes)).put("waterOffset",p.waterOffset)
+        settings.put("cardSizes",JSONObject(p.cardSizes)).put("waterOffset",p.waterOffset).put("adaptive",p.adaptive)
         val entries=JSONArray(s.entries.map { e -> JSONObject().apply {
             put("id",e.id); put("kind",e.kind); put("time",e.time); put("value",e.value); put("second",e.second)
             put("unit",e.unit); put("context",e.context); put("note",e.note); put("medicationId",e.medicationId)
@@ -130,7 +130,7 @@ object Codec {
         val audit=root.array("audit").let { a -> (0 until minOf(a.length(),500)).map { i ->
             val e=a.getJSONObject(i); Audit(e.str("id"),e.getLong("time"),e.str("kind"),e.str("status"))
         } }
-        return State(preferences.copy(cardSizes=readSizes(p.optJSONObject("cardSizes")),waterOffset=p.optInt("waterOffset")),
+        return State(preferences.copy(cardSizes=readSizes(p.optJSONObject("cardSizes")),waterOffset=p.optInt("waterOffset"), adaptive=p.optBoolean("adaptive",true)),
             entries,meds,audit,root.optLong("revision"),CareData.decode(root.optJSONObject("care"))).also { validate(it) }
     }
 

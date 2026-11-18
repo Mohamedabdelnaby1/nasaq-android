@@ -89,6 +89,25 @@ class WidgetVisualTests{
         }
     }
     @Test fun smallWidget(){render("12-widget-small",110,80,WidgetLook(mode="water",visible=true))}
+    @Test fun compactCupKeepsItsOwnTouchTargetWhenMirrored() {
+        val look = WidgetLook(mode = "water", visible = true, quickWater = true, title = false, style = "blue")
+        render("nasaq-water-compact-active", 110, 80, look)
+        for (language in listOf("ar", "en")) {
+            val original = state()
+            val state = original.copy(preferences = original.preferences.copy(language = language))
+            val picture = GraphicalWidgets.layout(c, state, 45, look, 110, 80, false, 1f, 0, null).apply(c, FrameLayout(c))
+            val extent = View.MeasureSpec.EXACTLY
+            picture.measure(View.MeasureSpec.makeMeasureSpec(110, extent), View.MeasureSpec.makeMeasureSpec(80, extent))
+            picture.layout(0, 0, 110, 80)
+            val rtl = language == "ar"
+            val primary = picture.findViewById<View>(R.id.widget_primary)
+            val action = picture.findViewById<View>(if (rtl) R.id.widget_mini_add_rtl else R.id.widget_mini_add)
+            assertTrue(primary.hasOnClickListeners() && action.hasOnClickListeners())
+            assertEquals(42, action.width)
+            assertEquals(if (rtl) 0 else 68, action.left)
+            assertEquals(if (rtl) 42 else 0, primary.left)
+        }
+    }
     @Test fun hiddenValuesDoNotLeakIntoPixels(){
         val first=state();val second=first.copy(entries=listOf(Entry(kind="glucose",value=280.0),Entry(kind="water",value=2000.0,unit="mL")))
         val look=WidgetLook(visible=false)

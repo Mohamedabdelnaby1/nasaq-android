@@ -155,7 +155,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             Field(w["daily_litres"],litres,{litres=it;invalid=false},true)
             Field(w["cup_size"],cup,{cup=it;invalid=false},true)
             if(!smart)Field(w["minutes"],interval,{interval=it;invalid=false},true)
-            else Text(w["wake_time"]+": "+p.quietEnd+" · "+w["sleep_time"]+": "+p.quietStart,style=MaterialTheme.typography.bodySmall)
+            else Text(w["wake_time"]+" · "+clockText(p.quietEnd, w)+" · "+w["sleep_time"]+" · "+clockText(p.quietStart, w),style=MaterialTheme.typography.bodySmall)
         }else{
             TimesEditor(w["time"],times,{times=it;invalid=false})
             Toggle(w["after_meal_reminders"],after){after=it}

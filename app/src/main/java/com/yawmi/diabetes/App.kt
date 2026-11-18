@@ -1,4 +1,4 @@
-@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class,androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@file:OptIn(androidx.compose.animation.ExperimentalSharedTransitionApi::class, androidx.compose.material3.ExperimentalMaterial3Api::class,androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package com.yawmi.diabetes
 
 import androidx.activity.compose.BackHandler
@@ -33,8 +33,17 @@ fun number(value:Double,w:Words,digits:Int=0):String=NumberFormat.getNumberInsta
 }.format(value)
 fun dateText(time:Long,w:Words):String=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
     .format(DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM).withLocale(w.locale))
-fun timeText(time:Long,w:Words):String=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault())
-    .format(DateTimeFormatter.ofPattern("HH:mm").withLocale(w.locale))
+fun timeText(time: Long, w: Words): String = clockText(
+    Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalTime(), w
+)
+
+internal fun clockText(time: String, w: Words): String = clockText(LocalTime.parse(time), w)
+
+internal fun clockText(time: LocalTime, w: Words): String {
+    val clock = time.format(DateTimeFormatter.ofPattern("h:mm", w.locale)
+        .withDecimalStyle(java.time.format.DecimalStyle.of(w.locale)))
+    return clock + " " + w[if (time.hour < 12) "clock_am" else "clock_pm"]
+}
 fun isToday(time:Long)=Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate()==LocalDate.now()
 fun periodStart(days:Int)=LocalDate.now().minusDays((days-1).toLong()).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
 fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
@@ -55,6 +64,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         val snackbar=remember { SnackbarHostState() }
         val scope=rememberCoroutineScope();val feedback=rememberFeedback()
         var homeLayoutOpen by remember{mutableStateOf(false)}
+        var timelineDate by rememberSaveable { mutableStateOf<String?>(null) }
         var saveNotice by remember { mutableStateOf<Job?>(null) }
         fun saved(entry:Entry,previous:Entry?,actual:State){
             val stored=actual.entries.find{it.id==entry.id} ?: return
@@ -75,6 +85,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             val entry = activity.requestedEntry
             if (!activity.locked && p.setupVersion >= 2 && (screen.isNotBlank() || entry.isNotBlank())) {
                 if (screen.isNotBlank()) tab = screen
+                timelineDate = null
                 recordEdit = null
                 draftEntry = null
                 medEdit = null
@@ -116,12 +127,13 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                                 Box(Modifier.fillMaxSize().padding(insets),contentAlignment=Alignment.TopCenter) {
                                     Box(Modifier.widthIn(max=1000.dp).fillMaxSize()) {
                                         when(destination) {
-                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={tab="day_summary"},openHydration={tab="hydration"},openGlucose={tab="glucose_log"})
+                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={timelineDate=null;tab="day_summary"},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
+                                                openMedicines={tab="medications"},openDay={timelineDate=it.toString();tab="day_summary"})
                                             "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
-                                                initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"})
+                                                initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"},onImport={activity.openCsv()})
                                             "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
                                                 portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))})
-                                            "day_summary" -> DayOverviewScreen(s) { tab="today" }
+                                            "day_summary" -> DayOverviewScreen(s, timelineDate?.let(LocalDate::parse) ?: LocalDate.now()) { tab="today" }
                                             "medications"->Medicines(s,add={form="new_med"},edit={medEdit=it},dose={pendingDose=it},manual={form="dose"})
                                             "insights"->Insights(s,add={form=it},export={days,type->activity.export(s,days,type)})
                                             else->SettingsScreen(repo,activity,backup={backupMode=it},info={info=it})
@@ -150,7 +162,8 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         }
         val activeForm = form
         if (activeForm == "quick" || activeForm == "glucose" || activeForm == "water") {
-            RecordingSheet(activeForm, ::dismissEntry, onSelect = { form = it }) { kind, close ->
+            RecordingSheet(activeForm, ::dismissEntry, onSelect = { form = it }, state = s,
+                onDraft = { draftEntry = it; form = it.kind }) { kind, close ->
                 QuickEntryContent(kind, recordEdit, s, onDismiss = { close(::dismissEntry) },
                     onSave = { entry -> close { saveEntry(entry) } }, draft = draftEntry)
             }
@@ -164,6 +177,23 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         else if (activeForm == "care_tools") CareTools(s, { form = null }) { change -> repo.change(block = change) }
         else if (activeForm == "new_med" || medEdit != null) MedicationEditor(medEdit,p,onDismiss={form=null;medEdit=null},onSave={repo.put(it);form=null;medEdit=null})
         else if (activeForm != null) EntryEditor(activeForm, recordEdit, s, onDismiss = ::dismissEntry, onSave = ::saveEntry)
+        if (!activity.locked) {
+            activity.csvPreview?.let { preview ->
+                CsvReview(preview, s, repo.busy, onDismiss = { activity.csvPreview = null }) {
+                    repo.change(onSuccess = { activity.csvPreview = null; activity.message("csv_import_done") }) { current ->
+                        val incoming = preview.additions(current)
+                        require(current.entries.size + incoming.size <= 100_000)
+                        current.copy(entries = current.entries + incoming)
+                    }
+                }
+            }
+            activity.reportDays?.let { days ->
+                ReportComposer(days, onDismiss = { activity.reportDays = null }) { range, options ->
+                    activity.reportDays = null
+                    activity.exportFile(s, range, "pdf", options)
+                }
+            }
+        }
         pendingDose?.let { r ->
             val med=s.medications.find { it.id==r.medicationId }
             AlertDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
@@ -214,6 +244,8 @@ internal fun SectionMotion(section: String, content: @Composable (String) -> Uni
         return
     }
     val rtl = LocalWords.current.rtl
+    SharedTransitionLayout {
+        val shared = this
     AnimatedContent(
         targetState = section,
         modifier = Modifier.fillMaxSize().clipToBounds(),
@@ -235,7 +267,13 @@ internal fun SectionMotion(section: String, content: @Composable (String) -> Uni
             result.using(null)
         },
         label = "destination"
-    ) { destination -> state.SaveableStateProvider(destination) { content(destination) } }
+    ) { destination ->
+        val routeScope = this
+        state.SaveableStateProvider(destination) {
+            CompositionLocalProvider(LocalDeskTransition provides DeskTransition(shared, routeScope)) { content(destination) }
+        }
+    }
+    }
 }
 
 @Composable fun Welcome(repo:Repository) {

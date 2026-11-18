@@ -6,6 +6,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RecordingSheet(
     page: String, onDismiss: () -> Unit, onSelect: (String) -> Unit,
+    state: State? = null, onDraft: ((Entry) -> Unit)? = null,
     editor: @Composable (String, close: (() -> Unit) -> Unit) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -44,26 +46,49 @@ internal fun RecordingSheet(
             (fadeIn(tween(270,100)) + slideInVertically(tween(580,easing=NasaqEase)) { it / 6 } togetherWith
                 fadeOut(tween(185))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
         }, label = "quick-record-page") { current ->
-            if (current == "quick") QuickActions { kind ->
+            if (current == "quick") QuickActions(state, onDraft) { kind ->
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
             } else editor(current, ::close)
         } else key(page) {
-            if (page == "quick") QuickActions(onSelect) else editor(page, ::close)
+            if (page == "quick") QuickActions(state, onDraft, onSelect) else editor(page, ::close)
         }
     }
 }
 
 @Composable
-private fun QuickActions(choose: (String) -> Unit) {
+private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, choose: (String) -> Unit) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val feedback = rememberFeedback()
     fun chooseAction(kind: String) { feedback(); choose(kind) }
+    val habits = remember(state) { state?.let { journalHabits(it, System.currentTimeMillis()) } }
+    var phrase by rememberSaveable { mutableStateOf("") }
+    val request = remember(phrase, state?.preferences) {
+        state?.let { JournalLanguage.parse(phrase, it.preferences) as? JournalRequest.Draft }
+    }
         Column(
             Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Text(w["quick_add"], style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            ScreenTitle(w["quick_add"]) { DomainMark("plus") }
+            if (state != null && onDraft != null) {
+                OutlinedTextField(phrase, { phrase = it.take(250) }, modifier = Modifier.fillMaxWidth(),
+                    shape = ControlShape, label = { Text(w["quick_phrase"]) }, singleLine = true,
+                    leadingIcon = { Glyph("spark", Modifier.size(19.dp)) })
+                MotionExpand(request != null) {
+                    request?.let { draft ->
+                        NasaqBoard {
+                            Text(w[draft.entry.kind] + " · " + entryTitle(draft.entry, state, w),
+                                style = MaterialTheme.typography.titleMedium)
+                            Button(onClick = { onDraft(draft.entry) }) { Text(w["assistant_edit_draft"]) }
+                        }
+                    }
+                }
+                if (phrase.isBlank()) habits?.waterAmount?.let { amount ->
+                    SuggestionChip(onClick = { onDraft(Entry(kind = "water", value = amount, unit = "mL")) },
+                        label = { Text(w.f("habit_water", "amount" to number(amount, w, 2))) })
+                }
+            }
             Surface(
                 onClick = { chooseAction("assistant_title") }, shape = RoundedCornerShape(22.dp),
                 color = c.primaryContainer, contentColor = c.onPrimaryContainer, modifier = Modifier.fillMaxWidth()
@@ -78,7 +103,7 @@ private fun QuickActions(choose: (String) -> Unit) {
                 }
             }
             FlowRow(maxItemsInEachRow = 2, horizontalArrangement = Arrangement.spacedBy(9.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                listOf("glucose", "water", "meal", "symptom").forEach { kind ->
+                (habits?.actions ?: journalActions).forEach { kind ->
                     val tone = when (kind) {
                         "water" -> c.tertiaryContainer
                         "meal" -> c.secondaryContainer

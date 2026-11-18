@@ -70,7 +70,7 @@ import androidx.compose.ui.unit.dp
                         }
                         Column(Modifier.weight(1f)) {
                             Text(w["sleep_card"], style = MaterialTheme.typography.labelMedium)
-                            Text(p.quietStart + " – " + p.quietEnd, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(clockText(p.quietStart, w) + " – " + clockText(p.quietEnd, w), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
                     }
                 }

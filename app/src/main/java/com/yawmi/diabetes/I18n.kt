@@ -46,6 +46,28 @@ hero_empty|ابدأ بقراءة واحدة|Start with one reading
 hero_empty_body|بدون زحمة تفاصيل. سجل الرقم وسيحفظ وقته تلقائيًا.|No clutter. Enter a value; its time is recorded automatically.
 clear_search|امسح البحث|Clear search
 chart_explore|حرّك على الرسم عشان تشوف توقيت القراءة وقيمتها|Slide across the chart to inspect a reading
+clock_am|ص|AM
+clock_pm|م|PM
+csv_import|استيراد CSV|Import CSV
+csv_import_count|{added} جديدة · {duplicate} مكررة · {invalid} غير صالحة|{added} new · {duplicate} duplicates · {invalid} invalid
+csv_confirm|استورد السجلات الجديدة|Import new entries
+csv_import_done|تم استيراد السجلات|Entries imported
+csv_error|الملف غير صالح. استخدم أعمدة CSV الخاصة بنَسَق وتوقيت ISO.|Unsupported file. Use Nasaq CSV columns and ISO timestamps.
+report_options|تخصيص التقرير|Customize report
+report_section_summary|ملخص الأرقام|Summary
+report_show_name|إظهار الاسم|Show name
+report_include_notes|تضمين الملاحظات والتعليمات|Include notes and instructions
+adaptive_actions|التخصيص حسب استخدامي|Adapt shortcuts to my habits
+adaptive_actions_body|يرتّب اختصارات التسجيل محليًا حسب السجل والوقت.|Rank shortcuts from your own entries and time of day.
+quick_phrase|اكتب مثلًا: شربت ٢٥٠ مل|Type e.g. I drank 250 mL
+habit_water|كميتك المعتادة · {amount} مل|Usually logged · {amount} mL
+previous_day|اليوم السابق|Previous day
+next_day|اليوم التالي|Next day
+preset_water_mini|كوب سريع · مقاس صغير|Compact water cup
+widget_space_hint|المقاس ده بيخفي بعض التفاصيل أو الأزرار. اختار مقاس أكبر للعرض الكامل.|This size hides some details or controls. A larger size shows more.
+widget_locked_preview|قفل التطبيق يخفي القياسات على الشاشة الرئيسية.|App lock hides measurements on the home screen.
+widget_preview_pin|صمّم وشوف المعاينة قبل الإضافة|Design and preview before adding
+widget_manage_number|إعدادات الويدجت {number}|Widget {number} settings
 record_short|سجّل|Record
 recorded_today|تسجيلات اليوم|Today's records
 water_week|متوسط آخر ٧ أيام|Last 7 days' average

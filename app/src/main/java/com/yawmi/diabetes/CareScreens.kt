@@ -23,7 +23,7 @@ import java.time.*
 
 @Composable
 fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
-    initialFilter: String = "all", onAddReading: (() -> Unit)? = null) {
+    initialFilter: String = "all", onAddReading: (() -> Unit)? = null, onImport: (() -> Unit)? = null) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     var filter by rememberSaveable(initialFilter) { mutableStateOf(initialFilter) }
@@ -42,7 +42,12 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     val motion = LocalMotion.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = ScreenGutters, verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item("journal-heading") {
-            ScreenTitle(w[if (initialFilter == "glucose") "glucose" else "log"], w["journal_subtitle"]) { DomainMark("log") }
+            ScreenTitle(w[if (initialFilter == "glucose") "glucose" else "log"], w["journal_subtitle"]) {
+                if (onImport != null) FilledTonalIconButton(onClick = onImport,
+                    modifier = Modifier.semantics { contentDescription = w["csv_import"] }) {
+                    Glyph("backup", Modifier.size(21.dp))
+                } else DomainMark("log")
+            }
         }
         if (initialFilter == "glucose" && onAddReading != null) item("daily-average") {
             ReadingHero(dayOverview(s, System.currentTimeMillis()), s.preferences, onAdd = onAddReading)
@@ -166,7 +171,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                 }
                 FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp),verticalArrangement=Arrangement.spacedBy(6.dp)){
                     if(med.mode=="interval")StatusPill(w.f("hours_every","n" to number(med.intervalHours.toDouble(),w)))
-                    else if(med.mode=="meal")StatusPill(w[med.meal])else med.times.forEach{StatusPill(it)}
+                    else if(med.mode=="meal")StatusPill(w[med.meal])else med.times.forEach{StatusPill(clockText(it, w))}
                     if(med.relation!="none")StatusPill(w[med.relation],c.onSurfaceVariant,c.surfaceContainer)
                 }
                 if(med.stock>=0 && med.stock<=med.refillAt)StatusPill(w["refill"],c.error,c.errorContainer)
@@ -220,7 +225,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
         }
         NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
             context, { w[it] }) { context = it } }
-        WeeklyInsights(s)
+        WeeklyInsights(s, context)
         Panel{
             SectionHeading(w["range_distribution"])
             if(glucose.isNotEmpty()){

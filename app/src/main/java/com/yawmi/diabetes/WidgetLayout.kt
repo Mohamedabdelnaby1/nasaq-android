@@ -17,14 +17,17 @@ internal data class WidgetLayout(
     val footer: Boolean,
     val footerKind: String,
     val undo: Boolean,
-    val parts: List<String>
+    val parts: List<String>,
+    val compactAction: Boolean = false,
+    val compactRtl: Boolean = false
 ) {
     fun cells(width: Float, height: Float): List<RectF> {
         val top = if (header) 44f else 0f
         val bottom = height - if (footer) 46f else 0f
         val middle = (top + bottom) / 2f
         return when (body) {
-            WidgetBody.SINGLE -> listOf(RectF(0f, top, width, bottom))
+            WidgetBody.SINGLE -> listOf(if (!compactAction) RectF(0f, top, width, bottom)
+                else if (compactRtl) RectF(42f, top, width, bottom) else RectF(0f, top, width - 42f, bottom))
             WidgetBody.FOCUS -> listOf(RectF(0f, top, width, middle)) + List(parts.size - 1) { i ->
                 val step = width / (parts.size - 1)
                 RectF(i * step, middle, (i + 1) * step, bottom)
@@ -75,8 +78,9 @@ internal data class WidgetLayout(
                 else -> parts
             }
             val footerKind = if (look.quickWater && "water" in displayed) "water" else parts.first()
+            val compactAction = !header && !footer && look.action && look.quickWater && parts == listOf("water")
             return WidgetLayout(body, header, header && parts.size > 1, footer, footerKind,
-                footer && footerKind == "water" && look.quickWater && look.undoWater, displayed)
+                footer && footerKind == "water" && look.quickWater && look.undoWater, displayed, compactAction, rtl)
         }
     }
 }

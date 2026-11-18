@@ -64,7 +64,7 @@ import java.time.format.DateTimeFormatter
 }
 @Composable fun TimeChoiceDialog(initial:LocalTime,onDismiss:()->Unit,onPicked:(LocalTime)->Unit) {
     val w=LocalWords.current
-    val state=rememberTimePickerState(initialHour=initial.hour,initialMinute=initial.minute,is24Hour=true)
+    val state=rememberTimePickerState(initialHour=initial.hour,initialMinute=initial.minute,is24Hour=false)
     val compact=androidx.compose.ui.platform.LocalDensity.current.fontScale>1.3f ||
         androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp<600
     AlertDialog(onDismissRequest=onDismiss,title={Text(w["time"])},text={
@@ -115,7 +115,7 @@ import java.time.format.DateTimeFormatter
         FlowRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
             times.forEachIndexed {index,time->
                 Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
-                    OutlinedButton(onClick={editingIndex=index;picking=true}){Text(time)}
+                    OutlinedButton(onClick={editingIndex=index;picking=true}){Text(clockText(time, w))}
                     if(!single && times.size>1)TextButton(onClick={onChange(times.filterIndexed{i,_->i!=index}.joinToString(","))}){Text(w["delete"])}
                 }
             }

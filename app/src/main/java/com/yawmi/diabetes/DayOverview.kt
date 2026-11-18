@@ -1,3 +1,5 @@
+@file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+
 package com.yawmi.diabetes
 
 import androidx.compose.foundation.BorderStroke
@@ -7,7 +9,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
@@ -16,6 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.yawmi.diabetes.core.Planner
 import java.time.Instant
+import java.time.LocalDate
 import java.time.ZoneId
 
 data class DayOverview(
@@ -123,37 +130,99 @@ private fun OverviewMetric(kind: String, title: String, value: String, note: Str
 }
 
 @Composable
-fun DayOverviewScreen(s: State, onClose: () -> Unit) {
+fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(), onClose: () -> Unit) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
-    val now = System.currentTimeMillis()
-    val summary = dayOverview(s, now)
-    data class Event(val time: Long, val record: Entry? = null, val item: CareItem? = null)
-    val timeline = (summary.entries.map { Event(it.time, record = it) } +
-        summary.care.map { Event(if (it.kind == "sleep") it.end else it.time, item = it) }).sortedByDescending { it.time }
+    val motion = LocalMotion.current
+    val zone = ZoneId.systemDefault()
+    val today = LocalDate.now(zone)
+    var selection by rememberSaveable(initialDate.toString()) { mutableStateOf(initialDate.toString()) }
+    var filter by rememberSaveable { mutableStateOf("all") }
+    val date = LocalDate.parse(selection)
+    val filters = listOf("all", "glucose", "water", "meal", "dose")
     Scaffold(containerColor = c.background) { insets ->
-        Column(
-            Modifier.fillMaxSize().padding(insets).safeDrawingPadding().verticalScroll(rememberScrollState())
-                .padding(horizontal = 18.dp, vertical = 10.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            ScreenTitle(w["day_detail_title"], dateText(now, w)) {
+        Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            ScreenTitle(w["day_detail_title"]) {
                 IconButton(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
-                    Glyph("back", Modifier.size(22.dp))
+                    Glyph("close", Modifier.size(22.dp))
                 }
             }
-            DayOverviewCard(s, summary)
-            Panel(w["day_activity"]) {
-                if (timeline.isEmpty()) EmptyState(w["story_empty"])
-                timeline.forEachIndexed { index, event ->
-                    event.record?.let { ActivityRow(it, s) }
-                    event.item?.let { item ->
-                        val title = if (item.kind == "sleep") w["actual_sleep"] else item.title
-                        val note = if (item.kind == "sleep") dateText(item.time, w) + " " + timeText(item.time, w) + " → " + timeText(item.end, w)
-                            else w[if (item.done) "day_completed" else "day_planned"] + " · " + timeText(item.time, w)
-                        OverviewMetric(if (item.kind == "sleep") "moon" else "today", title, "", note)
+            Surface(shape = BoardShape, color = c.primary, contentColor = c.onPrimary) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                    IconButton(onClick = { selection = date.minusDays(1).toString() },
+                        modifier = Modifier.semantics { contentDescription = w["previous_day"] }) {
+                        Glyph("back", Modifier.size(20.dp), c.onPrimary)
                     }
-                    if (index < timeline.lastIndex) HorizontalDivider(color = c.outlineVariant.copy(alpha = .45f))
+                    Text(dateText(date.atStartOfDay(zone).toInstant().toEpochMilli(), w),
+                        style = MaterialTheme.typography.titleMedium, color = c.onPrimary)
+                    IconButton(enabled = date < today, onClick = { selection = date.plusDays(1).toString() },
+                        modifier = Modifier.semantics { contentDescription = w["next_day"] }) {
+                        Glyph("arrow", Modifier.size(20.dp), if (date < today) c.onPrimary else c.onPrimary.copy(alpha = .35f))
+                    }
+                }
+            }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                filters.forEach { kind ->
+                    FilterChip(selected = filter == kind, onClick = { filter = kind },
+                        label = { Text(w[if (kind == "dose") "medication" else kind]) })
+                }
+            }
+            AnimatedContent(selection, Modifier.weight(1f), transitionSpec = {
+                if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
+                else {
+                    val direction = (if (targetState > initialState) 1 else -1) * (if (w.rtl) -1 else 1)
+                    ((fadeIn(tween(220, 60)) + slideInHorizontally(tween(430, easing = NasaqEase)) { direction * it / 5 }) togetherWith
+                        (fadeOut(tween(150)) + slideOutHorizontally(tween(300)) { -direction * it / 9 })).using(null)
+                }
+            }, label = "timeline-date") { day ->
+                val local = LocalDate.parse(day)
+                val at = local.atStartOfDay(zone).toInstant().toEpochMilli()
+                val summary = remember(s, day) { dayOverview(s, at, zone) }
+                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Timeline(summary, s, filter, local, zone)
+                    DayOverviewCard(s, summary)
+                }
+            }
+        }
+    }
+}
+
+private data class TimelineEvent(val time: Long, val entry: Entry? = null, val item: CareItem? = null)
+
+@Composable
+private fun Timeline(summary: DayOverview, state: State, filter: String, day: LocalDate, zone: ZoneId) {
+    val w = LocalWords.current
+    val c = MaterialTheme.colorScheme
+    val records = summary.entries.filter { filter == "all" || it.kind == filter }.map { TimelineEvent(it.time, entry = it) }
+    val care = if (filter == "all") summary.care.map { item ->
+        val end = day.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+        TimelineEvent(if (item.kind == "sleep") minOf(item.end, end) else item.time, item = item)
+    } else emptyList()
+    val hours = (records + care).sortedBy { it.time }.groupBy {
+        val instant = Instant.ofEpochMilli(it.time).atZone(zone)
+        instant.withMinute(0).withSecond(0).withNano(0).toInstant().toEpochMilli()
+    }
+    if (hours.isEmpty()) NasaqBoard { EmptyState(w["story_empty"]) }
+    hours.forEach { (hour, events) ->
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Column(Modifier.width(63.dp).padding(top = 15.dp), horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(timeText(hour, w), style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+                Surface(shape = CircleShape, color = c.primary, modifier = Modifier.size(6.dp)) {}
+            }
+            NasaqBoard(Modifier.weight(1f)) {
+                events.forEachIndexed { index, event ->
+                    if (index > 0) HorizontalDivider()
+                    event.entry?.let { ActivityRow(it, state) }
+                    event.item?.let { item ->
+                        val sleep = item.kind == "sleep"
+                        val note = if (sleep) timeText(item.time, w) + " → " + timeText(item.end, w)
+                            else w[if (item.done) "day_completed" else "day_planned"] + " · " + timeText(item.time, w)
+                        OverviewMetric(if (sleep) "moon" else "today", if (sleep) w["actual_sleep"] else item.title, "", note)
+                    }
                 }
             }
         }

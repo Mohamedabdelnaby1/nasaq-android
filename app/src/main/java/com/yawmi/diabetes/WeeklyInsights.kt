@@ -13,9 +13,9 @@ import androidx.compose.ui.unit.dp
 import java.time.*
 import java.time.format.DateTimeFormatter
 
-data class DaySummary(val date:LocalDate,val readings:Int,val water:Double,val doses:Int,val sleepHours:Double,val hasData:Boolean)
+data class DaySummary(val date:LocalDate,val readings:Int,val water:Double,val doses:Int,val sleepHours:Double,val hasData:Boolean,val glucoseMg: Double = 0.0)
 
-fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.systemDefault()):List<DaySummary> {
+fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.systemDefault(), context: String = "all"):List<DaySummary> {
     fun day(millis:Long)=Instant.ofEpochMilli(millis).atZone(zone).toLocalDate()
     val first=today.minusDays(13)
     val entries=s.entries.filter{day(it.time) in first..today}.groupBy{day(it.time)}
@@ -24,15 +24,16 @@ fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.sy
         val date=today.minusDays(offset.toLong())
         val records=entries[date].orEmpty()
         val sessions=sleep[date].orEmpty()
-        DaySummary(date,records.count{it.kind=="glucose"},records.filter{it.kind=="water"}.sumOf{it.value},
-            records.count{it.kind=="dose" && it.status=="taken"},sessions.sumOf{(it.end-it.time)/3_600_000.0},records.isNotEmpty()||sessions.isNotEmpty())
+        val glucose = records.filter { it.kind == "glucose" && (context == "all" || it.context == context) }
+        DaySummary(date,glucose.size,records.filter{it.kind=="water"}.sumOf{it.value},
+            records.count{it.kind=="dose" && it.status=="taken"},sessions.sumOf{(it.end-it.time)/3_600_000.0},records.isNotEmpty()||sessions.isNotEmpty(), glucose.sumOf(::mg))
     }
 }
 
-@Composable fun WeeklyInsights(s:State){
+@Composable fun WeeklyInsights(s:State, context: String = "all"){
     val w=LocalWords.current
     val colors=MaterialTheme.colorScheme
-    val summaries=remember(s.revision,s.entries,s.care.items,LocalDate.now()){dailySummaries(s)}
+    val summaries=remember(s.revision,s.entries,s.care.items,LocalDate.now(),context){dailySummaries(s, context = context)}
     var selected by rememberSaveable{mutableStateOf(LocalDate.now().toString())}
     val current=summaries.takeLast(7)
     val previous=summaries.take(7)
@@ -63,6 +64,18 @@ fun dailySummaries(s:State,today:LocalDate=LocalDate.now(),zone:ZoneId=ZoneId.sy
             Text(w["week_metric"],Modifier.weight(1.2f),fontWeight=FontWeight.Bold,style=MaterialTheme.typography.labelMedium)
             Text(w["previous_7"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
             Text(w["recent_7"],Modifier.weight(1f),style=MaterialTheme.typography.labelMedium)
+        }
+        fun average(week: List<DaySummary>): String {
+            val count = week.sumOf { it.readings }
+            if (count == 0) return "—"
+            val unit = s.preferences.unit
+            return number(com.yawmi.diabetes.core.Planner.fromMg(week.sumOf { it.glucoseMg } / count, unit), w,
+                if (unit == "mmol/L") 1 else 0) + " " + unit
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(w["average_short"], Modifier.weight(1.2f), style = MaterialTheme.typography.labelMedium)
+            Text(average(previous), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+            Text(average(current), Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
         }
         val rows=listOf(
             Triple("readings",previous.sumOf{it.readings}.toDouble(),current.sumOf{it.readings}.toDouble()),

@@ -32,6 +32,7 @@ import java.time.ZoneId
             Toggle(w["dynamic"],p.dynamicColors,w["dynamic_hint"]){v->repo.preferences{it.copy(dynamicColors=v)}}
             Toggle(w["large_text"],p.largeText){v->repo.preferences{it.copy(largeText=v)}}
             Toggle(w["reduce_motion"],p.reduceMotion){v->repo.preferences{it.copy(reduceMotion=v)}}
+            Toggle(w["adaptive_actions"], p.adaptive, w["adaptive_actions_body"]) { value -> repo.preferences { it.copy(adaptive = value) } }
             Toggle(w["haptics"],p.haptics,w["haptics_hint"]){v->repo.preferences{it.copy(haptics=v)}}
             TextButton(onClick={repo.preferences {it.copy(theme="system",palette="mint",dynamicColors=false,largeText=false,reduceMotion=false)}}){Text(w["reset_appearance"])}
             Text(w["reset_appearance_hint"],style=MaterialTheme.typography.bodySmall)

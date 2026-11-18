@@ -36,6 +36,21 @@ class MainActivity:ComponentActivity() {
         authenticating=false;authenticated=result.resultCode==RESULT_OK;locked=!authenticated
         if(!authenticated)message("lock_failure")
     }
+    internal var csvPreview by mutableStateOf<CsvPreview?>(null)
+    internal var reportDays by mutableStateOf<Int?>(null)
+    private val csvOpen = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) io.execute {
+            val result = runCatching {
+                contentResolver.openInputStream(uri)?.use { input -> input.reader(Charsets.UTF_8).use { CsvImport.read(it) } }
+                    ?: error("CSV unavailable")
+            }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) result.onSuccess { csvPreview = it }.onFailure { message("csv_error") }
+            }
+        }
+    }
+    fun openCsv() = csvOpen.launch(arrayOf("text/csv", "text/plain", "application/vnd.ms-excel", "application/octet-stream"))
+
     private val backupCreate=registerForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) {uri->
         val password=backupPassword;backupPassword=null
         if(uri==null || password==null) {password?.fill('\u0000');return@registerForActivityResult}
@@ -121,13 +136,18 @@ class MainActivity:ComponentActivity() {
         if(mode=="create")backupCreate.launch("Yawmi-${java.time.LocalDate.now()}.yawmi")else backupOpen.launch(arrayOf("*/*"))
     }
     fun export(s:State,days:Int,type:String) {
+        if (type == "pdf") {
+            if (!locked) reportDays = days
+        } else exportFile(s, days, type)
+    }
+    internal fun exportFile(s:State,days:Int,type:String, options: ReportOptions = ReportOptions()) {
         if(locked)return
         if(type=="csv") io.execute {try{val file=Reports.csv(this,s,days);runOnUiThread{
             val uri=androidx.core.content.FileProvider.getUriForFile(this,"$packageName.exports",file)
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM,uri)
                 .apply {clipData=android.content.ClipData.newRawUri("Yawmi report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
         }}catch(e:Exception){runOnUiThread{message("backup_error")}}}
-        else io.execute {try{val html=Reports.html(this,s,days);runOnUiThread{
+        else io.execute {try{val html=Reports.html(this,s,days,options);runOnUiThread{
             if(isFinishing || locked)return@runOnUiThread
             reportView?.destroy();val view=WebView(this);reportView=view
             view.settings.javaScriptEnabled=false;view.settings.allowFileAccess=false;view.settings.allowContentAccess=false
