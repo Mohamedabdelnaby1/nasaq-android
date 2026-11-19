@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
-@Composable fun SetupFlow(repo:Repository,activity:MainActivity) {
+@Composable fun SetupFlow(repo:Repository,activity:MainActivity,onQuickStart:(String,Entry?)->Unit) {
     val p=repo.state.preferences;val w=LocalWords.current
     val permissionAllowed=remember(activity.permissionRevision){Reminders.permitted(activity)}
     val exactAllowed=remember(activity.permissionRevision){Reminders.exact(activity)}
@@ -58,6 +58,12 @@ import androidx.compose.ui.unit.dp
                     if(page!=0)Text(w[when(page){0->"setup_welcome_body";1->"setup_profile_body";2->"setup_routine_body";3->"setup_style_body";else->"setup_permissions_body"}],style=MaterialTheme.typography.bodyLarge,color=MaterialTheme.colorScheme.onSurfaceVariant)
                     when(page) {
                         0->{
+                            QuickStartActions(p, repo.busy) { kind ->
+                                val id = java.util.UUID.randomUUID().toString()
+                                repo.change(onSuccess = { saved -> onQuickStart(kind, saved.entries.find { it.id == id }) }) { state ->
+                                    startTracking(state, kind == "water", id, System.currentTimeMillis())
+                                }
+                            }
                             WelcomeHero()
                             ChoiceRow(w["language"],listOf("system","ar","en"),p.language,{when(it){"ar"->"العربية";"en"->"English";else->w["system"]}}){choice->repo.preferences{it.copy(language=choice)}}
                             Notice(w["local_privacy"])
@@ -102,8 +108,31 @@ import androidx.compose.ui.unit.dp
                         waterGoal=if(litres.isBlank())0 else litresToMl(litres),cup=cup,waterEnabled=waterEnabled,glucoseEnabled=glucoseEnabled,
                         quietStart=sleep,quietEnd=wake,onboarded=true,setupVersion=2)}
                 }
-            },enabled=!repo.busy,modifier=Modifier.weight(1.6f).heightIn(min=54.dp)){Text(w[if(step==4)"setup_finish" else "next"])}
+            },enabled=!repo.busy,modifier=Modifier.weight(1.6f).heightIn(min=54.dp)){
+                Text(w[when(step){0->"setup_configure";4->"setup_finish";else->"next"}])
+            }
         }
+    }
+}
+
+internal fun startTracking(state: State, firstCup: Boolean, id: String, now: Long): State {
+    if (state.preferences.onboarded && state.preferences.setupVersion >= 2) return state
+    val started = state.copy(preferences = state.preferences.copy(onboarded = true, setupVersion = 2))
+    return if (firstCup) Records.add(started, cupEntry(state.preferences, now, id)) else started
+}
+
+@Composable
+internal fun QuickStartActions(p: Preferences, busy: Boolean, onStart: (String) -> Unit) {
+    val w = LocalWords.current
+    NasaqBoard {
+        SectionHeading(w["setup_quick_start"])
+        ActionButton({ onStart("glucose") }, Modifier.fillMaxWidth(), enabled = !busy) {
+            Text(w["add_reading"])
+        }
+        OutlineAction({ onStart("water") }, Modifier.fillMaxWidth(), enabled = !busy) {
+            Text(w.f("quick_log_cup", "amount" to number(p.cup.toDouble(), w)))
+        }
+        TextAction({ onStart("") }, enabled = !busy) { Text(w["setup_browse"]) }
     }
 }
 

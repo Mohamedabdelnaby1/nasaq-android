@@ -22,15 +22,12 @@ data class WidgetLook(
 internal class WidgetContent(private val state: State, look: WidgetLook, now: Long = System.currentTimeMillis()) {
     val words = Words(state.preferences.language)
     val visible = Widgets.valuesVisible(state.preferences.lock, look.visible)
+    val actionOrder by lazy { if (visible) journalHabits(state, now).actions else emptyList() }
     private val stats by lazy { TrackingStats(state, now) }
     private val day by lazy { dayOverview(state, now) }
     private val next by lazy { Reminders.plan(state, now).firstOrNull { it.kind == "medication" } }
     val readings get() = if (visible) stats.glucoseReadings.take(14).asReversed().map(::mg) else emptyList()
-    val hydration: Float? get() = state.preferences.let { p ->
-        if (visible && p.waterGoal > 0 && p.waterViewDays == 1 && p.waterViewMetric == "total")
-            (stats.todayWaterMl / p.waterGoal).toFloat()
-        else null
-    }
+    val hydration: Float? get() = if (visible) stats.waterGoalProgress?.toFloat() else null
     fun metric(kind: String): MetricDisplay {
         val name = words[when (kind) {
             "day_summary" -> "day_overview"
@@ -40,7 +37,7 @@ internal class WidgetContent(private val state: State, look: WidgetLook, now: Lo
         if (!visible) return MetricDisplay(name, "—", "", "", words["widget_values_off"])
         return when (kind) {
             "glucose" -> stats.glucose(words)
-            "water" -> stats.water(words)
+            "water" -> stats.waterToday(words)
             "medication" -> next?.let { dose ->
                 MetricDisplay(name, timeText(dose.due, words), "", dateText(dose.due, words),
                     state.medications.firstOrNull { it.id == dose.medicationId }?.name.orEmpty())
@@ -100,7 +97,7 @@ object WidgetArt {
         val seam = ColorUtils.blendARGB(surface, ink, if (night) .14f else .10f)
         val panel = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(surface, Color.WHITE, if (night) .055f else .67f), 255)
         val fontScale = when (look.font) { "compact" -> .89f; "large" -> 1.14f; else -> 1f }
-        val geometry = WidgetLayout.calculate(width.toInt(), height.toInt(), look, rtl)
+        val geometry = WidgetLayout.calculate(width.toInt(), height.toInt(), look, rtl, content.actionOrder)
         val frame = WidgetFrame(width, height, look.radius)
 
         private fun parse(value: String, fallback: Int) =
@@ -318,7 +315,11 @@ object WidgetArt {
             val goal = if (kind == "water") content.hydration?.let {
                 words.f("widget_goal_pct", "amount" to number(it.toDouble() * 100, words))
             }.orEmpty() else ""
-            val notes = if (look.details) listOf(m.period, m.detail, goal).filter(String::isNotBlank) else emptyList()
+            val notes = when {
+                !look.details -> emptyList()
+                kind == "glucose" -> listOf(listOf(m.period, m.detail).filter(String::isNotBlank).joinToString(" · "))
+                else -> listOf(m.period, m.detail, goal).filter(String::isNotBlank)
+            }
             val noteStart = noteY + if (useUnitLine) 12 * fontScale else 0f
             val noteLimit = if (!roomy && tall) art.top else card.bottom
             notes.forEachIndexed { i, note ->

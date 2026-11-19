@@ -5,6 +5,11 @@ import java.time.ZoneId
 import kotlin.math.abs
 
 internal val journalActions = listOf("glucose", "water", "meal", "symptom")
+internal val primaryJournalActions = journalActions.take(2)
+
+internal fun cupEntry(p: Preferences, now: Long = System.currentTimeMillis(),
+                      id: String = java.util.UUID.randomUUID().toString(), context: String = "") =
+    Entry(id = id, kind = "water", value = p.cup.toDouble(), unit = "mL", context = context, time = now, created = now)
 
 internal data class JournalHabits(val actions: List<String>, val waterAmount: Double?, val waterMatches: Int = 0)
 

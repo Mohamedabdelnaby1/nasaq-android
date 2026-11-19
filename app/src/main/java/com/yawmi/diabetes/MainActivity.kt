@@ -159,6 +159,21 @@ class MainActivity:ComponentActivity() {
             }
         }
     }
+    internal fun deferDose(reminder: Reminder, onDone: (Boolean) -> Unit) {
+        if (locked) return
+        Reminders.worker.execute {
+            val outcome = runCatching { Reminders.deferDose(this, reminder) }
+            runOnUiThread {
+                if (!isDestroyed) {
+                    val scheduled = outcome.getOrDefault(false)
+                    onDone(scheduled)
+                    if (scheduled) {
+                        message("snoozed")
+                    } else message(if (outcome.isFailure) "reminder_error" else "dose_cannot_snooze")
+                }
+            }
+        }
+    }
     fun oneShot(kind:String,minutes:Int) {Reminders.worker.execute {try{Reminders.once(this,kind,minutes);runOnUiThread{message(if(kind=="symptom")"followup_scheduled"else"recheck_scheduled")}}catch(e:Exception){runOnUiThread{message("reminder_error")}}}}
     fun dial(phone:String) {startActivity(Intent(Intent.ACTION_DIAL,Uri.fromParts("tel",phone,null)))}
     fun batterySettings() {
@@ -176,7 +191,8 @@ class MainActivity:ComponentActivity() {
             if (!locked) reportDays = days
         } else exportFile(s, days, type)
     }
-    internal fun exportFile(s:State,days:Int,type:String, options: ReportOptions = ReportOptions()) {
+    internal fun exportFile(s:State,days:Int,type:String, options: ReportOptions = ReportOptions(),
+                            reportAsOf: Long = System.currentTimeMillis()) {
         if(locked)return
         if(type=="csv") io.execute {try{val file=Reports.csv(this,s,days);runOnUiThread{
             if (locked || isFinishing || isDestroyed) return@runOnUiThread
@@ -184,7 +200,7 @@ class MainActivity:ComponentActivity() {
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM,uri)
                 .apply {clipData=android.content.ClipData.newRawUri("Nasaq report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
         }}catch(e:Exception){runOnUiThread{message("backup_error")}}}
-        else io.execute {try{val html=Reports.html(this,s,days,options);runOnUiThread{
+        else io.execute {try{val html=Reports.html(this,s,days,options,reportAsOf);runOnUiThread{
             if (isFinishing || isDestroyed || locked) return@runOnUiThread
             reportView?.destroy();val view=WebView(this);reportView=view
             var printStarted = false

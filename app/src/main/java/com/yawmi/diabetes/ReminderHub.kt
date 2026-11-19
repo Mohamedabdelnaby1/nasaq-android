@@ -32,6 +32,8 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     var medications by remember{mutableStateOf(false)}
     var audit by remember{mutableStateOf(false)}
     var care by remember{mutableStateOf(false)}
+    var chooseTest by remember { mutableStateOf(false) }
+    val lastTest = s.audit.lastOrNull { it.id == "test" }
     val suggestion=remember(s.revision,s.preferences){waterSuggestion(s)}
     val allowed=remember(activity.permissionRevision){Reminders.permitted(activity)}
     val precise=remember(activity.permissionRevision){Reminders.exact(activity)}
@@ -41,7 +43,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
         if(e.kind=="care")care=true
         else if(e.reminder?.kind=="medication")med=s.medications.find{it.id==e.reminder.medicationId}
         else edit=if(e.kind in setOf("wake","sleep"))"quiet"else e.kind
-    },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={activity.testNotification()},medications={medications=true},
+    },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={chooseTest=true},medications={medications=true},
         suggestion=suggestion,onApply={
             if(suggestion!=null)repo.preferences{
                 val wake=LocalTime.parse(it.quietEnd)
@@ -50,7 +52,27 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             }
         },onReset={repo.preferences{it.copy(waterOffset=0)}},onRepair={activity.reschedule()},
         onBattery={activity.batterySettings()},onCare={care=true}, scheduled = scheduled,
-        mutedKind = muted?.kind, testResult = activity.reminderTestResult)
+        mutedKind = muted?.kind, testResult = lastTest?.status ?: activity.reminderTestResult,
+        testKind = lastTest?.kind, onTestSeen = if (lastTest?.status == "posted" && !repo.busy) { seen ->
+            repo.change { fresh ->
+                val index = fresh.audit.indexOfLast { it.id == "test" }
+                if (fresh.audit.getOrNull(index) != lastTest) fresh else fresh.copy(audit = fresh.audit.toMutableList().apply {
+                    this[index] = lastTest.copy(status = if (seen) "test_seen" else "test_missing")
+                })
+            }
+        } else null)
+    if (chooseTest) BrandedDialog(onDismissRequest = { chooseTest = false },
+        title = { Text(w["reminder_test_channel"]) },
+        text = {
+            Column {
+                listOf("glucose", "water", "medication", "symptom").forEach { kind ->
+                    SettingsRow(kind, w[if (kind == "symptom") "followup" else kind]) {
+                        chooseTest = false
+                        activity.testNotification(kind)
+                    }
+                }
+            }
+        }, confirmButton = { TextAction({ chooseTest = false }) { Text(w["cancel"]) } })
     if(care)CareTools(s,{care=false}){change->repo.change(block=change)}
     edit?.let{kind->
         if(kind in setOf("water","glucose"))ReminderScheduleEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null},channel={activity.channel(kind)},test={activity.testNotification(kind)})
@@ -70,7 +92,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
 
 @Composable fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
     suggestion:WaterSuggestion?=null,onApply:()->Unit={},onReset:()->Unit={},onRepair:()->Unit={},onBattery:()->Unit={},onCare:()->Unit={}, scheduled: List<Reminder> = emptyList(), mutedKind: String? = null,
-    testResult: String? = null){
+    testResult: String? = null, testKind: String? = null, onTestSeen: ((Boolean) -> Unit)? = null){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme
     var now by remember{mutableLongStateOf(System.currentTimeMillis())}
     LaunchedEffect(Unit){while(true){kotlinx.coroutines.delay(60000);now=System.currentTimeMillis()}}
@@ -95,7 +117,16 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             if (!allowed) Text(w["reminder_no_permission"], color = c.error, style = MaterialTheme.typography.bodySmall)
             if (!precise) Text(w["reminder_approximate"], style = MaterialTheme.typography.bodySmall)
             if (mutedKind != null) Text(w[mutedKind] + " · " + w["reminder_channel_disabled"], color = c.error)
-            if (testResult != null) Text(w[if (testResult == "posted") "notification_test_sent" else testResult])
+            if (testResult != null) {
+                val result = w[if (testResult == "posted") "notification_test_sent" else testResult]
+                val kind = testKind?.let { w[if (it == "symptom") "followup" else it] }
+                Text(listOfNotNull(kind, result).joinToString(" · "))
+            }
+            if (onTestSeen != null) {
+                Text(w["reminder_test_question"], style = MaterialTheme.typography.bodyMedium)
+                TextAction({ onTestSeen(true) }) { Text(w["reminder_test_yes"]) }
+                TextAction({ onTestSeen(false) }) { Text(w["reminder_test_no"]) }
+            }
             val latest = s.audit.lastOrNull { it.id != "test" }
             if (latest != null) Text(w.f("reminder_latest_result", "status" to w[latest.status], "time" to timeText(latest.time, w)),
                 style = MaterialTheme.typography.labelMedium)

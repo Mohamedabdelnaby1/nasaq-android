@@ -205,6 +205,27 @@ object Reminders {
 
     internal fun channelFor(s: State, r: Reminder) =
         s.medications.firstOrNull { it.id == r.medicationId }?.channelId() ?: r.kind
+
+    private fun medicationPending(state: State, r: Reminder) =
+        r.kind == "medication" && state.medications.any { it.id == r.medicationId && it.active && it.reminders } &&
+            state.entries.none { it.kind == "dose" && it.occurrence == r.occurrence } &&
+            plan(state, r.original - 1000, r.original + 1000).any { it.occurrence == r.occurrence }
+
+    internal fun canDeferDose(s: State, r: Reminder, now: Long): Boolean =
+        now >= r.due && r.attempt < repeatFor(s, r).second &&
+            now + s.preferences.snoozeMinutes * 60_000L - r.original in 1..7_200_000 &&
+            (!s.preferences.medicationQuiet || !isQuiet(now + s.preferences.snoozeMinutes * 60_000L, s.preferences)) &&
+            medicationPending(s, r)
+
+    @Synchronized internal fun deferDose(c: Context, r: Reminder): Boolean {
+        val state = Store.get(c).read()
+        val now = System.currentTimeMillis()
+        if (!canDeferDose(state, r, now) || !snooze(c, r, state, automatic = false, now = now)) return false
+        prefs(c).edit().putBoolean("fired_${r.id}", true).apply()
+        NotificationManagerCompat.from(c).cancel(notificationId(c, r.id.substringBefore("~")))
+        reschedule(c)
+        return true
+    }
     private fun notificationId(c:Context,id:String):Int {
         val key="nid_$id"; val p=prefs(c); if(p.contains(key)) return p.getInt(key,1)
         val next=p.getInt("next-id",100)+1; p.edit().putInt("next-id",next).putInt(key,next).apply();return next
@@ -254,12 +275,7 @@ object Reminders {
         }
         var state=Store.get(c).read(); val now=System.currentTimeMillis()
         if(r.kind=="care" && state.care.items.none{it.id==r.occurrence && !it.done && it.alert && it.time==r.original})return
-        if(r.kind=="medication") {
-            if(state.medications.none { it.id==r.medicationId && it.active && it.reminders }) return
-            if(state.entries.any { it.kind=="dose" && it.occurrence==r.occurrence }) return
-            val valid=plan(state,r.original-1000,r.original+1000).any { it.occurrence==r.occurrence }
-            if(!valid) return
-        }
+        if (r.kind == "medication" && !medicationPending(state, r)) return
         if(operation=="show") {
             if(prefs(c).getBoolean("fired_${r.id}",false)) return
             prefs(c).edit().putBoolean("fired_${r.id}",true).apply()
@@ -284,7 +300,7 @@ object Reminders {
                 // Repeated taps on the same notification cannot add multiple cups.
                 val actionKey="water-action_${r.id}"
                 if(!prefs(c).getBoolean(actionKey,false)) {
-                    Store.get(c).update { Records.add(it,Entry(id=actionKey,kind="water",value=it.preferences.cup.toDouble(),unit="mL")) }
+                    Store.get(c).update { Records.add(it, cupEntry(it.preferences, now, id = actionKey)) }
                     prefs(c).edit().putBoolean(actionKey,true).apply()
                 }
             } else if(operation=="snooze") snooze(c,r,state,false)
@@ -292,16 +308,17 @@ object Reminders {
         }
         reschedule(c)
     }
-    private fun snooze(c:Context,r:Reminder,s:State,automatic:Boolean) {
+    private fun snooze(c:Context,r:Reminder,s:State,automatic:Boolean,now:Long=System.currentTimeMillis()): Boolean {
         val policy=repeatFor(s,r)
-        if(r.attempt>=policy.second) return
-        val due=System.currentTimeMillis()+(if(automatic)policy.first else s.preferences.snoozeMinutes)*60_000L
-        if(r.kind=="medication" && due-r.original>2*3_600_000L) return
-        if(r.kind!="care" && isQuiet(due,s.preferences) && (r.kind!="medication" || s.preferences.medicationQuiet)) return
+        if(r.attempt>=policy.second) return false
+        val due=now+(if(automatic)policy.first else s.preferences.snoozeMinutes)*60_000L
+        if(r.kind=="medication" && due-r.original>2*3_600_000L) return false
+        if(r.kind!="care" && isQuiet(due,s.preferences) && (r.kind!="medication" || s.preferences.medicationQuiet)) return false
         val next=r.copy(id=r.id.substringBefore("~")+"~${r.attempt+1}",due=due,attempt=r.attempt+1)
         val list=saved(c,"oneshots").filterNot { it.id==next.id }+next
         prefs(c).edit().putString("oneshots",JSONArray(list.map { it.json() }).toString()).apply()
         if(!automatic) audit(c,r,"snoozed")
+        return true
     }
     @Synchronized fun clearAll(c:Context) {
         saved(c,"scheduled").forEach { alarms(c).cancel(token(c,it)) }

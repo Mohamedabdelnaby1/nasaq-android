@@ -20,7 +20,8 @@ internal fun HydrationScreen(
     onBack: () -> Unit,
     add: (String) -> Unit,
     portion: (Double, String, String) -> Unit,
-    onTrackingOptions: (() -> Unit)? = null
+    onTrackingOptions: (() -> Unit)? = null,
+    cup: (() -> Unit)? = null
 ) {
     val w = LocalWords.current
     val now = trackingTime()
@@ -40,14 +41,17 @@ internal fun HydrationScreen(
                 }
             }
         })
-        ActionButton({ add("water") }, Modifier.fillMaxWidth(), enabled = !busy) {
+        if (cup != null) ActionButton(cup, Modifier.fillMaxWidth(), enabled = !busy) {
+            Text(w.f("quick_log_cup", "amount" to number(state.preferences.cup.toDouble(), w)))
+        }
+        OutlineAction({ add("water") }, Modifier.fillMaxWidth(), enabled = !busy) {
             Glyph("plus", Modifier.size(18.dp), LocalContentColor.current)
             Spacer(Modifier.width(7.dp))
             Text(w["custom_amount"])
         }
+        HydrationInstrument(state, stats)
         if (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total")
             TrackingCard("water", stats.water(w))
-        HydrationInstrument(state, stats.todayWaterMl)
         if (state.preferences.waterGoal > 0) {
             Reveal(1) {
                 NasaqBoard(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, outlined = false) {
@@ -71,11 +75,12 @@ internal fun HydrationScreen(
 
 
 @Composable
-private fun HydrationInstrument(state: State, water: Double) {
+private fun HydrationInstrument(state: State, stats: TrackingStats) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
-    val goal = state.preferences.waterGoal
-    val progress = if (goal > 0) (water / goal).toFloat().coerceIn(0f, 1f) else 0f
+    val metric = stats.waterToday(w)
+    val goalProgress = stats.waterGoalProgress
+    val progress = goalProgress?.toFloat()?.coerceIn(0f, 1f) ?: 0f
     val reservoir = androidx.compose.ui.graphics.Color(0xFF103E50)
     val pale = androidx.compose.ui.graphics.Color(0xFFCCF3FE)
     Surface(Modifier.sharedDesk("water"), color = reservoir, contentColor = pale, shape = BoardShape) {
@@ -85,27 +90,25 @@ private fun HydrationInstrument(state: State, water: Double) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(w["water_today"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                        Text(metric.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         val inMl = state.preferences.waterViewUnit == "mL"
-                        AnimatedNumber(if (inMl) water else water / 1000, digits = if (inMl) 1 else 2,
+                        AnimatedNumber(if (inMl) stats.todayWaterMl else stats.todayWaterMl / 1000, digits = if (inMl) 1 else 2,
                             style = MaterialTheme.typography.displayMedium, color = pale)
-                        Text(w[if (inMl) "ml" else "litres_short"], style = MaterialTheme.typography.labelLarge)
-                        if (goal > 0) {
+                        Text(metric.unit, style = MaterialTheme.typography.labelLarge)
+                        if (metric.detail.isNotBlank()) {
                             Spacer(Modifier.height(3.dp))
-                            Text(w["daily_target"], style = MaterialTheme.typography.labelMedium)
-                            val (amount, unit) = waterVolume(goal.toDouble(), state.preferences.waterViewUnit, w)
-                            Text("$amount $unit", style = MaterialTheme.typography.titleSmall)
+                            Text(metric.detail, style = MaterialTheme.typography.titleSmall)
                         }
                     }
                     WaterVessel(progress, Modifier.width(108.dp).height(182.dp))
                 }
-                if (goal > 0) {
+                if (goalProgress != null) {
                     val animated by androidx.compose.animation.core.animateFloatAsState(progress, if (LocalMotion.current)
                         androidx.compose.animation.core.tween(750, easing = NasaqEase) else androidx.compose.animation.core.snap(), label = "goal fill")
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         LinearProgressIndicator(progress = { animated }, modifier = Modifier.weight(1f).height(8.dp),
                             color = pale, trackColor = pale.copy(alpha = .20f))
-                        AnimatedNumber(progress * 100.0, suffix = "%", style = MaterialTheme.typography.labelLarge, color = pale)
+                        AnimatedNumber(goalProgress * 100.0, suffix = "%", style = MaterialTheme.typography.labelLarge, color = pale)
                     }
                 }
 

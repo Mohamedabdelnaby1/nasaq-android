@@ -79,7 +79,9 @@ fun WidgetStudio(
     val target = look.actionTarget.takeIf { it in parts } ?: "auto"
     val output = look.copy(quickWater = look.quickWater && (sampleNumbers || !s.preferences.lock),
         visible = sampleNumbers || look.visible)
-    val geometry = WidgetLayout.calculate(preview.width, preview.height, output, w.rtl)
+    val previewState = if (sampleNumbers) sample else s
+    val actionOrder = remember(previewState, output.visible) { WidgetContent(previewState, output).actionOrder }
+    val geometry = WidgetLayout.calculate(preview.width, preview.height, output, w.rtl, actionOrder)
     val canSave = widgetColor(look.background) && widgetColor(look.accent)
     val scroll = rememberScrollState()
     LaunchedEffect(page) { scroll.scrollTo(0) }
@@ -115,7 +117,7 @@ fun WidgetStudio(
                         ChoiceChip(sampleNumbers, { sampleNumbers = !sampleNumbers }, label = { Text(w["widget_sample"]) })
                     }
                     Box(Modifier.fillMaxWidth().height(stageHeight), contentAlignment = Alignment.Center) {
-                        WidgetPreview(if (sampleNumbers) sample else s, output, preview.width, preview.height,
+                        WidgetPreview(previewState, output, preview.width, preview.height,
                             fitBox = true, animate = false)
                     }
                     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),

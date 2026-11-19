@@ -42,7 +42,9 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
     var context by remember{mutableStateOf(initial?.context ?: "other")}
     var note by remember{mutableStateOf(initial?.note.orEmpty())}
     var time by remember{mutableLongStateOf(initial?.time ?: System.currentTimeMillis())}
-    var details by remember{mutableStateOf(existing != null || initial?.time?.let { !isToday(it) } == true)};var error by remember{mutableStateOf<String?>(null)}
+    var details by remember{mutableStateOf(existing != null || draft?.time?.let {
+        !isToday(it) || System.currentTimeMillis() - it >= 30_000L
+    } == true)};var error by remember{mutableStateOf<String?>(null)}
     var unusual by remember{mutableStateOf<Entry?>(null)}
     val maxHeight=(LocalConfiguration.current.screenHeightDp-64).coerceAtLeast(240).dp
     fun save(){

@@ -134,7 +134,7 @@ class WidgetVisualTests{
             assertEquals(80, undo.bottom)
             val w = Words(lang)
             val spoken = card.findViewById<View>(R.id.widget_primary).contentDescription.toString()
-            assertEquals(TrackingStats(s, stamp).water(w).description, spoken)
+            assertEquals(TrackingStats(s, stamp).waterToday(w).description, spoken)
             assertTrue(spoken.startsWith(w["water_today_short"]))
         }
         render("nasaq-water-mini-undo", 110, 80, look)

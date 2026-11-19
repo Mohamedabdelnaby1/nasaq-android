@@ -89,6 +89,12 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             }
         }
         fun record(entry:Entry){repo.add(entry){saved(entry,null,it)}}
+        fun logCup() {
+            val id = java.util.UUID.randomUUID().toString()
+            repo.change(onSuccess = { committed -> committed.entries.find { it.id == id }?.let { saved(it, null, committed) } }) { current ->
+                Records.add(current, cupEntry(current.preferences, id = id))
+            }
+        }
         fun editRecord(entry: Entry) { draftEntry = null; recordEdit = entry; form = entry.kind }
         fun addToDay(kind: String, date: LocalDate) {
             val local = java.time.LocalTime.now()
@@ -136,7 +142,14 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                     Glyph("shield",Modifier.size(72.dp));Spacer(Modifier.height(24.dp));Text(w["locked"],style=MaterialTheme.typography.headlineSmall)
                     Spacer(Modifier.height(20.dp));ActionButton(onClick={activity.unlock()}) {Text(w["unlock"])}
                 }
-                (!p.onboarded || p.setupVersion<2) -> SetupFlow(repo,activity)
+                (!p.onboarded || p.setupVersion<2) -> SetupFlow(repo,activity) { kind, entry ->
+                    activity.requestedEntry = ""
+                    activity.requestedScreen = ""
+                    when (kind) {
+                        "water" -> entry?.let { saved(it, null, repo.state) }
+                        "glucose" -> form = "glucose"
+                    }
+                }
                 else -> BoxWithConstraints {
                     val wide=maxWidth>=840.dp
                     Row(Modifier.fillMaxSize()) {
@@ -153,12 +166,12 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                                 Box(Modifier.fillMaxSize().padding(insets),contentAlignment=Alignment.TopCenter) {
                                     Box(Modifier.widthIn(max=1000.dp).fillMaxSize()) {
                                         when(destination) {
-                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={openDay(null)},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
+                                            "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup=::logCup,notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={openDay(null)},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
                                                 openMedicines={tab="medications"},openDay={openDay(it)})
                                             "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
                                                 initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"},onImport={activity.openCsv()},
                                                 onTrackingOptions={trackingOptions="glucose"})
-                                            "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
+                                            "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},cup=::logCup,
                                                 portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},
                                                 onTrackingOptions={trackingOptions="water"})
                                             "day_summary" -> DayOverviewScreen(s, timelineDate?.let(LocalDate::parse) ?: LocalDate.now(),
@@ -195,7 +208,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             RecordingSheet(activeForm, ::dismissEntry, onSelect = { form = it }, state = s,
                 onDraft = { draftEntry = it; form = it.kind }, onQuickWater = if (!repo.busy) {{
                     dismissEntry()
-                    record(Entry(kind = "water", value = p.cup.toDouble(), unit = "mL"))
+                    logCup()
                 }} else null, onHideWater = { amount -> repo.preferences { prefs ->
                     prefs.copy(ignoredWaterAmounts = (prefs.ignoredWaterAmounts.toList() + amount).takeLast(20).toSet())
                 } }) { kind, close ->
@@ -223,18 +236,30 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                 }
             }
             activity.reportDays?.let { days ->
-                ReportComposer(days, onDismiss = { activity.reportDays = null }) { range, options ->
+                ReportComposer(s, days, onDismiss = { activity.reportDays = null }) { range, options, now ->
                     activity.reportDays = null
-                    activity.exportFile(s, range, "pdf", options)
+                    activity.exportFile(s, range, "pdf", options, now)
                 }
             }
         }
         pendingDose?.let { r ->
             val med=s.medications.find { it.id==r.medicationId }
+            var deferring by remember(r) { mutableStateOf(false) }
+            val now = trackingTime()
+            val mayDefer = remember(s, r, now) { Reminders.canDeferDose(s, r, now) }
             BrandedDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text(med?.dose ?: "");Text(w["dose_confirm"]);Text(w["missed_hint"],style=MaterialTheme.typography.bodySmall)
                 if(!med?.instructions.isNullOrBlank()) Text(med!!.instructions,style=MaterialTheme.typography.bodySmall)
                 DoseTrackingReference(s)
+                if (mayDefer) OutlineAction(onClick = {
+                    deferring = true
+                    activity.deferDose(r) { scheduled ->
+                        deferring = false
+                        if (scheduled) pendingDose = null
+                    }
+                }, modifier = Modifier.fillMaxWidth(), enabled = !repo.busy && !deferring) {
+                    Text(w.f("dose_snooze_minutes", "n" to number(p.snoozeMinutes.toDouble(), w)))
+                }
             }},confirmButton={TextAction(onClick={
                 record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="taken",note=med?.let {"${it.name} · ${it.dose}"} ?: ""));pendingDose=null
             },enabled=!repo.busy){Text(w["taken"])}},dismissButton={TextAction(onClick={

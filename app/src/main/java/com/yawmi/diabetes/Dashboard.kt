@@ -39,6 +39,7 @@ fun Home(
     val now = trackingTime()
     val summary = remember(s.entries, s.care, now) { dayOverview(s, now) }
     val stats = remember(s.entries, p, now) { TrackingStats(s, now) }
+    val shortcuts = remember(s.entries, p, now) { journalHabits(s, now).actions }
     val doses = remember(s, now) { Reminders.plan(s, now - 7_200_000, now + 86_400_000).filter { it.kind == "medication" } }
     val permission = remember(permissionRevision, now) { Reminders.permitted(device) to Reminders.exact(device) }
     val ordered = p.order.filter { it !in p.hiddenCards && it in deskKinds }
@@ -51,10 +52,16 @@ fun Home(
                 Glyph("settings", Modifier.size(21.dp))
             }
         }
+        shortcuts.firstOrNull()?.takeUnless { it in primaryJournalActions }?.let { kind ->
+            DailyAction(kind, w[kind], null, !busy, { add(kind) }, Modifier.fillMaxWidth())
+        }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            DailyAction("glucose", w["add_reading"], null, !busy, { add("glucose") }, Modifier.weight(1f).fillMaxHeight())
-            DailyAction("water", w["log_cup_short"],
-                number(p.cup.toDouble(), w) + " " + w["ml"], !busy, cup, Modifier.weight(1f).fillMaxHeight())
+            shortcuts.filter { it in primaryJournalActions }.forEach { kind ->
+                val target = Modifier.weight(1f).fillMaxHeight()
+                if (kind == "water") DailyAction(kind, w["log_cup_short"],
+                    number(p.cup.toDouble(), w) + " " + w["ml"], !busy, cup, target)
+                else DailyAction(kind, w["add_reading"], null, !busy, { add(kind) }, target)
+            }
         }
         NextActionCard(s, now, onAction = { reminder ->
             if (reminder.kind == "medication") dose(reminder) else add(if (reminder.kind == "care") "care_tools" else reminder.kind)
@@ -147,7 +154,7 @@ private fun DeskWeek(now: Long, count: Int, open: (LocalDate) -> Unit) {
 
 private fun deskMetric(kind: String, stats: TrackingStats, summary: DayOverview, w: Words): MetricDisplay = when (kind) {
     "glucose" -> stats.glucose(w)
-    "water" -> stats.water(w)
+    "water" -> stats.waterToday(w)
     else -> MetricDisplay(w["doses_taken_today"], number(summary.takenDoses.toDouble(), w), "", "", "")
 }
 

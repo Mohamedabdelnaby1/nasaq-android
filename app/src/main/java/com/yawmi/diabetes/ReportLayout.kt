@@ -68,5 +68,9 @@ tr{break-inside:avoid;page-break-inside:avoid}
 .report-footer strong{color:#285142}
 .report-footer p+p{margin-top:3px}
 @media screen{body{padding:20px;max-width:850px;margin:auto}}
-@media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@media print{
+  html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .visit-overview{break-inside:avoid}
+  .report-detail{break-before:page;page-break-before:always}
+}
 """

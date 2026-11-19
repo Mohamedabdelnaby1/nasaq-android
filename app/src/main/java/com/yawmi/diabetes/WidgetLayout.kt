@@ -69,7 +69,7 @@ internal data class WidgetLayout(
     }
 
     companion object {
-        fun calculate(width: Int, height: Int, look: WidgetLook, rtl: Boolean): WidgetLayout {
+        fun calculate(width: Int, height: Int, look: WidgetLook, rtl: Boolean, actionOrder: List<String> = emptyList()): WidgetLayout {
             val parts = if (look.mode == "summary") look.parts.filter { it in widgetParts }.distinct().ifEmpty { widgetParts }
                 else listOf(look.mode.takeIf { it in widgetModes } ?: "glucose")
             fun fit(space: Int): WidgetBody? {
@@ -103,7 +103,9 @@ internal data class WidgetLayout(
                 else -> parts
             }
             val footerKind = look.actionTarget.takeIf { it in displayed }
-                ?: if (look.quickWater && "water" in displayed) "water" else parts.first()
+                ?: "water".takeIf { look.quickWater && it in displayed }
+                ?: actionOrder.firstOrNull { it in displayed }
+                ?: parts.first()
             val compactAction = !header && !footer && look.action && parts.singleOrNull() in listOf("water", "glucose")
             return WidgetLayout(body, header, header && parts.size > 1, footer, footerKind,
                 (footer || compactAction) && footerKind == "water" && look.quickWater && look.undoWater, displayed, compactAction, rtl)

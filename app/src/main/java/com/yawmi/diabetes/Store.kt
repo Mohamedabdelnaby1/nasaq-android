@@ -9,6 +9,9 @@ import android.util.AtomicFile
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.security.KeyStore
 import java.util.concurrent.Executors
@@ -19,6 +22,8 @@ import javax.crypto.spec.GCMParameterSpec
 
 class Store private constructor(private val context: Context) {
     private val file=AtomicFile(File(context.filesDir,"yawmi-state.aes"))
+    private val commits = MutableStateFlow<State?>(null)
+    internal val changes = commits.asStateFlow()
     private fun key(): SecretKey {
         val store=KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
         (store.getKey("yawmi.local.v1",null) as? SecretKey)?.let { return it }
@@ -43,6 +48,7 @@ class Store private constructor(private val context: Context) {
         require(bytes.size <= 16_000_000)
         val stream=file.startWrite()
         try { stream.write(bytes); file.finishWrite(stream) } catch(e:Exception) { file.failWrite(stream); throw e }
+        commits.value = state
         runCatching{Widgets.updateAll(context,state)}
         return state
     }
@@ -84,11 +90,25 @@ class Repository(private val context:Context) {
     var error by mutableStateOf<String?>(null); private set
     private val executor=Executors.newSingleThreadExecutor()
     private val main=Handler(Looper.getMainLooper())
+    private val store = Store.get(context)
+    private val observer = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
+    init {
+        observer.launch {
+            store.changes.collect { next ->
+                if (next != null && ready && error != "load_error" && next.revision >= state.revision) state = next
+            }
+        }
+    }
     private var pendingWrites=0
     fun refresh() { executor.execute {
         try { val loaded=Store.get(context).read();runCatching{PhoneShortcuts.publish(context,loaded.preferences);Store.get(context).refreshWidgets()}
             runCatching { Reminders.reconcile(context) }
-            main.post { state=loaded; ready=true; error=null } }
+            main.post {
+                val latest = store.changes.value?.takeIf { it.revision >= loaded.revision } ?: loaded
+                if (!ready || error == "load_error" || latest.revision >= state.revision) state = latest
+                ready = true
+                error = null
+            } }
         catch(e:Exception) { main.post { error="load_error"; ready=true } }
     } }
     fun change(onSuccess:(State)->Unit={},block:(State)->State) {
@@ -110,7 +130,13 @@ class Repository(private val context:Context) {
         executor.execute {
             try {
                 val next = write()
-                main.post { state = next; pendingWrites--; busy = pendingWrites > 0; error = null; onSuccess(next) }
+                main.post {
+                    if (next.revision >= state.revision || error == "load_error") state = next
+                    pendingWrites--
+                    busy = pendingWrites > 0
+                    error = null
+                    onSuccess(next)
+                }
                 try { Reminders.reschedule(context) } catch (_: Exception) { main.post { error = "reminder_error" } }
             } catch (_: StaleRestorePreview) {
                 val latest = runCatching { Store.get(context).read() }.getOrNull()
@@ -128,6 +154,6 @@ class Repository(private val context:Context) {
     fun put(m:Medication)=change { s -> s.copy(medications=s.medications.filterNot { it.id==m.id }+m) }
     fun delete(id:String)=change { s -> Records.remove(s,id) }
     fun clearError() { if(error!="load_error") error=null }
-    fun close() { executor.shutdown() }
+    fun close() { observer.cancel(); executor.shutdown() }
 }
 

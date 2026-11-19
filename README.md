@@ -5,8 +5,8 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.14.1/Nasaq-v0.14.1.apk"><img src="https://img.shields.io/badge/Android-0.14.1-205449?style=for-the-badge" alt="تنزيل نَسَق 0.14.1"></a>
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="كل الإصدارات"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.15.0/Nasaq-v0.15.0.apk"><img src="https://img.shields.io/badge/Android-0.15.0-205449?style=for-the-badge" alt="تنزيل نَسَق 0.15.0"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="الإصدارات المنشورة على GitHub"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
 
@@ -17,9 +17,19 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-[نزّل Nasaq-v0.14.1.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.14.1/Nasaq-v0.14.1.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
+[نزّل Nasaq-v0.15.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.15.0/Nasaq-v0.15.0.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
 
 [الإصدارات المنشورة وبصمات SHA-256](https://github.com/Mohamedabdelnaby1/nasaq-android/releases)
+
+### التغييرات في 0.15.0
+
+- بداية سريعة لتسجيل أول قراءة أو كوب من شاشة الترحيب، مع الوصول للإعدادات المفصّلة عند الحاجة.
+- إجمالي مياه النهارده والهدف ظاهرين بنفس الحساب في الرئيسية والويدجت وصفحة المياه، مع الاحتفاظ بمتابعة الفترات الأخرى.
+- المساعد المحلي يجهّز مسودات بمواعيد نسبية مثل «شربت كوبايتين من ساعة»، وتقدر تراجع الوقت والكمية قبل الحفظ.
+- اختبار تنبيه حسب القناة مع تسجيل إذا كنت شفته، وتأجيل التنبيه من مراجعة الجرعة المستحقة.
+- معاينة أرقام التقرير قبل التصدير، واختيار ملخص الزيارة أو تقرير تفصيلي يبدأ بصفحة الملخص.
+
+[تجربة النسخة على أجهزة فعلية](docs/BETA_QA_AR.md)
 
 ### التغييرات في 0.14.1
 

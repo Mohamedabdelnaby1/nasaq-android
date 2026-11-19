@@ -563,7 +563,22 @@ move_down|تحريك لأسفل|Move down
 assistant_title|مساعد نَسَق|Nasaq assistant
 assistant_subtitle|سجّل أو ابحث في سجلك بالكتابة أو بالصوت|Log an entry or search your journal by typing or speaking
 assistant_prompt|اكتب طلبك|Type your request
-assistant_examples|مثال: شربت نص لتر، أو اعرض قياسات الصيام الأسبوع ده|Try “I drank half a liter” or “show fasting readings this week”
+assistant_examples|جرّب «شربت كوبايتين من ساعة» أو «اعرض قياسات الصيام الأسبوع ده».|Try “I drank two cups an hour ago” or “show fasting readings this week”.
+setup_quick_start|ابدأ من هنا|Quick start
+setup_configure|تخصيص الإعدادات|Customize setup
+setup_browse|افتح نَسَق|Open Nasaq
+water_progress_goal|من هدف {goal}|of a {goal} goal
+reminder_test_channel|اختار نوع تنبيه الاختبار|Choose a test notification
+reminder_test_question|التنبيه ظهر على جهازك؟|Did the notification appear?
+reminder_test_yes|أيوه، ظهر|Yes, it appeared
+reminder_test_no|لأ، مظهرش|No, I didn't see it
+test_seen|أكدت ظهور تنبيه الاختبار|Test notification seen
+test_missing|تنبيه الاختبار مظهرش عندك|Test notification not seen
+dose_snooze_minutes|أجّل التنبيه {n} دقيقة|Remind me in {n} minutes
+dose_cannot_snooze|التنبيه ده مش متاح للتأجيل دلوقتي.|This reminder can't be snoozed right now.
+report_visit_brief|ملخص الزيارة|Visit summary
+report_full|تقرير تفصيلي|Detailed report
+report_preview_data|الأرقام اللي هتظهر في التقرير|Numbers in this report
 assistant_speak|تكلّم|Speak
 assistant_voice_error|تعذّر التقاط الصوت. جرّب الكتابة أو تحقّق من خدمة التعرّف على الكلام.|Speech was unavailable. Try typing or check your speech service.
 assistant_voice_note|قد يستخدم التعرّف على الصوت خدمة الهاتف. الكتابة تُعالج على الجهاز.|Speech may use your phone's speech service. Typed requests are processed on-device.

@@ -79,7 +79,7 @@ object GraphicalWidgets {
         val cfg = Widgets.config(c)
         val w = content.words
         val quick = look.quickWater
-        val geometry = WidgetLayout.calculate(width, height, look, w.rtl)
+        val geometry = WidgetLayout.calculate(width, height, look, w.rtl, content.actionOrder)
         val resource = if (geometry.compactAction) R.layout.home_widget_mini else when (geometry.body) {
             WidgetBody.SINGLE -> R.layout.home_widget
             WidgetBody.FOCUS -> R.layout.home_widget_focus

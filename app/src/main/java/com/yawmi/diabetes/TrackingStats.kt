@@ -40,6 +40,16 @@ internal class TrackingStats(s: State, now: Long, private val zone: ZoneId = Zon
         waterByDay.values.takeIf { it.isNotEmpty() }?.average()
         else waterByDay.values.sum()
     val todayWaterMl = waterByDay[date] ?: 0.0
+    val waterGoalProgress = p.waterGoal.takeIf { it > 0 }?.let { todayWaterMl / it }
+
+    fun waterToday(w: Words): MetricDisplay {
+        val (amount, unit) = waterVolume(todayWaterMl, p.waterViewUnit, w)
+        val goal = p.waterGoal.takeIf { it > 0 }?.let {
+            val (value, measure) = waterVolume(it.toDouble(), p.waterViewUnit, w)
+            w.f("water_progress_goal", "goal" to "$value $measure")
+        }.orEmpty()
+        return MetricDisplay(w["water_today_short"], amount, unit, "", goal)
+    }
 
     fun glucose(w: Words): MetricDisplay {
         val average = p.glucoseViewMetric == "average"

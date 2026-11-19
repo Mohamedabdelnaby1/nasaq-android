@@ -12,6 +12,18 @@ internal data class ReportOptions(
     val journal: Boolean = true, val plans: Boolean = true, val notes: Boolean = true, val message: String = ""
 )
 
+internal data class ReportSnapshot(val days: Int, val from: Long, val until: Long, val zone: ZoneId, val entries: List<Entry>) {
+    val glucose = entries.filter { it.kind == "glucose" }
+    val doses = entries.filter { it.kind == "dose" }
+    val water = entries.filter { it.kind == "water" }
+    val waterDays = water.map { Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate() }.distinct().size
+    val averageMg = glucose.takeIf { it.isNotEmpty() }?.map(::mg)?.average()
+    val waterMl = water.sumOf(Entry::value)
+    val dosesTaken = doses.count { it.status == "taken" }
+
+    fun dateRange(w: Words) = dateText(from, w) + " – " + dateText(until, w)
+}
+
 /** A dedicated print layout, with embedded Tajawal and no remote assets. */
 object Reports {
     private fun reportStart(days: Int, now: Long, zone: ZoneId): Long {
@@ -22,6 +34,11 @@ object Reports {
 
     private fun filtered(s: State, from: Long, now: Long) =
         s.entries.filter { it.time in from..now }.sortedBy(Entry::time)
+
+    internal fun snapshot(s: State, days: Int, now: Long, zone: ZoneId = ZoneId.systemDefault()): ReportSnapshot {
+        val from = reportStart(days, now, zone)
+        return ReportSnapshot(days, from, now, zone, filtered(s, from, now))
+    }
 
     private fun csvCell(value:String)=Escapes.csv(value)
     fun csv(c:Context,s:State,days:Int):File {
@@ -35,25 +52,23 @@ object Reports {
             writeText("\uFEFF"+(listOf(headers)+rows).joinToString("\r\n"){row->row.joinToString(","){csvCell(it)}}+"\r\n",Charsets.UTF_8)
         }
     }
-    internal fun html(c:Context,s:State,days:Int, options: ReportOptions = ReportOptions()):String=buildHtml(s,days,options) {weight->
+    internal fun html(c:Context,s:State,days:Int, options: ReportOptions = ReportOptions(),
+                      now: Long = System.currentTimeMillis()):String=buildHtml(s,days,options,now) {weight->
         Base64.encodeToString(c.assets.open("fonts/tajawal_${weight}.ttf").use {it.readBytes()},Base64.NO_WRAP)
     }
-    internal fun buildHtml(s: State, days: Int, options: ReportOptions = ReportOptions(), font: (String) -> String): String {
+    internal fun buildHtml(s: State, days: Int, options: ReportOptions = ReportOptions(),
+                           now: Long = System.currentTimeMillis(), font: (String) -> String): String {
         val w = Words(s.preferences.language)
         val p = s.preferences
-        val now = System.currentTimeMillis()
-        val zone = ZoneId.systemDefault()
-        val from = reportStart(days, now, zone)
-        val entries = filtered(s, from, now)
-        val glucose = entries.filter { it.kind == "glucose" }
-        val doses = entries.filter { it.kind == "dose" }
-        val water = entries.filter { it.kind == "water" }
-        val waterDays = water.map { Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate() }.distinct().size
-        val average = glucose.takeIf { it.isNotEmpty() }?.map(::mg)?.average()
+        val snapshot = snapshot(s, days, now)
+        val (entries, glucose, doses) = Triple(snapshot.entries, snapshot.glucose, snapshot.doses)
+        val average = snapshot.averageMg
         val percentage = if (glucose.isEmpty()) "—"
             else number(glucose.count { mg(it) in p.lower..p.upper } * 100.0 / glucose.size, w) + "%"
         val target = "${formatGlucose(p.lower, p, w)}–${formatGlucose(p.upper, p, w)} ${p.unit}"
-        val (volume, volumeUnit) = waterVolume(water.sumOf(Entry::value), p.waterViewUnit, w)
+        val (volume, volumeUnit) = waterVolume(snapshot.waterMl, p.waterViewUnit, w)
+        val hasPlans = options.plans && s.medications.any { it.active }
+        val hasDetail = options.chart || options.journal || hasPlans || options.notes && options.message.isNotBlank()
 
         return buildString {
             append("""<!doctype html><html lang='${w.language}' dir='${if (w.rtl) "rtl" else "ltr"}'>
@@ -61,15 +76,16 @@ object Reports {
                 @font-face{font-family:Tajawal;src:url(data:font/ttf;base64,${font("regular")}) format('truetype');font-weight:400}
                 @font-face{font-family:Tajawal;src:url(data:font/ttf;base64,${font("bold")}) format('truetype');font-weight:700}
                 $reportStyles</style></head><body>""")
-            append(reportHeader(p, w, from, now, options.showName))
+            if (options.summary) append("<section class='visit-overview'>")
+            append(reportHeader(p, w, snapshot.from, now, options.showName))
             if (options.summary) {
-                append(sectionTitle("report_section_summary", "overview", "", w))
+                append(sectionTitle("report_visit_brief", "overview", "", w))
                 append("<div class='tile-grid'>")
                 append(tile("violet", w["widget_glucose_average"], average?.let { formatGlucose(it, p, w) } ?: "—",
                     if (average == null) "" else p.unit, w.f("day_reading_count", "count" to count(glucose.size, w))))
                 append(tile("sky", w["recorded_total"], volume, volumeUnit,
-                    w.f("report_logged_days", "count" to count(waterDays, w), "days" to count(days, w))))
-                append(tile("peach", w["report_doses_taken"], count(doses.count { it.status == "taken" }, w), "",
+                    w.f("report_logged_days", "count" to count(snapshot.waterDays, w), "days" to count(days, w))))
+                append(tile("peach", w["report_doses_taken"], count(snapshot.dosesTaken, w), "",
                     w.f("report_doses_skipped", "count" to count(doses.count { it.status == "skipped" }, w))))
                 append("</div><div class='summary-strip'>")
                 val indicators = listOf("report_within_target" to percentage, "targets" to target,
@@ -80,13 +96,14 @@ object Reports {
                 }
                 append("</div><div class='hints'><p>${html(w["range_hint"])}</p><p>${html(w["report_logged_only"])}</p>")
                 if (options.notes && p.targetNote.isNotBlank()) append("<p>${html(w["target_source"])} · ${html(p.targetNote)}</p>")
-                append("</div>")
+                append("</div></section>")
             }
+            if (hasDetail) append(if (options.summary) "<main class='report-detail'>" else "<main>")
             if (options.chart) {
                 append(sectionTitle("glucose_trend", "glucose", "violet", w))
                 if (glucose.isEmpty()) append("<p class='plain-box'>${html(w["no_analysis"])}</p>")
                 else {
-                    append(chart(glucose, p, w, from, now, zone))
+                    append(chart(glucose, p, w, snapshot.from, now, snapshot.zone))
                     append("<h3 class='subheading'>${html(w["context_analysis"])}</h3>")
                     append("<table><thead><tr>${headings(w, "context", "count", "average")}</tr></thead><tbody>")
                     glucose.groupBy(Entry::context).forEach { (context, readings) ->
@@ -104,11 +121,12 @@ object Reports {
                 else append(journalTable(s, entries, w, options.notes))
                 append("</section>")
             }
-            if (options.plans && s.medications.any { it.active }) append(medicationTable(s, w, options.notes))
+            if (hasPlans) append(medicationTable(s, w, options.notes))
             if (options.notes && options.message.isNotBlank()) {
                 append(sectionTitle("report_message", "log", "", w))
                 append("<p class='user-note'>${html(options.message.take(1400))}</p>")
             }
+            if (hasDetail) append("</main>")
             append("<footer class='report-footer'><p><strong>${html(w["app"])} ${BuildConfig.VERSION_NAME}</strong></p>")
             append("<p>${html(w["medical_notice"])}</p><p>${html(w["privacy_export"])}</p></footer></body></html>")
         }

@@ -52,11 +52,11 @@ class ReportTests {
                 }
             })
         fun font(weight: String) = Base64.getEncoder().encodeToString(File(root(), "tajawal_$weight.ttf").readBytes())
-        val report = Reports.buildHtml(state, 7, ReportOptions(message = "تقرير تجريبي للمراجعة.\nالبيانات هنا للعرض فقط."), ::font)
+        val report = Reports.buildHtml(state, 7, ReportOptions(message = "تقرير تجريبي للمراجعة.\nالبيانات هنا للعرض فقط."), font = ::font)
         assertTrue(report.contains("tile sky"))
         assertTrue(report.contains("table-header-group"))
         assertTrue(report.contains("مراجعة تجريبية للسجل"))
-        val noNotes = Reports.buildHtml(state, 7, ReportOptions(showName = false, notes = false), ::font)
+        val noNotes = Reports.buildHtml(state, 7, ReportOptions(showName = false, notes = false), font = ::font)
         assertFalse(noNotes.contains("class='note'"))
         assertFalse(noNotes.contains("مراجعة تجريبية"))
         File(File("build/reports/yawmi").apply { mkdirs() }, "report-pages-ar.html").writeText(report)

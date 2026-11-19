@@ -22,14 +22,13 @@ object WidgetActions {
 
     fun record(s:State,widgetId:Int,token:String,now:Long):State {
         if(s.preferences.lock || token.length!=36)return s
-        return Records.add(s,Entry(id="widget_$token",kind="water",value=s.preferences.cup.toDouble(),unit="mL",
-            context="widget_$widgetId",time=now,created=now))
+        return Records.add(s, cupEntry(s.preferences, now, "widget_$token", "widget_$widgetId"))
     }
 
     fun undo(s:State,widgetId:Int,token:String,now:Long):State {
         if(s.preferences.lock)return s
         val entry=latest(s,widgetId,now)?.takeIf{it.id==token} ?: return s
-        return Records.remove(s,entry.id)
+        return RecordUndo.revert(s, entry, null)
     }
 }
 

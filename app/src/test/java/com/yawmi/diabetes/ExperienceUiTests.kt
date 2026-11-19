@@ -33,6 +33,22 @@ class ExperienceUiTests{
         }
     }
     @Test fun homeWithPersonalisedNextAction(){val s=sample();compose.setContent{YawmiTheme(s.preferences){AppChrome("today",s.preferences,{},{},{}){insets->Box(Modifier.padding(insets)){Home(s,false,{},{},{},{},{},{_,_,_->})}}}};capture("01-home")}
+    @Test @Config(qualifiers="w360dp-h640dp-port-xxhdpi") fun quickStartExposesBothRecordingActionsWithLargeText() {
+        val p = sample().preferences.copy(largeText = true, cup = 350)
+        val w = Words("ar")
+        val chosen = mutableListOf<String>()
+        compose.setContent {
+            val density = LocalDensity.current
+            CompositionLocalProvider(LocalDensity provides Density(density.density, 1.5f)) {
+                YawmiTheme(p) { QuickStartActions(p, false) { chosen.add(it) } }
+            }
+        }
+        compose.onNodeWithText(w["add_reading"]).assertIsDisplayed().assertHasClickAction().performClick()
+        compose.onNodeWithText(w.f("quick_log_cup", "amount" to number(350.0, w)))
+            .assertIsDisplayed().assertHasClickAction().performClick()
+        compose.runOnIdle { assertEquals(listOf("glucose", "water"), chosen) }
+        capture("daily-quick-start-ar")
+    }
     @Test fun compactHomeCanSwitchBackToDetailed(){
         var s by mutableStateOf(sample().let{it.copy(preferences=it.preferences.copy(compactHome=true))})
         compose.setContent{YawmiTheme(s.preferences){Surface{Home(s,false,{},{},{},{},{},{_,_,_->},onMode={compact->s=s.copy(preferences=s.preferences.copy(compactHome=compact))})}}}

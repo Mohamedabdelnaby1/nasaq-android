@@ -75,7 +75,7 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         ScreenTitle(w["quick_add"])
-        val primary = listOf("glucose", "water")
+        val primary = (habits?.actions ?: journalActions).filter { it in primaryJournalActions }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             primary.forEach { kind ->
                 val tone = domainColors(kind)
