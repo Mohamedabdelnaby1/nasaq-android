@@ -25,14 +25,13 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     return (reminders+routine).sortedBy{it.time}
 }
 
-@Composable fun ReminderHub(repo:Repository,activity:MainActivity){
+@Composable fun ReminderHub(repo:Repository,activity:MainActivity,openWaterSettings:()->Unit,openMedications:(Medication?)->Unit){
     val s=repo.state;val w=LocalWords.current
     var edit by remember{mutableStateOf<String?>(null)}
-    var med by remember{mutableStateOf<Medication?>(null)}
-    var medications by remember{mutableStateOf(false)}
     var audit by remember{mutableStateOf(false)}
     var care by remember{mutableStateOf(false)}
     var chooseTest by remember { mutableStateOf(false) }
+    var editError by remember(edit) { mutableStateOf<String?>(null) }
     val lastTest = s.audit.lastOrNull { it.id == "test" }
     val suggestion=remember(s.revision,s.preferences){waterSuggestion(s)}
     val allowed=remember(activity.permissionRevision){Reminders.permitted(activity)}
@@ -41,9 +40,9 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     val muted = remember(scheduled, activity.permissionRevision) { scheduled.firstOrNull { !Reminders.channelEnabled(activity, Reminders.channelFor(s, it)) } }
     ReminderHubContent(s,allowed,precise,edit={edit=it},event={e->
         if(e.kind=="care")care=true
-        else if(e.reminder?.kind=="medication")med=s.medications.find{it.id==e.reminder.medicationId}
+        else if(e.reminder?.kind=="medication")openMedications(s.medications.find{it.id==e.reminder.medicationId})
         else edit=if(e.kind in setOf("wake","sleep"))"quiet"else e.kind
-    },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={chooseTest=true},medications={medications=true},
+    },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={chooseTest=true},medications={openMedications(null)},
         suggestion=suggestion,onApply={
             if(suggestion!=null)repo.preferences{
                 val wake=LocalTime.parse(it.quietEnd)
@@ -60,7 +59,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
                     this[index] = lastTest.copy(status = if (seen) "test_seen" else "test_missing")
                 })
             }
-        } else null)
+        } else null, onAcknowledgeZone = { repo.preferences { it.copy(lastZone = ZoneId.systemDefault().id) } })
     if (chooseTest) BrandedDialog(onDismissRequest = { chooseTest = false },
         title = { Text(w["reminder_test_channel"]) },
         text = {
@@ -74,16 +73,22 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             }
         }, confirmButton = { TextAction({ chooseTest = false }) { Text(w["cancel"]) } })
     if(care)CareTools(s,{care=false}){change->repo.change(block=change)}
-    edit?.let{kind->
-        if(kind in setOf("water","glucose"))ReminderScheduleEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null},channel={activity.channel(kind)},test={activity.testNotification(kind)})
-        else if(kind=="audit"){audit=true;edit=null}
-        else PreferencesEditor(kind,s.preferences,{edit=null},{next->repo.preferences{next};edit=null})
+    edit?.let { kind ->
+        val onSave: ((Preferences) -> Preferences) -> Unit = { update ->
+            if (!repo.busy) repo.change(onSuccess = { edit = null }, onFailure = { editError = it }) {
+                it.copy(preferences = update(it.preferences))
+            }
+        }
+        when (kind) {
+            "water", "glucose" -> ReminderScheduleEditor(kind, s.preferences, { edit = null }, onSave,
+                channel = { activity.channel(kind) }, test = { activity.testNotification(kind) },
+                openWaterSettings = { edit = null; openWaterSettings() }, saving = repo.busy, saveError = editError)
+            "audit" -> LaunchedEffect(Unit) { audit = true; edit = null }
+            else -> PreferencesEditor(kind, s.preferences, { edit = null },
+                saving = repo.busy, saveError = editError, onSave = onSave)
+        }
     }
-    if(medications)BrandedDialog(onDismissRequest={medications=false},title={Text(w["medications"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)){
-        if(s.medications.isEmpty())Text(w["no_meds"])
-        s.medications.forEach{m->TextAction(onClick={med=m;medications=false}){Text(m.name)}}
-    }},confirmButton={TextAction(onClick={medications=false}){Text(w["close"])}})
-    med?.let{m->MedicationEditor(m,s.preferences,{med=null},{repo.put(it);med=null})}
+
     if(audit)BrandedDialog(onDismissRequest={audit=false},title={Text(w["notification_log"])},text={Column(Modifier.verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(9.dp)){
         if(s.audit.isEmpty())Text(w["no_audit"])
         s.audit.takeLast(20).reversed().forEach{a->Text(dateText(a.time,w)+" "+timeText(a.time,w)+" · "+w[if(a.kind=="medication")"medication"else a.kind]+" · "+w[a.status],style=MaterialTheme.typography.bodySmall)}
@@ -92,13 +97,17 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
 
 @Composable fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
     suggestion:WaterSuggestion?=null,onApply:()->Unit={},onReset:()->Unit={},onRepair:()->Unit={},onBattery:()->Unit={},onCare:()->Unit={}, scheduled: List<Reminder> = emptyList(), mutedKind: String? = null,
-    testResult: String? = null, testKind: String? = null, onTestSeen: ((Boolean) -> Unit)? = null){
+    testResult: String? = null, testKind: String? = null, onTestSeen: ((Boolean) -> Unit)? = null, onAcknowledgeZone: () -> Unit = {}){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme
     var now by remember{mutableLongStateOf(System.currentTimeMillis())}
     LaunchedEffect(Unit){while(true){kotlinx.coroutines.delay(60000);now=System.currentTimeMillis()}}
     val events=remember(s.revision,s.preferences,now/60000){routineEvents(s,now)}
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp).padding(bottom=75.dp),verticalArrangement=Arrangement.spacedBy(16.dp)){
-        PageIntro(w["notification_hub"],w["notification_hub_body"],"bell")
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),verticalArrangement=Arrangement.spacedBy(16.dp)){
+        ScreenTitle(w["notification_hub"])
+        if (s.preferences.lastZone != ZoneId.systemDefault().id) NasaqBoard {
+            Notice(w["travel_hint"])
+            TextAction(onAcknowledgeZone) { Text(w["acknowledge"]) }
+        }
         Surface(color=LocalBrand.current,shape=RoundedCornerShape(24.dp)){Box{Pattern(Modifier.matchParentSize());Column(Modifier.fillMaxWidth().padding(18.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
             Text(w["reminder_readiness"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Color.White)
             Row(horizontalArrangement=Arrangement.spacedBy(10.dp)){
@@ -190,30 +199,52 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     }}
 }
 
-@Composable fun ReminderScheduleEditor(kind:String,p:Preferences,onDismiss:()->Unit,onSave:(Preferences)->Unit,channel:()->Unit,test:()->Unit){
+@Composable fun ReminderScheduleEditor(kind:String,p:Preferences,onDismiss:()->Unit,onSave:((Preferences)->Preferences)->Unit,channel:()->Unit,test:()->Unit,openWaterSettings:()->Unit,saving:Boolean=false,saveError:String?=null){
     val water=kind=="water";val w=LocalWords.current
     var enabled by remember{mutableStateOf(if(water)p.waterEnabled else p.glucoseEnabled)}
     var days by remember{mutableStateOf(if(water)p.waterDays else p.glucoseDays)}
     var smart by remember{mutableStateOf(p.waterSmart)}
-    var litres by remember{mutableStateOf((p.waterGoal/1000.0).toString())};var cup by remember{mutableStateOf(p.cup.toString())}
     var interval by remember{mutableStateOf(p.waterEvery.toString())};var times by remember{mutableStateOf(p.glucoseTimes.joinToString(","))}
     var after by remember{mutableStateOf(p.afterMealEnabled)};var delay by remember{mutableStateOf(p.afterMealMinutes.toString())}
     var invalid by remember{mutableStateOf(false)}
     EditorShell(w[if(water)"water_reminders"else"glucose_reminders"],onDismiss,{
         try{
-            val next=if(water)p.copy(waterEnabled=enabled,waterDays=days,waterSmart=smart,waterGoal=litresToMl(litres),cup=whole(cup),waterEvery=whole(interval))
-                else p.copy(glucoseEnabled=enabled,glucoseDays=days,glucoseTimes=parseTimes(times),afterMealEnabled=after,afterMealMinutes=whole(delay))
-            require(!enabled || days.isNotEmpty());require(!water || !enabled || !smart || next.waterGoal>0)
-            Codec.validate(State(preferences=next));onSave(next)
+            val update: (Preferences) -> Preferences = if (water) {
+                val intervalMinutes = if (smart) p.waterEvery else whole(interval)
+                val reminderDays = days
+                val isEnabled = enabled
+                val adaptive = smart
+                val apply: (Preferences) -> Preferences = { current ->
+                    require(!isEnabled || !adaptive || current.waterGoal > 0)
+                    current.copy(waterEnabled = isEnabled, waterDays = reminderDays, waterSmart = adaptive,
+                        waterEvery = intervalMinutes)
+                }
+                apply
+            } else {
+                val reminderTimes = parseTimes(times)
+                val reminderDays = days
+                val isEnabled = enabled
+                val afterMeals = after
+                val afterMealDelay = if (afterMeals) whole(delay) else p.afterMealMinutes
+                val apply: (Preferences) -> Preferences = {
+                    it.copy(glucoseEnabled = isEnabled, glucoseDays = reminderDays, glucoseTimes = reminderTimes,
+                        afterMealEnabled = afterMeals, afterMealMinutes = afterMealDelay)
+                }
+                apply
+            }
+            require(!enabled || days.isNotEmpty())
+            Codec.validate(State(preferences = update(p)))
+            onSave(update)
+
         }catch(e:Exception){invalid=true}
-    }){
+    }, saveEnabled = !saving){
+        if (saveError != null) Notice(w[saveError], true)
         Toggle(w["enabled"],enabled){enabled=it}
         Text(w["reminder_days"],style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
         FlowRow(horizontalArrangement=Arrangement.spacedBy(6.dp)){(1..7).forEach{day->ChoiceChip(selected=day in days,onClick={days=if(day in days)days-day else days+day},label={Text(w[dayKey(day)])},shape=RoundedCornerShape(50))}}
         if(water){
             Toggle(w["smart_water_reminders"],smart,w["smart_water_hint"]){smart=it}
-            Field(w["daily_litres"],litres,{litres=it;invalid=false},true)
-            Field(w["cup_size"],cup,{cup=it;invalid=false},true)
+            SettingsRow("water", w["water_goal_and_cup"], onClick = openWaterSettings)
             if(!smart)Field(w["minutes"],interval,{interval=it;invalid=false},true)
             else Text(w["wake_time"]+" · "+clockText(p.quietEnd, w)+" · "+w["sleep_time"]+" · "+clockText(p.quietStart, w),style=MaterialTheme.typography.bodySmall)
         }else{

@@ -15,7 +15,7 @@ data class WidgetLook(
     val parts: List<String> = listOf("glucose", "water", "medication"), val opacity: Int = 100,
     val font: String = "comfortable", val title: Boolean = true, val details: Boolean = true,
     val action: Boolean = true, val background: String = "", val accent: String = "",
-    val waterVisual: String = "ring", val radius: Int = 24, val quickWater: Boolean = false,
+    val waterVisual: String = "ring", val radius: Int = 22, val quickWater: Boolean = false,
     val undoWater: Boolean = false, val layout: String = "widget_focus", val actionTarget: String = "auto"
 )
 
@@ -269,17 +269,15 @@ object WidgetArt {
         private fun metric(kind: String, bounds: RectF, hero: Boolean) {
             val card = frame.inset(bounds)
             val rows = geometry.body == WidgetBody.ROWS
-            val radius = frame.innerRadius
+            val hue = tone(kind)
             if (!rows) {
-                box(card, panel, radius)
-                box(RectF(card).apply { inset(.5f, .5f) }, seam, radius, true)
-            } else {
-                box(card, panel, 6f)
-                val hasNextRow = bounds.bottom < height - if (geometry.footer) 47f else 1f
-                if (hasNextRow) line(card.left + 8, bounds.bottom, card.right - 8, bounds.bottom, seam)
+                val tint = ColorUtils.blendARGB(panel, hue, if (hero) .12f else .065f)
+                box(card, tint, frame.innerRadius)
+            } else if (bounds.bottom < height - if (geometry.footer) 47f else 1f) {
+                line(card.left + 6, bounds.bottom, card.right - 6, bounds.bottom, seam)
             }
             val m = content.metric(kind)
-            val hue = tone(kind)
+
             val roomy = card.width() >= (if (kind == "water") WATER_ART_WIDTH else 171f) && card.height() >= 57
             val tall = card.height() >= 106
             val micro = card.width() < 90 || card.height() < 47
@@ -335,9 +333,9 @@ object WidgetArt {
             }
         }
 
-        private fun control(spot: RectF, kind: String, fill: Int, label: String = "") {
-            val fg = contrast(fill)
-            box(spot, fill, minOf(frame.innerRadius, spot.width() / 2, spot.height() / 2))
+        private fun control(spot: RectF, kind: String, fill: Int, label: String = "", showFill: Boolean = true) {
+            val fg = if (showFill) contrast(fill) else secondary
+            if (showFill) box(spot, fill, minOf(16f, spot.width() / 2, spot.height() / 2))
             val described = label.isNotEmpty() && spot.width() >= 101f
             val x = if (described) if (rtl) spot.right - 20f else spot.left + 20f else spot.centerX()
             val icon = minOf(15f, spot.width() - 4f, spot.height() - 4f)
@@ -354,7 +352,12 @@ object WidgetArt {
             box(RectF(frame.outer).apply { inset(.6f, .6f) }, ColorUtils.setAlphaComponent(seam, alpha),
                 frame.radius - .6f, true)
 
+            val headerBottom = 44f
+            val left = frame.gutter + 3f
+            val right = width - left
             if (geometry.header) {
+                line(left, headerBottom - 1, right, headerBottom - 1, seam)
+
                 fun headerButton(index: Int, kind: String) {
                     val left = if (rtl) index * 44f else width - (index + 1) * 44f
                     val target = frame.inset(RectF(left, 0f, left + 44f, 44f))
@@ -362,7 +365,7 @@ object WidgetArt {
                     val cx = target.centerX()
                     // Keep both buttons on the same baseline even when one borders the shell.
                     val cy = (frame.gutter + 40f) / 2
-                    control(RectF(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), kind, panel)
+                    control(RectF(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), kind, panel, showFill = false)
                 }
                 headerButton(0, "settings")
                 if (geometry.cycle) headerButton(1, "cycle")
@@ -370,7 +373,7 @@ object WidgetArt {
                     val margin = if (geometry.cycle) 91f else 47f
                     val edge = frame.gutter + 5f
                     val area = if (rtl) RectF(margin, 0f, width - edge, 44f) else RectF(edge, 0f, width - margin, 44f)
-                    text(words["app"], area, frame.gutter + 1f, 19f, ink, bold = true, fit = true)
+                    text(words["app"], area, frame.gutter + 2f, 16f, ink, bold = true, fit = true)
                 }
             }
             geometry.parts.zip(geometry.cells(width, height)).forEachIndexed { i, (kind, area) ->

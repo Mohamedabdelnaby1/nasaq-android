@@ -13,7 +13,6 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.style.TextOverflow
-import java.time.LocalDate
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.*
@@ -27,129 +26,89 @@ import androidx.compose.ui.unit.*
 @Composable
 fun Home(
     s: State, busy: Boolean, add: (String) -> Unit, dose: (Reminder) -> Unit, sick: () -> Unit,
-    cup: () -> Unit, notifications: () -> Unit, portion: (Double, String, String) -> Unit,
-    customise: () -> Unit = {}, onMode: (Boolean) -> Unit = {}, permissionRevision: Int = 0,
-    openOverview: () -> Unit = {}, openHydration: (() -> Unit)? = null, openGlucose: (() -> Unit)? = null,
-    openMedicines: (() -> Unit)? = null, openDay: ((LocalDate) -> Unit)? = null
+    cup: () -> Unit, notifications: () -> Unit, customise: () -> Unit = {},
+    permissionRevision: Int = 0, openOverview: () -> Unit = {},
+    openHydration: () -> Unit = { add("water") }, openGlucose: () -> Unit = { add("glucose") },
+    openMedicines: () -> Unit = {}
 ) {
     val w = LocalWords.current
     val p = s.preferences
-    val c = MaterialTheme.colorScheme
-    val device = androidx.compose.ui.platform.LocalContext.current
     val now = trackingTime()
-    val summary = remember(s.entries, s.care, now) { dayOverview(s, now) }
-    val stats = remember(s.entries, p, now) { TrackingStats(s, now) }
-    val shortcuts = remember(s.entries, p, now) { journalHabits(s, now).actions }
-    val doses = remember(s, now) { Reminders.plan(s, now - 7_200_000, now + 86_400_000).filter { it.kind == "medication" } }
-    val permission = remember(permissionRevision, now) { Reminders.permitted(device) to Reminders.exact(device) }
-    val ordered = p.order.filter { it !in p.hiddenCards && it in deskKinds }
-    val motion = LocalMotion.current
-    val scroll = rememberScrollState()
-    Column(Modifier.fillMaxSize().verticalScroll(scroll).padding(ScreenGutters),
-        verticalArrangement = Arrangement.spacedBy(15.dp)) {
-        ScreenTitle(w["today"], dateText(now, w)) {
-            IconAction(customise, Modifier.semantics { contentDescription = w["customise"] }) {
-                Glyph("settings", Modifier.size(21.dp))
-            }
+    val stats = remember(s, now) { TrackingStats(s, now) }
+    val summary = remember(s, now) { dayOverview(s, now) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val alertsAllowed = remember(permissionRevision) { Reminders.permitted(context) }
+    val metrics = p.order.filter { it !in p.hiddenCards && it in listOf("glucose", "water", "medications") }
+    val recent = summary.entries.filter { entry ->
+        when (entry.kind) {
+            "meal" -> "meals" !in p.hiddenCards
+            "symptom" -> "symptoms" !in p.hiddenCards
+            "dose" -> "medications" !in p.hiddenCards
+            else -> entry.kind !in p.hiddenCards
         }
-        shortcuts.firstOrNull()?.takeUnless { it in primaryJournalActions }?.let { kind ->
-            DailyAction(kind, w[kind], null, !busy, { add(kind) }, Modifier.fillMaxWidth())
+    }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        ScreenTitle(w["today"], dateText(now, w)) {
+            IconAction(onClick = customise, modifier = Modifier.semantics { contentDescription = w["home_cards"] }) {
+                Glyph("settings", Modifier.size(20.dp))
+            }
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            shortcuts.filter { it in primaryJournalActions }.forEach { kind ->
-                val target = Modifier.weight(1f).fillMaxHeight()
-                if (kind == "water") DailyAction(kind, w["log_cup_short"],
-                    number(p.cup.toDouble(), w) + " " + w["ml"], !busy, cup, target)
-                else DailyAction(kind, w["add_reading"], null, !busy, { add(kind) }, target)
-            }
+            DailyAction("glucose", w["add_reading"], null, !busy, { add("glucose") }, Modifier.weight(1f).fillMaxHeight())
+            DailyAction("water", w["log_cup_short"], number(p.cup.toDouble(), w) + " " + w["ml"],
+                !busy, cup, Modifier.weight(1f).fillMaxHeight())
         }
-        NextActionCard(s, now, onAction = { reminder ->
-            if (reminder.kind == "medication") dose(reminder) else add(if (reminder.kind == "care") "care_tools" else reminder.kind)
-        }, onSetup = notifications)
-        SegmentedRail(listOf(w["compact_home"], w["detailed"]), if (p.compactHome) 0 else 1, { onMode(it == 0) })
-        AnimatedContent(p.compactHome, transitionSpec = {
-            if (!motion) (EnterTransition.None togetherWith ExitTransition.None).using(null)
-            else (fadeIn(tween(300, 85)) + slideInVertically(tween(510, easing = NasaqEase)) { if (targetState) -it / 12 else it / 14 } togetherWith
-                (fadeOut(tween(180)) + scaleOut(tween(300), targetScale = .975f)))
-                .using(SizeTransform(clip = true) { _, _ -> tween(500, easing = NasaqEase) })
-        }, label = "daily-desk-layout") { compact ->
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                fun destination(kind: String): () -> Unit = when (kind) {
-                    "glucose" -> openGlucose ?: { add("glucose") }
-                    "water" -> openHydration ?: { add("water") }
-                    else -> openMedicines ?: { doses.firstOrNull()?.let(dose) ?: add("dose") }
-                }
-                if (compact && ordered.isNotEmpty()) {
-                    NasaqBoard {
-                        ordered.forEachIndexed { index, kind ->
-                            if (index > 0) HorizontalDivider()
-                            DeskMetricLine(kind, deskMetric(kind, stats, summary, w), destination(kind))
-                        }
-
+        p.pinnedShortcut.takeIf { it in journalActions && it !in primaryJournalActions }?.let { shortcut ->
+            SettingsRow(shortcut, w[shortcut]) { add(shortcut) }
+        }
+        val displayed = if (p.compactHome) metrics else p.order.filterNot { it in p.hiddenCards }
+        fun openMetric(kind: String): () -> Unit = when (kind) {
+            "water" -> openHydration
+            "medications" -> openMedicines
+            else -> openGlucose
+        }
+        if (p.compactHome && displayed.isNotEmpty()) NasaqBoard {
+            displayed.forEachIndexed { index, kind ->
+                if (index > 0) HorizontalDivider()
+                DeskMetricLine(kind, deskMetric(kind, stats, summary, w), openMetric(kind))
+            }
+        } else displayed.forEachIndexed { index, kind ->
+            Reveal(index) {
+                when (kind) {
+                    "meals" -> NasaqBoard {
+                        SettingsRow("log", w["today_story"],
+                            w.f("today_entries_count", "count" to number(summary.activityCount.toDouble(), w)), onClick = openOverview)
+                        val limit = when (p.cardSizes[kind]) { "small" -> 1; "large" -> 5; else -> 3 }
+                        recent.take(limit).forEach { entry -> ActivityRow(entry, s) }
                     }
-                } else if (!compact) {
-                    ordered.forEachIndexed { index, kind ->
-                        Reveal(index) { DeskMetricCard(kind, deskMetric(kind, stats, summary, w), stats, s, destination(kind)) }
+                    "symptoms" -> if (p.sickPlan.isNotBlank() || recent.any { it.kind == "symptom" }) {
+                        val note = if (p.cardSizes[kind] == "small") null else w["care_corner_body"]
+                        NasaqBoard { SettingsRow("shield", w["care_corner"], note, onClick = sick) }
                     }
-                    if ("meals" !in p.hiddenCards) NasaqBoard {
-                        SectionHeading(w["today_story"], w["details"], openOverview)
-                        val limit = when (p.cardSizes["meals"]) { "small" -> 1; "large" -> 5; else -> 3 }
-                        val entries = summary.entries.take(limit)
-                        if (entries.isEmpty()) EmptyState(w["story_empty"])
-                        entries.forEachIndexed { index, entry ->
-                            if (index > 0) HorizontalDivider()
-                            ActivityRow(entry, s)
-                        }
-                    }
+                    else -> DeskMetricCard(kind, deskMetric(kind, stats, summary, w), stats, s, openMetric(kind))
                 }
             }
         }
-        if (openDay != null) NasaqBoard {
-            SectionHeading(w["days_in_log"], w["today"], openOverview)
-            DeskWeek(now, summary.activityCount, openDay)
-        }
-        if (!p.compactHome && "water" in ordered && p.waterGoal > 0) {
-            var showingCups by rememberSaveable { mutableStateOf(false) }
+        if (p.compactHome || "meals" !in displayed) {
             NasaqBoard {
-                SettingsRow("water", w["water_cup_plan"], w[if (showingCups) "less" else "details"], expanded = showingCups,
-                    onClick = { showingCups = !showingCups })
-                MotionExpand(showingCups) { WaterCups(s, busy, portion) }
+                SettingsRow("log", w["day_overview"],
+                    w.f("today_entries_count", "count" to number(summary.activityCount.toDouble(), w)), onClick = openOverview)
             }
         }
-        if ("symptoms" !in p.hiddenCards && !p.compactHome) {
-            NasaqBoard { SettingsRow("shield", w["care_corner"], w["care_corner_body"], onClick = sick) }
-        }
-        if ((p.waterEnabled || p.glucoseEnabled || s.medications.any { it.active && it.reminders }) &&
-            (!permission.first || !permission.second)) {
-            NasaqBoard { SettingsRow("bell", w["reminder_setup_needed"], onClick = notifications) }
-        }
-    }
-}
 
-private val deskKinds = setOf("glucose", "water", "medications")
-
-@Composable
-private fun DeskWeek(now: Long, count: Int, open: (LocalDate) -> Unit) {
-    val w = LocalWords.current
-    val c = MaterialTheme.colorScheme
-    val today = java.time.Instant.ofEpochMilli(now).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-    val first = today.minusDays(6)
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        (0L..6L).forEach { offset ->
-            val date = first.plusDays(offset)
-            val active = date == today
-            Surface(onClick = { open(date) }, modifier = Modifier.weight(1f), shape = RoundedCornerShape(15.dp),
-                color = if (active) c.primary else c.surfaceContainerHigh, contentColor = if (active) c.onPrimary else c.onSurface) {
-                Column(Modifier.padding(vertical = 8.dp), horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    val day = date.dayOfWeek.getDisplayName(java.time.format.TextStyle.NARROW, w.locale)
-                    Text(day, style = MaterialTheme.typography.labelSmall)
-                    Text(number(date.dayOfMonth.toDouble(), w), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                }
+        if (!alertsAllowed && (p.waterEnabled || p.glucoseEnabled || s.medications.any { it.active && it.reminders })) {
+            SettingsRow("bell", w["reminder_no_permission"], onClick = notifications)
+        }
+        NextActionCard(s, now, { reminder ->
+            when (reminder.kind) {
+                "medication" -> dose(reminder)
+                "water" -> openHydration()
+                "glucose" -> add("glucose")
+                else -> add("care_tools")
             }
-        }
+        }, notifications, showWhenEmpty = false)
     }
-    if (count > 0) Text(w.f("day_event_count", "count" to number(count.toDouble(), w)), style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
 }
 
 private fun deskMetric(kind: String, stats: TrackingStats, summary: DayOverview, w: Words): MetricDisplay = when (kind) {
@@ -302,3 +261,4 @@ private fun ReadingTrace(readings: List<Entry>, modifier: Modifier, ink: Color) 
         trailing?.invoke()
     }
 }
+

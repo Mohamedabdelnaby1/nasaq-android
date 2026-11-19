@@ -23,7 +23,6 @@ class MainActivity:ComponentActivity() {
     lateinit var repository:Repository;private set
     var requestedScreen by mutableStateOf("")
     var requestedEntry by mutableStateOf("")
-    var openNotifications by mutableStateOf(false)
     var permissionRevision by mutableIntStateOf(0);private set
     internal var reminderTestResult by mutableStateOf<String?>(null); private set
     var locked by mutableStateOf(true);private set

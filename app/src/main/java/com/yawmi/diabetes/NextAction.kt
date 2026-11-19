@@ -11,9 +11,10 @@ import androidx.compose.ui.unit.dp
 
 fun nextCareAction(s:State,now:Long=System.currentTimeMillis()):Reminder? = Reminders.plan(s,now,now+172800000).firstOrNull()
 
-@Composable fun NextActionCard(s:State,now:Long,onAction:(Reminder)->Unit,onSetup:()->Unit){
+@Composable fun NextActionCard(s:State,now:Long,onAction:(Reminder)->Unit,onSetup:()->Unit,showWhenEmpty:Boolean=true){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme
     val next=remember(s.revision,s.preferences,now/60000){nextCareAction(s,now)}
+    if (next == null && !showWhenEmpty) return
     val kind=next?.kind ?: "bell"
     Surface(onClick={if(next!=null)onAction(next)else onSetup()},shape=RoundedCornerShape(20.dp),color=c.primaryContainer.copy(alpha=.55f),modifier=Modifier.pressResponse(compression=.98f)){
         Row(Modifier.fillMaxWidth().padding(14.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)){

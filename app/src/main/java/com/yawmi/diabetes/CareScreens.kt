@@ -34,7 +34,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     val entries = remember(s.entries, s.medications, filter, query, w) {
         val search = query.trim()
         s.entries.filter {
-            (filter == "all" || it.kind == filter) &&
+            (initialFilter != "glucose" || it.kind == "glucose") && (filter == "all" || it.kind == filter) &&
                 (search.isBlank() || it.note.contains(search, true) || w[it.context].contains(search, true) ||
                     entryTitle(it, s, w).contains(search, true))
         }.sortedByDescending { it.time }
@@ -67,8 +67,8 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
                         unfocusedBorderColor = c.outlineVariant))
                 val filters = listOf("all", "glucose", "water", "dose", "meal", "symptom", "weight", "pressure", "a1c")
                 fun filterLabel(kind: String) = w[if (kind == "dose") "medication" else kind]
-                SettingsRow("settings", w["filter_records"], filterLabel(filter), expanded = showFilters) { showFilters = !showFilters }
-                MotionExpand(showFilters) {
+                if (initialFilter != "glucose") SettingsRow("settings", w["filter_records"], filterLabel(filter), expanded = showFilters) { showFilters = !showFilters }
+                MotionExpand(initialFilter != "glucose" && showFilters) {
                     FlowRow(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                         filters.forEach { kind ->
                             ChoiceChip(selected = filter == kind, onClick = {
@@ -214,7 +214,7 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     }
 }
 
-@Composable fun Insights(s:State,add:(String)->Unit,export:(Int,String)->Unit, onOpenDay: ((java.time.LocalDate) -> Unit)? = null){
+@Composable fun Insights(s:State,export:(Int,String)->Unit, onOpenDay: ((java.time.LocalDate) -> Unit)? = null){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme;val p=s.preferences
     var days by rememberSaveable{mutableIntStateOf(14)}
     var context by rememberSaveable{mutableStateOf("all")}
@@ -223,6 +223,11 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
     val range=if(glucose.isEmpty())0.0 else glucose.count{mg(it) in p.lower..p.upper}*100.0/glucose.size
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),verticalArrangement=Arrangement.spacedBy(16.dp)){
         SectionBanner("insights", w["insights"], dateText(periodStart(days), w) + " – " + dateText(System.currentTimeMillis(), w))
+        Surface(color=LocalBrand.current,shape=RoundedCornerShape(23.dp)){Box{Pattern(Modifier.matchParentSize());Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+            Glyph("export",Modifier.size(26.dp),Gold);Text(w["report_ready"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Color.White);Text(w["report_ready_body"],style=MaterialTheme.typography.bodySmall,color=Color(0xFFCEE0D6))
+            ActionButton(onClick={export(days,"pdf")},enabled=entries.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),shape=RoundedCornerShape(12.dp),modifier=Modifier.fillMaxWidth()){Text(w["export_pdf"])}
+            TextAction(onClick={export(days,"csv")},enabled=entries.isNotEmpty(),colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text(w["export_csv"])}
+        }}}
         val periods = listOf(1, 7, 14, 30)
         SegmentedRail(periods.map { w[if (it == 1) "today_only" else "last${it}"] }, periods.indexOf(days), { days = periods[it] })
         NasaqBoard { ChoiceRow(w["reading_filter"], listOf("all", "fasting", "not_fasting", "before", "after"),
@@ -257,12 +262,6 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
         if(glucose.isNotEmpty())Panel(w["context_analysis"]){glucose.groupBy{it.context}.forEach{(context,list)->
             Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically){Text(w[context],Modifier.weight(1f),style=MaterialTheme.typography.bodyMedium);StatusPill(number(com.yawmi.diabetes.core.Planner.fromMg(list.map{mg(it)}.average(),p.unit),w,1)+" "+p.unit)}
         };Text(w["average_context_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)}
-        Surface(color=LocalBrand.current,shape=RoundedCornerShape(23.dp)){Box{Pattern(Modifier.matchParentSize());Column(Modifier.padding(18.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
-            Glyph("export",Modifier.size(26.dp),Gold);Text(w["report_ready"],style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold,color=Color.White);Text(w["report_ready_body"],style=MaterialTheme.typography.bodySmall,color=Color(0xFFCEE0D6))
-            ActionButton(onClick={export(days,"pdf")},enabled=entries.isNotEmpty(),colors=ButtonDefaults.buttonColors(containerColor=Gold,contentColor=Forest),shape=RoundedCornerShape(12.dp),modifier=Modifier.fillMaxWidth()){Text(w["export_pdf"])}
-            TextAction(onClick={export(days,"csv")},enabled=entries.isNotEmpty(),colors=ButtonDefaults.textButtonColors(contentColor=Color.White)){Text(w["export_csv"])}
-        }}}
-        Panel(w["other_tracking"]){FlowRow(horizontalArrangement=Arrangement.spacedBy(7.dp)){listOf("weight","pressure","a1c").forEach{kind->OutlineAction(onClick={add(kind)}){Text(w[kind])}}};listOf("weight","pressure","a1c").forEach{kind->s.entries.filter{it.kind==kind}.maxByOrNull{it.time}?.let{e->Text(w[kind]+" · "+entryTitle(e,s,w)+" · "+dateText(e.time,w),style=MaterialTheme.typography.labelSmall)}}}
         Text(w["correlation_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
     }
 }

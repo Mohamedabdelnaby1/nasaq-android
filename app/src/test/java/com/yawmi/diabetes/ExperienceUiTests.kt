@@ -32,7 +32,7 @@ class ExperienceUiTests{
             File("build/reports/design-v4/$name.png").apply{parentFile?.mkdirs()}.outputStream().use{check(bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG,100,it))}
         }
     }
-    @Test fun homeWithPersonalisedNextAction(){val s=sample();compose.setContent{YawmiTheme(s.preferences){AppChrome("today",s.preferences,{},{},{}){insets->Box(Modifier.padding(insets)){Home(s,false,{},{},{},{},{},{_,_,_->})}}}};capture("01-home")}
+    @Test fun homeWithPersonalisedNextAction(){val s=sample();compose.setContent{YawmiTheme(s.preferences){AppChrome("today",s.preferences,{},{},{}){insets->Box(Modifier.padding(insets)){Home(s,false,{},{},{},{},{})}}}};capture("01-home")}
     @Test @Config(qualifiers="w360dp-h640dp-port-xxhdpi") fun quickStartExposesBothRecordingActionsWithLargeText() {
         val p = sample().preferences.copy(largeText = true, cup = 350)
         val w = Words("ar")
@@ -51,9 +51,9 @@ class ExperienceUiTests{
     }
     @Test fun compactHomeCanSwitchBackToDetailed(){
         var s by mutableStateOf(sample().let{it.copy(preferences=it.preferences.copy(compactHome=true))})
-        compose.setContent{YawmiTheme(s.preferences){Surface{Home(s,false,{},{},{},{},{},{_,_,_->},onMode={compact->s=s.copy(preferences=s.preferences.copy(compactHome=compact))})}}}
+        compose.setContent{YawmiTheme(s.preferences){Surface{Home(s,false,{},{},{},{},{})}}}
         compose.onNodeWithText(Words("ar")["today_story"]).assertDoesNotExist();capture("02-compact-home")
-        compose.onNodeWithText(Words("ar")["detailed"]).performClick()
+        compose.runOnIdle { s = s.copy(preferences = s.preferences.copy(compactHome = false)) }
         compose.onNodeWithText(Words("ar")["today_story"]).assertExists()
     }
     @Test @Config(qualifiers="w360dp-h640dp-port-mdpi") fun dailyActionsAreVisibleAndSeparateInEitherLayout() {
@@ -67,8 +67,7 @@ class ExperienceUiTests{
             YawmiTheme(state.preferences) {
                 AppChrome("today", state.preferences, {}, {}, {}) { padding ->
                     Box(Modifier.fillMaxSize().padding(padding)) {
-                        Home(state, false, { route = it }, {}, {}, { cups++ }, {}, { _, _, _ -> },
-                            onMode = { compact = it }, openGlucose = { route = "glucose_log" })
+                        Home(state, false, { route = it }, {}, {}, { cups++ }, {}, openGlucose = { route = "glucose_log" })
                     }
                 }
             }

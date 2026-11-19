@@ -82,6 +82,7 @@ class Store private constructor(private val context: Context) {
 }
 
 private class StaleRestorePreview : IllegalStateException()
+internal class RecordChanged : IllegalStateException()
 
 class Repository(private val context:Context) {
     var state by mutableStateOf(State()); private set
@@ -111,9 +112,9 @@ class Repository(private val context:Context) {
             } }
         catch(e:Exception) { main.post { error="load_error"; ready=true } }
     } }
-    fun change(onSuccess:(State)->Unit={},block:(State)->State) {
+    fun change(onSuccess:(State)->Unit={},onFailure:((String)->Unit)?=null,block:(State)->State) {
         if(!ready || error=="load_error") return
-        submit(onSuccess) { Store.get(context).update(block) }
+        submit(onSuccess, onFailure = onFailure) { Store.get(context).update(block) }
     }
 
     internal fun restore(backup: State, useSettings: Boolean, expected: RestoreCounts, revision: Long, onSuccess: () -> Unit) {
@@ -124,7 +125,7 @@ class Repository(private val context:Context) {
         }
     }
 
-    private fun submit(onSuccess: (State) -> Unit, failure: String = "save_error", write: () -> State) {
+    private fun submit(onSuccess: (State) -> Unit, failure: String = "save_error", onFailure: ((String) -> Unit)? = null, write: () -> State) {
         pendingWrites++
         busy = true
         executor.execute {
@@ -141,7 +142,14 @@ class Repository(private val context:Context) {
             } catch (_: StaleRestorePreview) {
                 val latest = runCatching { Store.get(context).read() }.getOrNull()
                 main.post { latest?.let { state = it }; pendingWrites--; busy = pendingWrites > 0; error = "restore_changed" }
-            } catch (_: Exception) { main.post { error = failure; pendingWrites--; busy = pendingWrites > 0 } }
+            } catch (exception: Exception) {
+                val reason = if (exception is RecordChanged) "record_changed" else failure
+                main.post {
+                    pendingWrites--
+                    busy = pendingWrites > 0
+                    if (onFailure == null) error = reason else onFailure(reason)
+                }
+            }
         }
     }
     fun preferences(block:(Preferences)->Preferences)=change { it.copy(preferences=block(it.preferences)) }
@@ -151,7 +159,7 @@ class Repository(private val context:Context) {
             care=state.care.copy(layouts=layouts))
     }
     fun add(entry:Entry,onSuccess:(State)->Unit={})=change(onSuccess) { s -> Records.add(s,entry) }
-    fun put(m:Medication)=change { s -> s.copy(medications=s.medications.filterNot { it.id==m.id }+m) }
+    fun put(m:Medication,onSuccess:(State)->Unit={},onFailure:((String)->Unit)?=null)=change(onSuccess,onFailure) { s -> s.copy(medications=s.medications.filterNot { it.id==m.id }+m) }
     fun delete(id:String)=change { s -> Records.remove(s,id) }
     fun clearError() { if(error!="load_error") error=null }
     fun close() { observer.cancel(); executor.shutdown() }

@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 @Composable
 internal fun RecordingSheet(
     page: String, onDismiss: () -> Unit, onSelect: (String) -> Unit,
-    state: State? = null, onDraft: ((Entry) -> Unit)? = null, onQuickWater: (() -> Unit)? = null, onHideWater: ((Double) -> Unit)? = null,
+    state: State? = null, onDraft: ((Entry) -> Unit)? = null, onHideWater: ((Double) -> Unit)? = null,
     editor: @Composable (String, close: (() -> Unit) -> Unit) -> Unit
 ) {
     val colors = MaterialTheme.colorScheme
@@ -40,7 +40,7 @@ internal fun RecordingSheet(
         sheetState = sheet,
         containerColor = colors.surfaceContainerLow,
         scrimColor = Color.Black.copy(alpha = .26f),
-        shape = RoundedCornerShape(topStart = 38.dp, topEnd = 23.dp),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         tonalElevation = 0.dp
     ) {
         if (motion) AnimatedContent(page, transitionSpec = {
@@ -48,11 +48,11 @@ internal fun RecordingSheet(
                 scaleIn(tween(540,easing=NasaqEase), initialScale = .93f) togetherWith
                 (fadeOut(tween(190)) + scaleOut(tween(285), targetScale = .93f))).using(SizeTransform(clip = true) { _, _ -> tween(510,easing=NasaqEase) })
         }, label = "quick-record-page") { current ->
-            if (current == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater) { kind ->
+            if (current == "quick") QuickActions(state, onDraft, onHideWater) { kind ->
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
             } else editor(current, ::close)
         } else key(page) {
-            if (page == "quick") QuickActions(state, onDraft, onQuickWater?.let { save -> { close(save) } }, onHideWater) { kind ->
+            if (page == "quick") QuickActions(state, onDraft, onHideWater) { kind ->
                 if (kind == "glucose" || kind == "water") onSelect(kind) else close { onSelect(kind) }
             } else editor(page, ::close)
         }
@@ -60,16 +60,12 @@ internal fun RecordingSheet(
 }
 
 @Composable
-private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWater: (() -> Unit)?, onHideWater: ((Double) -> Unit)?, choose: (String) -> Unit) {
+private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onHideWater: ((Double) -> Unit)?, choose: (String) -> Unit) {
     val w = LocalWords.current
     val feedback = rememberFeedback()
     fun chooseAction(kind: String) { feedback(); choose(kind) }
     val habits = remember(state) { state?.let { journalHabits(it, System.currentTimeMillis()) } }
     var showTools by rememberSaveable { mutableStateOf(false) }
-    var phrase by rememberSaveable { mutableStateOf("") }
-    val request = remember(phrase, state?.preferences) {
-        state?.let { JournalLanguage.parse(phrase, it.preferences) as? JournalRequest.Draft }
-    }
     Column(
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 17.dp).padding(bottom = 22.dp),
         verticalArrangement = Arrangement.spacedBy(9.dp)
@@ -90,14 +86,6 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
                 }
             }
         }
-        if (state != null && onQuickWater != null) {
-            val amount = number(state.preferences.cup.toDouble(), w)
-            OutlineAction(onQuickWater, Modifier.fillMaxWidth()) {
-                Glyph("plus", Modifier.size(17.dp))
-                Spacer(Modifier.width(6.dp))
-                Text(w.f("quick_log_cup", "amount" to amount))
-            }
-        }
         (habits?.actions ?: journalActions).filterNot { it in primary }.forEach { kind ->
             SettingsRow(kind, w[kind]) { chooseAction(kind) }
         }
@@ -107,25 +95,21 @@ private fun QuickActions(state: State?, onDraft: ((Entry) -> Unit)?, onQuickWate
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 SettingsRow("spark", w["assistant_title"]) { chooseAction("assistant_title") }
                 SettingsRow("shield", w["care_tools"]) { chooseAction("care_tools") }
-                if (state != null && onDraft != null) {
-                    OutlinedTextField(phrase, { phrase = it.take(250) }, modifier = Modifier.fillMaxWidth(),
-                        shape = ControlShape, label = { Text(w["quick_phrase"]) }, singleLine = true)
-                    request?.let { draft ->
-                        TonalAction({ onDraft(draft.entry) }, Modifier.fillMaxWidth()) {
-                            Text(w["assistant_edit_draft"])
-                        }
-                    }
-                    habits?.waterAmount?.takeIf { phrase.isBlank() }?.let { amount ->
-                        NasaqBoard {
-                            TonalAction({ onDraft(Entry(kind = "water", value = amount, unit = "mL")) }) {
-                                Text(w.f("habit_water", "amount" to number(amount, w, 2)))
-                            }
-                            Text(w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w)),
-                                style = MaterialTheme.typography.bodySmall)
-                            if (onHideWater != null) TextAction({ onHideWater(amount) }) { Text(w["hide_suggestion"]) }
-                        }
+                listOf("dose", "weight", "pressure", "a1c").forEach { kind ->
+                    if (kind != "dose" || state?.medications?.any { it.active } == true) {
+                        SettingsRow(if (kind == "dose") "medication" else kind,
+                            w[if (kind == "dose") "record_dose" else kind]) { chooseAction(kind) }
                     }
                 }
+                val suggestedAmount = habits?.waterAmount
+                if (state != null && suggestedAmount != null && suggestedAmount != state.preferences.cup.toDouble() && onDraft != null) {
+                    SettingsRow("water", w.f("habit_water", "amount" to number(suggestedAmount, w, 2)),
+                        w.f("habit_water_reason", "count" to number(habits.waterMatches.toDouble(), w))) {
+                        onDraft(Entry(kind = "water", value = suggestedAmount, unit = "mL"))
+                    }
+                    if (onHideWater != null) TextAction({ onHideWater(suggestedAmount) }) { Text(w["hide_suggestion"]) }
+                }
+
             }
         }
     }

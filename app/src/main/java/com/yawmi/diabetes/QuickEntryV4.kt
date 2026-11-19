@@ -32,7 +32,7 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
     }
 }
 
-@Composable internal fun QuickEntryContent(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit,draft:Entry?=null){
+@Composable internal fun QuickEntryContent(kind:String,existing:Entry?,s:State,onDismiss:()->Unit,onSave:(Entry)->Unit,draft:Entry?=null,saving:Boolean=false,saveError:String?=null){
     val w=LocalWords.current;val p=s.preferences;val c=MaterialTheme.colorScheme;val water=kind=="water";val feedback=rememberFeedback()
     val initial=existing ?: draft
     val id=remember{initial?.id ?: java.util.UUID.randomUUID().toString()}
@@ -96,8 +96,9 @@ fun QuickEntrySheet(kind: String, existing: Entry?, s: State, onDismiss: () -> U
                 }}
             }
             Surface(color=c.surfaceContainerLow){Column(Modifier.fillMaxWidth().padding(horizontal=24.dp).padding(top=8.dp,bottom=14.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(8.dp)){
-                ActionButton(onClick={save()},shape=CircleShape,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
-                Text(w["recorded_now_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
+                if (saveError != null) Notice(w[saveError], true)
+                ActionButton(onClick={save()},enabled=!saving,shape=CircleShape,modifier=Modifier.fillMaxWidth().heightIn(min=54.dp)){Text(w[if(water)"water_record_button"else"save_reading"],style=MaterialTheme.typography.titleMedium)}
+                if (existing == null && !details) Text(w["recorded_now_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)
             }}
         }
     unusual?.let{entry->BrandedDialog(onDismissRequest={unusual=null},title={Text(w["unusual"])},text={Text("${entry.value} ${entry.unit}")},confirmButton={TextAction(onClick={unusual=null;onSave(entry)}){Text(w["confirm"])}},dismissButton={TextAction(onClick={unusual=null}){Text(w["cancel"])}})}

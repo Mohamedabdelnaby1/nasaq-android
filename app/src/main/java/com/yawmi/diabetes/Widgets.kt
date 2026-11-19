@@ -60,7 +60,7 @@ private fun widgetLook(read: (String) -> Any?): WidgetLook {
         title = bool("title", true), details = bool("time", true), action = bool("action", true),
         background = color("background"), accent = color("accent"),
         waterVisual = choice("waterVisual", widgetWaterVisuals, "ring"),
-        radius = int("radius", 24).coerceIn(12, 32), quickWater = bool("quickWater", false),
+        radius = int("radius", WidgetLook().radius).coerceIn(12, 32), quickWater = bool("quickWater", false),
         layout = choice("layout", widgetLayouts, "widget_focus"),
         actionTarget = choice("actionTarget", widgetActionTargets, "auto")
     )

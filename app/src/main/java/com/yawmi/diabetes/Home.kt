@@ -28,17 +28,6 @@ import java.time.ZoneId
 import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.drawscope.clipRect
 
-@Composable fun DoseRow(r:Reminder,s:State,onClick:(Reminder)->Unit) {
-    val w=LocalWords.current;val med=s.medications.find {it.id==r.medicationId} ?: return
-    val now=System.currentTimeMillis();val old=now-r.original>2*3_600_000
-    Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(12.dp)) {
-        Surface(shape=RoundedCornerShape(16.dp),color=MaterialTheme.colorScheme.primaryContainer) {Glyph("medication",Modifier.padding(10.dp).size(24.dp))}
-        Column(Modifier.weight(1f)) {Text(med.name,fontWeight=FontWeight.SemiBold);Text("${med.dose} · ${timeText(r.due,w)}",style=MaterialTheme.typography.bodySmall)
-            if(old) Text(w["not_recorded"],style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
-        TextAction(onClick={onClick(r)}) {Text(w["record_dose"])}
-    }
-}
-
 @Composable
 fun GlucoseChart(entries: List<Entry>, p: Preferences, onOpenDay: ((java.time.LocalDate) -> Unit)? = null) {
     val w = LocalWords.current

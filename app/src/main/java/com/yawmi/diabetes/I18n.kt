@@ -106,6 +106,16 @@ water_daily_average_view|متوسط المياه اليومي|Daily water averag
 water_cup_plan|أكواب هدف اليوم|Cups in today’s goal
 days_in_log|الأيام في السجل|Days in the journal
 more_tools|أدوات إضافية|More tools
+widget_advanced_style|الخط والحواف والشفافية|Text, corners and opacity
+private_notifications|إخفاء تفاصيل التنبيه على شاشة القفل|Hide reminder details on the lock screen
+private_notifications_note|يظهر التنبيه وتفضل التفاصيل خاصة حسب إعدادات قفل أندرويد.|A reminder appears with private details subject to Android lock screen settings.
+tracking_settings|السكر والمياه|Glucose and water
+tracking_settings_note|الأهداف والوحدات والفترات|Goals, units and periods
+appearance_options_note|الألوان والخط وترتيب الرئيسية|Colours, text and home layout
+data_settings|البيانات والخصوصية|Data and privacy
+water_goal_and_cup|هدف المياه وحجم الكوب|Water goal and cup size
+today_entries_count|نشاطات مسجّلة اليوم: {count}|Activities logged today: {count}
+record_changed|التسجيل اتغيّر من مكان تاني. افتحه من السجل علشان تراجع آخر تعديل.|This record changed. Reopen it from the journal to review the latest version.
 settings_daily|المتابعة اليومية|Daily tracking
 settings_display|العرض والتخصيص|Display and layout
 settings_storage|الخصوصية والبيانات|Privacy and data

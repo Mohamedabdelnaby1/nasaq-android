@@ -35,8 +35,8 @@ class MotionShowcaseTests{
                 AppChrome(section, s.preferences, { section = it }, {}, {}) { insets ->
                     Box(Modifier.fillMaxSize().padding(insets)) {
                         SectionMotion(section) { destination ->
-                            if (destination == "insights") Insights(s, {}, { _, _ -> })
-                            else Home(s, false, {}, {}, {}, {}, {}, { _, _, _ -> })
+                            if (destination == "insights") Insights(s, { _, _ -> })
+                            else Home(s, false, {}, {}, {}, {}, {})
                         }
                     }
                 }

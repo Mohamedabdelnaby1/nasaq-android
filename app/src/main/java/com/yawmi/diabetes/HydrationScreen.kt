@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
 internal fun HydrationScreen(
     state: State,
     busy: Boolean,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     add: (String) -> Unit,
     portion: (Double, String, String) -> Unit,
     onTrackingOptions: (() -> Unit)? = null,
@@ -31,16 +31,16 @@ internal fun HydrationScreen(
     val records = remember(overview.entries) { overview.entries.filter { it.kind == "water" } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        SectionBanner("water", w["water"], dateText(now, w), action = {
+        ScreenTitle(w["water"], dateText(now, w)) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 if (onTrackingOptions != null) IconAction(onTrackingOptions, Modifier.semantics { contentDescription = w["tracking_options"] }) {
                     Glyph("settings", Modifier.size(19.dp), c.onTertiaryContainer)
                 }
-                IconAction(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
+                if (onBack != null) IconAction(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
                     Glyph("back", Modifier.size(21.dp), c.onTertiaryContainer)
                 }
             }
-        })
+        }
         if (cup != null) ActionButton(cup, Modifier.fillMaxWidth(), enabled = !busy) {
             Text(w.f("quick_log_cup", "amount" to number(state.preferences.cup.toDouble(), w)))
         }

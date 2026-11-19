@@ -59,6 +59,7 @@ fun WidgetStudio(
     }
     var size by rememberSaveable { mutableIntStateOf(if (actualSize != null || initial.mode == "water" && !initial.title) 0 else 2) }
     var sampleNumbers by rememberSaveable { mutableStateOf(false) }
+    var showAdvanced by rememberSaveable { mutableStateOf(false) }
     var showCustomColors by rememberSaveable { mutableStateOf(initial.background.isNotEmpty() || initial.accent.isNotEmpty()) }
     val preview = sizes[size.coerceIn(sizes.indices)]
     val sample = remember(s.preferences) {
@@ -109,8 +110,8 @@ fun WidgetStudio(
             }
             val windowHeight = with(LocalDensity.current) { LocalWindowInfo.current.containerSize.height.toDp() }
             val stageHeight = if (windowHeight < 680.dp) 108.dp else 144.dp
-            Surface(color = colors.surfaceContainerHigh, shape = RoundedCornerShape(23.dp)) {
-                Column(Modifier.fillMaxWidth().padding(9.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Surface(color = colors.surfaceContainerHigh, shape = BoardShape) {
+                Column(Modifier.fillMaxWidth().padding(9.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                         Text(w[if (sampleNumbers) "widget_sample_active" else "widget_preview"], Modifier.weight(1f),
                             style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
@@ -236,17 +237,24 @@ fun WidgetStudio(
                             }
                         }
                         NasaqBoard {
-                            ChoiceRow(w["widget_font"], listOf("compact", "comfortable", "large"), look.font, { w[it] }) {
-                                look = look.copy(font = it)
+                            SettingsRow("settings", w["widget_advanced_style"], expanded = showAdvanced) {
+                                showAdvanced = !showAdvanced
                             }
-                            Text(w["corner_radius"] + " · " + number(look.radius.toDouble(), w))
-                            Slider(look.radius.toFloat(), { look = look.copy(radius = kotlin.math.round(it).toInt()) }, valueRange = 12f..32f)
-                            Text(w["widget_opacity"] + " · " + number(look.opacity.toDouble(), w) + "%")
-                            Slider(look.opacity.toFloat(), { look = look.copy(opacity = kotlin.math.round(it).toInt()) }, valueRange = 0f..100f)
-                            TextAction(onClick = { showCustomColors = !showCustomColors }) { Text(w["widget_custom_colors"]) }
-                            if (showCustomColors) {
-                                Field(w["widget_custom_background"], look.background, { look = look.copy(background = it.take(12)) })
-                                Field(w["widget_custom_accent"], look.accent, { look = look.copy(accent = it.take(12)) })
+                            MotionExpand(showAdvanced) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    ChoiceRow(w["widget_font"], listOf("compact", "comfortable", "large"), look.font, { w[it] }) {
+                                        look = look.copy(font = it)
+                                    }
+                                    Text(w["corner_radius"] + " · " + number(look.radius.toDouble(), w))
+                                    Slider(look.radius.toFloat(), { look = look.copy(radius = kotlin.math.round(it).toInt()) }, valueRange = 12f..32f)
+                                    Text(w["widget_opacity"] + " · " + number(look.opacity.toDouble(), w) + "%")
+                                    Slider(look.opacity.toFloat(), { look = look.copy(opacity = kotlin.math.round(it).toInt()) }, valueRange = 0f..100f)
+                                    TextAction(onClick = { showCustomColors = !showCustomColors }) { Text(w["widget_custom_colors"]) }
+                                    if (showCustomColors) {
+                                        Field(w["widget_custom_background"], look.background, { look = look.copy(background = it.take(12)) })
+                                        Field(w["widget_custom_accent"], look.accent, { look = look.copy(accent = it.take(12)) })
+                                    }
+                                }
                             }
                             TextAction(onClick = {
                                 val d = WidgetLook()

@@ -5,7 +5,7 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.15.0/Nasaq-v0.15.0.apk"><img src="https://img.shields.io/badge/Android-0.15.0-205449?style=for-the-badge" alt="تنزيل نَسَق 0.15.0"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.16.0/Nasaq-v0.16.0.apk"><img src="https://img.shields.io/badge/Android-0.16.0-205449?style=for-the-badge" alt="تنزيل نَسَق 0.16.0"></a>
   <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="الإصدارات المنشورة على GitHub"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
@@ -17,9 +17,17 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-[نزّل Nasaq-v0.15.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.15.0/Nasaq-v0.15.0.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
+[نزّل Nasaq-v0.16.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.16.0/Nasaq-v0.16.0.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
 
 [الإصدارات المنشورة وبصمات SHA-256](https://github.com/Mohamedabdelnaby1/nasaq-android/releases)
+
+### التغييرات في 0.16.0
+
+- الرئيسية تبدأ بتسجيل قراءة السكر وكوب المياه، مع مكان واحد لتخصيص البطاقات وفتح ملخص اليوم.
+- الإعدادات مجمّعة حسب المهمة. تعديل هدف المياه وحجم الكوب له صفحة واحدة، ومراجعة مواعيد الأدوية تستخدم صفحة أدويتي نفسها.
+- الرجوع من شاشة المياه أو تخصيصها يرجّعك للشاشة اللي فتحتها منها. بطاقات الويدجت تفتح شاشاتها مباشرة.
+- تصميم الويدجت يستخدم مسافات ثابتة للأزرار وحواف متناسقة. اللون والتوزيع في تبويب الشكل، والخط والحواف والشفافية تحت اختيار واحد.
+- محرر السجل يفضل مفتوح لو الحفظ تعذّر، ويبلغك لو فيه تعديل أحدث قبل ما يستبدله.
 
 ### التغييرات في 0.15.0
 

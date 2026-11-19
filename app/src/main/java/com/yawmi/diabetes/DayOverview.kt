@@ -132,7 +132,7 @@ private fun OverviewMetric(kind: String, title: String, value: String, note: Str
 
 @Composable
 fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
-    onEdit: ((Entry) -> Unit)? = null, onAdd: ((String, LocalDate) -> Unit)? = null, onClose: () -> Unit) {
+    onEdit: ((Entry) -> Unit)? = null, onAdd: ((String, LocalDate) -> Unit)? = null, onClose: (() -> Unit)?) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     val motion = LocalMotion.current
@@ -146,7 +146,7 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
     Scaffold(containerColor = c.background) { insets ->
         Column(Modifier.fillMaxSize().padding(insets).padding(horizontal = 20.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SectionBanner("log", w["day_detail_title"], action = {
+            ScreenTitle(w["day_detail_title"]) {
                 Row {
                     if (onAdd != null) Box {
                         IconAction(onClick = { addMenu = true },
@@ -159,11 +159,11 @@ fun DayOverviewScreen(s: State, initialDate: LocalDate = LocalDate.now(),
                             }
                         }
                     }
-                IconAction(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
+                if (onClose != null) IconAction(onClick = onClose, modifier = Modifier.semantics { contentDescription = w["close"] }) {
                     Glyph("close", Modifier.size(22.dp))
                 }
                 }
-            })
+            }
             Surface(shape = ControlShape, color = c.primary, contentColor = c.onPrimary) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {

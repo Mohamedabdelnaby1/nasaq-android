@@ -40,15 +40,6 @@ val Aqua=Color(0xFF519BA3)
     }
 }
 
-@Composable fun RoundAction(kind:String,label:String,onClick:()->Unit,tone:Color=MaterialTheme.colorScheme.surfaceContainerHigh){
-    val interaction=remember{MutableInteractionSource()};val pressed by interaction.collectIsPressedAsState();val feedback=rememberFeedback()
-    val scale by animateFloatAsState(if(pressed && LocalMotion.current).97f else 1f,if(LocalMotion.current)tween(140,easing=NasaqEase)else snap(),label="quick-action-press")
-    Column(Modifier.widthIn(min=56.dp).graphicsLayer{scaleX=scale;scaleY=scale}.clickable(interactionSource=interaction,indication=null,onClick={feedback();onClick()}).padding(vertical=4.dp),horizontalAlignment=Alignment.CenterHorizontally,verticalArrangement=Arrangement.spacedBy(7.dp)){
-        Surface(shape=RoundedCornerShape(17.dp),color=tone){Glyph(kind,Modifier.padding(13.dp).size(23.dp))}
-        Text(label,style=MaterialTheme.typography.labelMedium,maxLines=1)
-    }
-}
-
 @Composable fun Pattern(modifier:Modifier=Modifier){
     Canvas(modifier){repeat(5){i->drawCircle(Color.White.copy(alpha=.055f),size.width*(.36f+i*.16f),androidx.compose.ui.geometry.Offset(size.width*.92f,size.height*1.15f),style=androidx.compose.ui.graphics.drawscope.Stroke(1.dp.toPx()))}}
 }
@@ -61,6 +52,7 @@ val Aqua=Color(0xFF519BA3)
 fun AppChrome(
     tab: String, p: Preferences, onTab: (String) -> Unit, onQuick: () -> Unit, notifications: () -> Unit,
     snackbar: SnackbarHostState = remember { SnackbarHostState() }, showBottomBar: Boolean = true,
+    onBack: (() -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
     val w = LocalWords.current
@@ -87,9 +79,12 @@ fun AppChrome(
     }, topBar = {
         Row(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 18.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(33.dp))
+            if (onBack == null) Image(androidx.compose.ui.res.painterResource(R.drawable.ic_launcher), null, Modifier.size(33.dp))
+            else IconAction(onBack, Modifier.semantics { contentDescription = w["back"] }) {
+                Glyph("back", Modifier.size(20.dp), c.onSurface)
+            }
             Text(w["app"], Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            IconAction(notifications, Modifier.semantics { contentDescription = w["notifications"] }) {
+            if (tab == "today") IconAction(notifications, Modifier.semantics { contentDescription = w["notifications"] }) {
                 Glyph("bell", Modifier.size(20.dp), c.onSurface)
             }
             if (!showBottomBar) ActionButton(onQuick, colors = ButtonDefaults.buttonColors(containerColor = accent, contentColor = dock)) {
@@ -108,7 +103,7 @@ fun AppChrome(
                     val cell = maxWidth / mainSections.size
                     val position by animateDpAsState(cell * mainSections.indexOf(active).coerceAtLeast(0),
                         if (motion) tween(495, easing = NasaqEase) else snap(), label = "dock position")
-                    Box(Modifier.offset(x = position).width(cell).height(49.dp).padding(horizontal = 2.dp)
+                    Box(Modifier.offset { androidx.compose.ui.unit.IntOffset(position.roundToPx(), 0) }.width(cell).height(49.dp).padding(horizontal = 2.dp)
                         .background(accent, ControlShape))
                     Row(Modifier.fillMaxWidth().selectableGroup()) {
                         mainSections.forEach { section ->

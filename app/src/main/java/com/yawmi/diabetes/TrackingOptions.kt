@@ -84,15 +84,6 @@ internal fun TrackingCard(kind: String, item: MetricDisplay) {
 }
 
 @Composable
-internal fun TrackingOptionsDialog(s: State, kind: String, dismiss: () -> Unit, update: ((Preferences) -> Preferences) -> Unit) {
-    val w = LocalWords.current
-    EditorShell(w[if (kind == "glucose") "glucose_view_options" else "water_view_options"],
-        dismiss, dismiss, saveLabel = w["done"]) {
-        TrackingOptions(s, kind, update)
-    }
-}
-
-@Composable
 internal fun DoseTrackingReference(s: State) {
     val w = LocalWords.current
     val now = trackingTime()

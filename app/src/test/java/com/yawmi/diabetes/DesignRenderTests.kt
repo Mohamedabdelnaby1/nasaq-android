@@ -28,7 +28,7 @@ class DesignRenderTests {
     @Test fun rendersActualDashboard(){
         val p=Preferences(language="ar",name="محمد",theme="light",waterGoal=2500,cup=250,reduceMotion=true,setupVersion=2)
         val s=State(preferences=p,entries=listOf(Entry(kind="glucose",value=112.0,unit="mg/dL",context="fasting"),Entry(kind="water",value=750.0,unit="mL")))
-        compose.setContent{YawmiTheme(p){Surface(Modifier.fillMaxSize()){Home(s,false,{},{},{},{},{},{_,_,_->})}}}
+        compose.setContent{YawmiTheme(p){Surface(Modifier.fillMaxSize()){Home(s,false,{},{},{},{},{})}}}
         compose.waitForIdle()
         screenshot("dashboard-light-ar.png")
     }
@@ -57,7 +57,7 @@ class DesignRenderTests {
     }
     @Test fun rendersDarkDashboard(){
         val p=Preferences(language="ar",name="محمد",theme="dark",reduceMotion=true)
-        compose.setContent{YawmiTheme(p){Surface(Modifier.fillMaxSize()){Home(State(preferences=p),false,{},{},{},{},{},{_,_,_->})}}}
+        compose.setContent{YawmiTheme(p){Surface(Modifier.fillMaxSize()){Home(State(preferences=p),false,{},{},{},{},{})}}}
         screenshot("dashboard-dark-ar.png")
     }
     private fun screenshot(name:String){
