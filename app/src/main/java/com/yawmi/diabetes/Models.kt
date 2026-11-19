@@ -25,7 +25,9 @@ data class Preferences(
     val waterDays:Set<Int> = (1..7).toSet(),val glucoseDays:Set<Int> = (1..7).toSet(),val snoozeMinutes:Int=10,
     val cardSizes:Map<String,String> = emptyMap(),val waterOffset:Int=0, val adaptive: Boolean = true,
     val pinnedShortcut: String = "", val adaptiveSince: Long = 0,
-    val ignoredWaterAmounts: Set<Double> = emptySet()
+    val ignoredWaterAmounts: Set<Double> = emptySet(),
+    val glucoseViewDays: Int = 30, val glucoseViewMetric: String = "average", val glucoseViewContext: String = "all",
+    val waterViewDays: Int = 1, val waterViewMetric: String = "total", val waterViewUnit: String = "L"
 )
 
 data class Entry(
@@ -79,6 +81,8 @@ object Codec {
         settings.put("cardSizes",JSONObject(p.cardSizes)).put("waterOffset",p.waterOffset).put("adaptive",p.adaptive)
             .put("pinnedShortcut", p.pinnedShortcut).put("adaptiveSince", p.adaptiveSince)
             .put("ignoredWaterAmounts", strings(p.ignoredWaterAmounts))
+            .put("glucoseViewDays",p.glucoseViewDays).put("glucoseViewMetric",p.glucoseViewMetric).put("glucoseViewContext",p.glucoseViewContext)
+            .put("waterViewDays",p.waterViewDays).put("waterViewMetric",p.waterViewMetric).put("waterViewUnit",p.waterViewUnit)
         val entries=JSONArray(s.entries.map { e -> JSONObject().apply {
             put("id",e.id); put("kind",e.kind); put("time",e.time); put("value",e.value); put("second",e.second)
             put("unit",e.unit); put("context",e.context); put("note",e.note); put("medicationId",e.medicationId)
@@ -117,7 +121,10 @@ object Codec {
             setupVersion=p.optInt("setupVersion"),birthYear=p.optInt("birthYear"),profileWeight=p.optDouble("profileWeight",0.0),fluidRestricted=p.optBoolean("fluidRestricted"),waterSmart=p.optBoolean("waterSmart",true),
             compactHome=p.optBoolean("compactHome"),haptics=p.optBoolean("haptics",true),
             waterDays=if(p.has("waterDays"))p.array("waterDays").let{a->(0 until a.length()).map{a.getInt(it)}.toSet()}else (1..7).toSet(),
-            glucoseDays=if(p.has("glucoseDays"))p.array("glucoseDays").let{a->(0 until a.length()).map{a.getInt(it)}.toSet()}else (1..7).toSet(),snoozeMinutes=p.optInt("snoozeMinutes",10)
+            glucoseDays=if(p.has("glucoseDays"))p.array("glucoseDays").let{a->(0 until a.length()).map{a.getInt(it)}.toSet()}else (1..7).toSet(),snoozeMinutes=p.optInt("snoozeMinutes",10),
+            glucoseViewDays=p.optInt("glucoseViewDays",30), glucoseViewMetric=p.str("glucoseViewMetric","average"),
+            glucoseViewContext=p.str("glucoseViewContext","all"), waterViewDays=p.optInt("waterViewDays",1),
+            waterViewMetric=p.str("waterViewMetric","total"), waterViewUnit=p.str("waterViewUnit","L")
         )
         val entries=root.array("entries").let { a -> require(a.length()<=100_000); (0 until a.length()).map { i ->
             val e=a.getJSONObject(i); Entry(e.getString("id"),e.getString("kind"),e.getLong("time"),e.optDouble("value",0.0),
@@ -144,6 +151,9 @@ object Codec {
         val p=s.preferences
         checkLayout(p.order,p.hiddenCards,p.cardSizes)
         require(p.waterOffset in 0..240)
+        require(p.glucoseViewDays in trackingDays && p.waterViewDays in trackingDays)
+        require(p.glucoseViewMetric in glucoseMetrics && p.glucoseViewContext in glucoseContexts)
+        require(p.waterViewMetric in waterMetrics && p.waterViewUnit in setOf("L", "mL"))
         require(p.pinnedShortcut.isEmpty() || p.pinnedShortcut in journalActions)
         require(p.adaptiveSince >= 0 && p.ignoredWaterAmounts.size <= 20 &&
             p.ignoredWaterAmounts.all { it in 1.0..5000.0 })

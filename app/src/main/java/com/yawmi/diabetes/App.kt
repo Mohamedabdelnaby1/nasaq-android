@@ -61,6 +61,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
         var draftEntry by remember { mutableStateOf<Entry?>(null) }
         var pendingDose by remember { mutableStateOf<Reminder?>(null) }
         var delete by remember { mutableStateOf<Entry?>(null) }
+        var trackingOptions by rememberSaveable { mutableStateOf<String?>(null) }
         var backupMode by remember { mutableStateOf<String?>(null) }
         var info by remember { mutableStateOf<String?>(null) }
         val snackbar=remember { SnackbarHostState() }
@@ -155,9 +156,11 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                                             "today"->Home(s,repo.busy,add={form=it},dose={pendingDose=it},sick={info="sick"},cup={record(Entry(kind="water",value=p.cup.toDouble(),unit="mL"))},notifications={tab="settings";activity.openNotifications=true},portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},customise={homeLayoutOpen=true},onMode={v->repo.preferences{it.copy(compactHome=v)}},permissionRevision=activity.permissionRevision,openOverview={openDay(null)},openHydration={tab="hydration"},openGlucose={tab="glucose_log"},
                                                 openMedicines={tab="medications"},openDay={openDay(it)})
                                             "log", "glucose_log" -> Journal(s,onEdit={recordEdit=it;form=it.kind},onDelete={delete=it},
-                                                initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"},onImport={activity.openCsv()})
+                                                initialFilter=if(destination=="glucose_log")"glucose"else"all",onAddReading={form="glucose"},onImport={activity.openCsv()},
+                                                onTrackingOptions={trackingOptions="glucose"})
                                             "hydration" -> HydrationScreen(s,repo.busy,onBack={tab="today"},add={form=it},
-                                                portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))})
+                                                portion={amount,context,id->record(Entry(id=id,kind="water",value=amount,unit="mL",context=context))},
+                                                onTrackingOptions={trackingOptions="water"})
                                             "day_summary" -> DayOverviewScreen(s, timelineDate?.let(LocalDate::parse) ?: LocalDate.now(),
                                                 onEdit = ::editRecord, onAdd = ::addToDay) { tab=timelineOrigin }
                                             "medications"->Medicines(s,add={form="new_med"},edit={medEdit=it},dose={pendingDose=it},manual={form="dose"})
@@ -231,6 +234,7 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             BrandedDialog(onDismissRequest={pendingDose=null},title={Text(med?.name ?: w["record_dose"])},text={Column(verticalArrangement=Arrangement.spacedBy(12.dp)) {
                 Text(med?.dose ?: "");Text(w["dose_confirm"]);Text(w["missed_hint"],style=MaterialTheme.typography.bodySmall)
                 if(!med?.instructions.isNullOrBlank()) Text(med!!.instructions,style=MaterialTheme.typography.bodySmall)
+                DoseTrackingReference(s)
             }},confirmButton={TextAction(onClick={
                 record(Entry(kind="dose",medicationId=r.medicationId,occurrence=r.occurrence,planned=r.original,status="taken",note=med?.let {"${it.name} · ${it.dose}"} ?: ""));pendingDose=null
             },enabled=!repo.busy){Text(w["taken"])}},dismissButton={TextAction(onClick={
@@ -247,6 +251,10 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
                     activity.message("restore_done")
                 }
             }
+        }
+        trackingOptions?.takeUnless { activity.locked }?.let { kind ->
+            val dismiss = { trackingOptions = null }
+            TrackingOptionsDialog(s, kind, dismiss, repo::preferences)
         }
         backupMode?.let { mode -> BackupDialog(mode,onDismiss={backupMode=null},onConfirm={password->backupMode=null;activity.backup(mode,password)}) }
         info?.let { kind ->

@@ -158,7 +158,7 @@ object Reminders {
             if((occurrence.isNotBlank() && occurrence in recorded) || (medication.isNotBlank() && s.medications.none{it.id==medication && it.active && it.reminders}))
                 NotificationManagerCompat.from(c).cancel(active.id)
         }
-        val maintenance=Reminder("maintenance","maintenance",now+43_200_000)
+        val maintenance = Reminder("maintenance", "maintenance", nextWidgetRefresh(now))
         val next = reminders + maintenance
         next.forEach { schedule(c, it) }
         val ids = next.mapTo(mutableSetOf()) { it.id }
@@ -173,7 +173,7 @@ object Reminders {
     internal fun reconcile(c: Context) {
         val now = System.currentTimeMillis()
         if (prefs(c).getBoolean("planned_exact", !exact(c)) != exact(c) ||
-            saved(c, "scheduled").none { it.kind == "maintenance" && it.due > now }) reschedule(c)
+            saved(c, "scheduled").none { it.kind == "maintenance" && it.due in (now + 1)..nextWidgetRefresh(now) }) reschedule(c)
     }
 
     private fun schedule(c:Context,r:Reminder) {

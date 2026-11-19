@@ -45,12 +45,13 @@ fun WidgetStudio(s: State, initial: WidgetLook, onDismiss: () -> Unit, onSave: (
     var size by rememberSaveable { mutableIntStateOf(if (initial.mode == "water" && initial.quickWater) 0 else 2) }
     var sampleNumbers by rememberSaveable { mutableStateOf(false) }
     val preview = previewSizes[size]
-    val sample = remember(s.preferences.language, s.preferences.unit) {
+    val sample = remember(s.preferences) {
         val start = LocalDate.now().atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
         val readings = listOf(108.0, 129.0, 117.0, 136.0).mapIndexed { index, value ->
-            Entry(kind = "glucose", unit = "mg/dL", value = value, time = start + index * 60_000)
+            Entry(kind = "glucose", unit = "mg/dL", value = value, time = start + index * 60_000,
+                context = glucoseContexts[1 + index % (glucoseContexts.size - 1)])
         }
-        State(preferences = Preferences(language = s.preferences.language, unit = s.preferences.unit, waterGoal = 2000),
+        State(preferences = s.preferences.copy(lock = false, waterGoal = 2000),
             entries = readings + Entry(kind = "water", unit = "mL", value = 950.0, time = start) +
                 Entry(kind = "dose", status = "taken", time = start) +
                 Entry(kind = "water", unit = "mL", value = 1750.0, time = start - 43_200_000))

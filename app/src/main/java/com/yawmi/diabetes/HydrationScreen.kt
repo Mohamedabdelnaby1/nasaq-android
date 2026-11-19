@@ -12,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
 
 @Composable
 internal fun HydrationScreen(
@@ -20,24 +19,25 @@ internal fun HydrationScreen(
     busy: Boolean,
     onBack: () -> Unit,
     add: (String) -> Unit,
-    portion: (Double, String, String) -> Unit
+    portion: (Double, String, String) -> Unit,
+    onTrackingOptions: (() -> Unit)? = null
 ) {
     val w = LocalWords.current
-    var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(60_000 - now % 60_000)
-            now = System.currentTimeMillis()
-        }
-    }
+    val now = trackingTime()
+    val stats = remember(state.entries, state.preferences, now) { TrackingStats(state, now) }
     val overview = remember(state, now) { dayOverview(state, now) }
     val c = MaterialTheme.colorScheme
     val records = remember(overview.entries) { overview.entries.filter { it.kind == "water" } }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
         SectionBanner("water", w["water"], dateText(now, w), action = {
-            IconAction(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
-                Glyph("back", Modifier.size(21.dp), c.onTertiaryContainer)
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (onTrackingOptions != null) IconAction(onTrackingOptions, Modifier.semantics { contentDescription = w["tracking_options"] }) {
+                    Glyph("settings", Modifier.size(19.dp), c.onTertiaryContainer)
+                }
+                IconAction(onClick = onBack, modifier = Modifier.semantics { contentDescription = w["back"] }) {
+                    Glyph("back", Modifier.size(21.dp), c.onTertiaryContainer)
+                }
             }
         })
         ActionButton({ add("water") }, Modifier.fillMaxWidth(), enabled = !busy) {
@@ -45,26 +45,14 @@ internal fun HydrationScreen(
             Spacer(Modifier.width(7.dp))
             Text(w["custom_amount"])
         }
-        HydrationInstrument(state, overview.waterMl)
+        if (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total")
+            TrackingCard("water", stats.water(w))
+        HydrationInstrument(state, stats.todayWaterMl)
         if (state.preferences.waterGoal > 0) {
             Reveal(1) {
                 NasaqBoard(color = c.tertiaryContainer, contentColor = c.onTertiaryContainer, outlined = false) {
                     SectionHeading(w["tap_cup_short"])
                     WaterCups(state, busy, portion)
-                }
-            }
-        }
-        Reveal(1) {
-            NasaqBoard {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    DomainMark("water")
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                        Text(w["day_water_average"], style = MaterialTheme.typography.titleMedium)
-                        Text(w.f("day_water_coverage", "count" to number(overview.waterDays.toDouble(), w)),
-                            style = MaterialTheme.typography.labelMedium, color = c.onSurfaceVariant)
-                    }
-                    val value = overview.waterAverageMl?.let { number(it / 1000, w, 2) + " " + w["litres_short"] } ?: "—"
-                    Text(value, style = MaterialTheme.typography.titleLarge)
                 }
             }
         }
@@ -98,13 +86,15 @@ private fun HydrationInstrument(state: State, water: Double) {
                     verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(w["water_today"], style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                        AnimatedNumber(water / 1000, digits = 2,
+                        val inMl = state.preferences.waterViewUnit == "mL"
+                        AnimatedNumber(if (inMl) water else water / 1000, digits = if (inMl) 1 else 2,
                             style = MaterialTheme.typography.displayMedium, color = pale)
-                        Text(w["litres_short"], style = MaterialTheme.typography.labelLarge)
+                        Text(w[if (inMl) "ml" else "litres_short"], style = MaterialTheme.typography.labelLarge)
                         if (goal > 0) {
                             Spacer(Modifier.height(3.dp))
                             Text(w["daily_target"], style = MaterialTheme.typography.labelMedium)
-                            Text(number(goal / 1000.0, w, 2) + " " + w["litres_short"], style = MaterialTheme.typography.titleSmall)
+                            val (amount, unit) = waterVolume(goal.toDouble(), state.preferences.waterViewUnit, w)
+                            Text("$amount $unit", style = MaterialTheme.typography.titleSmall)
                         }
                     }
                     WaterVessel(progress, Modifier.width(108.dp).height(182.dp))

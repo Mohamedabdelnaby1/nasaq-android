@@ -91,10 +91,10 @@ class WidgetVisualTests{
     @Test fun smallWidget(){render("12-widget-small",110,80,WidgetLook(mode="water",visible=true))}
     @Test fun compactCupSeparatesAddAndUndoAfterARecord() {
         val look = WidgetLook(mode = "water", visible = true, quickWater = true, title = false, undoWater = true)
+        val base = state()
         val stamp = System.currentTimeMillis()
         val entry = Entry(id = "widget_record", kind = "water", unit = "mL", value = 250.0, time = stamp)
         for (lang in listOf("ar", "en")) {
-            val base = state()
             val s = base.copy(preferences = base.preferences.copy(language = lang), entries = base.entries + entry)
             val card = GraphicalWidgets.layout(c, s, 46, look, 110, 80, true, 1f, 0, entry).apply(c, FrameLayout(c))
             val mode = View.MeasureSpec.EXACTLY
@@ -107,10 +107,9 @@ class WidgetVisualTests{
             assertEquals(plus.bottom, undo.top)
             assertEquals(80, undo.bottom)
             val w = Words(lang)
-            val summary = dayOverview(s, stamp)
             val spoken = card.findViewById<View>(R.id.widget_primary).contentDescription.toString()
-            assertTrue(spoken.startsWith(w["water_week"] + ". " + number(summary.waterAverageMl!!, w)))
-            assertTrue(spoken.endsWith(w.f("widget_water_today", "amount" to (number(summary.waterMl, w) + " " + w["ml"]))))
+            assertEquals(TrackingStats(s, stamp).water(w).description, spoken)
+            assertTrue(spoken.startsWith(w["water_today_short"]))
         }
         render("nasaq-water-mini-undo", 110, 80, look)
     }

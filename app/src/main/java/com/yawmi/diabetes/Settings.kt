@@ -19,7 +19,8 @@ import java.time.ZoneId
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(ScreenGutters),verticalArrangement=Arrangement.spacedBy(14.dp)) {
         val header = when (section) {
             "appearance" -> "insights"
-            "personal" -> "glucose"
+            "personal", "glucose_view_options" -> "glucose"
+            "water_view_options" -> "water"
             "home_cards" -> "log"
             "privacy" -> "shield"
             "backup" -> "export"
@@ -31,6 +32,14 @@ import java.time.ZoneId
             ActionButton(onClick={repo.preferences{it.copy(lastZone=ZoneId.systemDefault().id)}}){Text(w["acknowledge"])}
         }
         if(section=="integrations")IntegrationPanel(repo,activity)
+        if (section == "glucose_view_options" || section == "water_view_options") {
+            val glucose = section == "glucose_view_options"
+            TrackingOptions(s, if (glucose) "glucose" else "water", repo::preferences)
+            NasaqBoard {
+                if (glucose) SettingsLink(w["targets"]) { edit = "targets" }
+                else SettingsLink(w["daily_litres"]) { edit = "water" }
+            }
+        }
         if(section=="appearance")Panel() {
             ChoiceRow(w["language"],listOf("system","ar","en"),p.language,{when(it){"ar"->"العربية";"en"->"English";else->w["system"]}}){choice->repo.preferences{it.copy(language=choice)}}
             ChoiceRow(w["theme"],listOf("system","light","dark"),p.theme,{w[it]}){choice->repo.preferences{it.copy(theme=choice)}}

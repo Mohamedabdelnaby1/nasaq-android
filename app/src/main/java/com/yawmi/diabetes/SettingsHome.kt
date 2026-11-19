@@ -47,7 +47,9 @@ import androidx.compose.ui.unit.dp
         ScreenTitle(w["settings"])
         val groups = listOf(
             "settings_daily" to listOf(
-                Triple("personal", "glucose", "settings_care"),
+                Triple("glucose_view_options", "glucose", "glucose_view_options"),
+                Triple("water_view_options", "water", "water_view_options"),
+                Triple("personal", "today", "settings_care"),
                 Triple("notifications", "bell", "notification_hub"),
             ),
             "settings_display" to listOf(
@@ -68,6 +70,8 @@ import androidx.compose.ui.unit.dp
                     rows.forEachIndexed { item, (key, icon, label) ->
                         if (item > 0) HorizontalDivider(color = c.outlineVariant)
                         val subtitle = when (key) {
+                            "glucose_view_options" -> trackingPeriod(p.glucoseViewDays, w)
+                            "water_view_options" -> trackingPeriod(p.waterViewDays, w)
                             "personal" -> p.name.takeIf(String::isNotBlank) ?: w["settings_care_body"]
                             "notifications" -> w["settings_alerts_body"]
                             "appearance" -> w["settings_style_body"]

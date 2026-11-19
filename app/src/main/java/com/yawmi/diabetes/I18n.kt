@@ -71,6 +71,22 @@ widget_preview_pin|صمّم وشوف المعاينة قبل الإضافة|Desi
 widget_manage_number|إعدادات الويدجت {number}|Widget {number} settings
 record_short|سجّل|Record
 log_cup_short|سجّل كوب|Log a cup
+tracking_options|طريقة الحساب والعرض|Calculation and display
+glucose_view_options|حساب وعرض السكر|Glucose calculation and display
+water_view_options|حساب وعرض المياه|Water calculation and display
+tracking_display_hint|اختياراتك تظهر على بطاقات اليوم والويدجتس.|These settings apply to Today cards and widgets.
+glucose_view_hint|المتوسط بيحسب قراءات السكر اللي سجلتها في الفترة. الجرعات بتفضل في سجل الدواء.|The average uses glucose readings recorded in this period. Doses stay in the medication log.
+water_view_hint|الإجمالي يجمع الكميات المسجّلة. المتوسط اليومي يتحسب من الأيام اللي فيها تسجيل مياه.|Total adds logged amounts. Daily average uses days with water logged.
+water_logged_days_view|أيام فيها تسجيل: {count}|Days with water logged: {count}
+tracking_metric|الرقم الرئيسي|Main value
+tracking_period|الفترة|Period
+tracking_reset|استرجاع العرض الافتراضي|Reset display defaults
+all_time_view|كل السجل|All time
+days_view|آخر {days} يوم|Last {days} days
+latest_glucose_view|أحدث قراءة سكر|Latest glucose reading
+water_today_short|مياه النهارده|Water today
+water_total_view|إجمالي المياه|Water total
+water_daily_average_view|متوسط المياه اليومي|Daily water average
 water_cup_plan|أكواب هدف اليوم|Cups in today’s goal
 days_in_log|الأيام في السجل|Days in the journal
 more_tools|أدوات إضافية|More tools

@@ -215,6 +215,7 @@ fun whole(raw:String):Int {val value=Planner.parseNumber(raw);require(value%1.0=
                 if (existing?.occurrence.isNullOrBlank()) ChoiceRow(w["medication"],s.medications.filter {it.active}.map {it.id},medicationId,{id->s.medications.find {it.id==id}?.name.orEmpty()}){medicationId=it}
                 ChoiceRow(w["status"],listOf("taken","skipped"),status,{w[it]}){status=it}
                 Notice(w["manual_hint"])
+                DoseTrackingReference(s)
             }
             "pressure" -> {Field(w["systolic"],value,{value=it},true);Field(w["diastolic"],second,{second=it},true)}
             else -> Field(w["value"]+" · "+when(kind){"weight"->w["kg"];"a1c"->"%";else->""},value,{value=it},true)

@@ -60,6 +60,7 @@ private class DeskWidget(
     private val geometry = WidgetLayout.calculate(width, height, look, rtl)
     private val now = System.currentTimeMillis()
     private val day by lazy { dayOverview(state, now) }
+    private val tracking by lazy { TrackingStats(state, now) }
 
     private fun parse(raw: String, fallback: Int) =
         ColorUtils.setAlphaComponent(runCatching { Color.parseColor(raw) }.getOrDefault(fallback), 255)
@@ -167,16 +168,22 @@ private class DeskWidget(
     }
 
     private fun metrics(kind: String): WidgetMetric {
-        val key = when (kind) { "glucose" -> "widget_glucose_average"; "water" -> "widget_water_average"; "day_summary" -> "day_overview"; else -> kind }
+        val key = when (kind) {
+            "glucose" -> if (state.preferences.glucoseViewMetric == "latest") "latest_glucose_view" else "widget_glucose_average"
+            "water" -> when {
+                state.preferences.waterViewMetric == "daily_average" -> "widget_water_average"
+                state.preferences.waterViewDays == 1 -> "water_today_short"
+                else -> "water_total_view"
+            }
+            "day_summary" -> "day_overview"
+            else -> kind
+        }
         val label = words[key]
         if (!visible) return WidgetMetric(label, "•••", "", words["widget_values_off"])
         return when (kind) {
-            "water" -> {
-                val litres = words["litres_short"]
-                val average = day.waterAverageMl?.let { number(it / 1000, words, 2) }
-                val today = number(day.waterMl / 1000, words, 2) + " " + litres
-                WidgetMetric(label, average ?: "—", if (average != null) litres else "",
-                    words.f("widget_water_today", "amount" to today))
+            "water", "glucose" -> {
+                val metric = if (kind == "water") tracking.water(words) else tracking.glucose(words)
+                WidgetMetric(metric.label, metric.amount, metric.unit, metric.period.ifEmpty { metric.detail })
             }
             "medication" -> {
                 val next = Reminders.plan(state, now, now + 86_400_000).firstOrNull { it.kind == "medication" }
@@ -185,8 +192,7 @@ private class DeskWidget(
             }
             "day_summary" -> WidgetMetric(label, number(day.activityCount.toDouble(), words), "",
                 words.f("day_event_count", "count" to number(day.activityCount.toDouble(), words)))
-            else -> WidgetMetric(label, day.glucoseValue(state.preferences.unit, words) ?: "—", state.preferences.unit,
-                words.f("day_reading_count", "count" to number(day.glucoseCount.toDouble(), words)))
+            else -> WidgetMetric(label, "—", "", "")
         }
     }
 
@@ -196,8 +202,12 @@ private class DeskWidget(
         val faded = ColorUtils.setAlphaComponent(color, 66)
         when (kind) {
             "water" -> {
+                if (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total") {
+                    glyph(kind, cx, cy, color, min(area.width(), area.height()) * .21f)
+                    return
+                }
                 val fill = if (visible && state.preferences.waterGoal > 0)
-                    (day.waterMl / state.preferences.waterGoal).toFloat().coerceIn(0f,1f) else 0f
+                    (tracking.todayWaterMl / state.preferences.waterGoal).toFloat().coerceIn(0f,1f) else 0f
                 val max = min(area.width(),area.height())
                 when (look.waterVisual) {
                     "bottle" -> {
@@ -234,7 +244,7 @@ private class DeskWidget(
                 }
             }
             "glucose" -> {
-                val readings = if (visible) day.entries.filter { it.kind == "glucose" }.asReversed().takeLast(10).map(::mg) else emptyList()
+                val readings = if (visible) tracking.glucoseReadings.take(10).asReversed().map(::mg) else emptyList()
                 if (readings.size < 2) { glyph(kind,cx,cy,faded,13f); return }
                 val lo = readings.min()
                 val span = (readings.max()-lo).coerceAtLeast(1.0)
@@ -261,6 +271,8 @@ private class DeskWidget(
         val muted = merge(bg, fg, .75f)
         facet(area, bg, if (featured) 22f else 17f)
         val item = metrics(kind)
+        val showDetails = look.details || kind == "glucose" ||
+            kind == "water" && (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total")
         val pad = if (area.width() < 81f) 6f else 10f
         val start = if(rtl)area.right-pad else area.left+pad
         val end = if(rtl)area.left+pad else area.right-pad
@@ -271,7 +283,7 @@ private class DeskWidget(
             text(item.label, x, area.top + 16f, 10f, space, fg, true, Paint.Align.CENTER)
             text(item.amount, x, area.top + 37f, 23f, space, fg, true, Paint.Align.CENTER)
             text(item.unit, x, area.top + 48f, 8.5f, space, muted, align = Paint.Align.CENTER)
-            if (look.details)
+            if (showDetails)
                 text(item.detail, x, area.top + 62f, 8.5f, space, muted, align = Paint.Align.CENTER)
             return
         }
@@ -281,7 +293,7 @@ private class DeskWidget(
             if (area.width() >= 155) glyph(kind,start+direction*6f,mid-2,fg,5.5f)
             val iconSpace = if(area.width()>=155) 16 else 0
             text(item.label, start+direction*iconSpace, mid-1f, 11.5f, space-amountSpace-iconSpace-3, fg, true)
-            if (look.details && area.height() >= 39f && item.detail.isNotEmpty())
+            if (showDetails && area.height() >= 39f && item.detail.isNotEmpty())
                 text(item.detail,start+direction*iconSpace,mid+12f,8f,space-amountSpace-iconSpace-3,muted)
             val align=if(rtl)Paint.Align.LEFT else Paint.Align.RIGHT
             text(item.amount,end,mid+2f,18f,amountSpace,fg,true,align)
@@ -301,7 +313,7 @@ private class DeskWidget(
         text(item.amount, start, baseline, amountSize, textArea, fg, true)
         if (item.unit.isNotBlank() && baseline + 13f <= area.bottom)
             text(item.unit,start,baseline+10f,9f,textArea,muted)
-        if (look.details && baseline + 24f <= area.bottom && item.detail.isNotBlank())
+        if (showDetails && baseline + 24f <= area.bottom && item.detail.isNotBlank())
             text(item.detail,start,baseline+20f,8.5f,textArea,muted)
         if (hasVisual) {
             val left = if (rtl) area.left+pad else area.right-pad-chartSpace+4

@@ -76,21 +76,18 @@ object GraphicalWidgets {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         }
         val readValues = Widgets.valuesVisible(s.preferences.lock, look.visible)
-        val summary by lazy { dayOverview(s, System.currentTimeMillis()) }
+        val now = System.currentTimeMillis()
+        val summary by lazy { dayOverview(s, now) }
+        val tracking by lazy { TrackingStats(s, now) }
         fun description(kind: String): String {
-            val name = w[when (kind) { "glucose" -> "day_glucose_average"; "water" -> "water_week"; "day_summary" -> "day_overview"; else -> kind }]
+            val name = w[if (kind == "day_summary") "day_overview" else kind]
             if (!readValues) return "$name. ${w["widget_values_off"]}"
-            val detail = when (kind) {
-                "glucose" -> summary.glucoseValue(s.preferences.unit, w)?.let { it + " " + s.preferences.unit } ?: w["no_reading"]
-                "water" -> {
-                    val average = summary.waterAverageMl?.let { number(it, w) + " " + w["ml"] } ?: w["no_reading"]
-                    val today = number(summary.waterMl, w) + " " + w["ml"]
-                    "$average. ${w.f("widget_water_today", "amount" to today)}"
-                }
-                "day_summary" -> w.f("day_event_count", "count" to number(summary.activityCount.toDouble(), w))
-                else -> w["next_reminder"]
+            return when (kind) {
+                "glucose" -> tracking.glucose(w).description
+                "water" -> tracking.water(w).description
+                "day_summary" -> "$name. ${w.f("day_event_count", "count" to number(summary.activityCount.toDouble(), w))}"
+                else -> "$name. ${w["next_reminder"]}"
             }
-            return "$name. $detail"
         }
         val cellIds = if (geometry.body == WidgetBody.SINGLE) listOf(R.id.widget_primary)
             else listOf(R.id.widget_primary, R.id.widget_secondary, R.id.widget_third)

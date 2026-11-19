@@ -99,4 +99,57 @@ class StabilityReleaseTests {
         assertFalse(hidden.contains("&lt;example&gt;"))
         assertFalse(hidden.contains("private-target"))
     }
+    @Test fun defaultGlucosePersistsAtMidnightWhileWaterResetsAndDosesDoNotCount() {
+        val now = Instant.parse("2026-04-06T23:59:00Z").toEpochMilli()
+        val midnight = Instant.parse("2026-04-07T00:00:00Z").toEpochMilli()
+        val readings = listOf(
+            Entry(kind = "glucose", value = 100.0, unit = "mg/dL", time = Instant.parse("2026-03-09T00:00:00Z").toEpochMilli()),
+            Entry(kind = "glucose", value = 140.0, unit = "mg/dL", time = now),
+            Entry(kind = "glucose", value = 250.0, unit = "mg/dL", time = Instant.parse("2026-03-07T19:00:00Z").toEpochMilli()),
+        )
+        val state = State(entries = readings + Entry(kind = "water", time = now, value = 750.0, unit = "mL") +
+            Entry(kind = "dose", time = now, value = 12.0, status = "taken"))
+        val words = Words("en")
+        val before = TrackingStats(state, now, ZoneOffset.UTC)
+        val after = TrackingStats(state, midnight, ZoneOffset.UTC)
+        assertEquals("120", before.glucose(words).amount)
+        assertEquals("120", after.glucose(words).amount)
+        assertEquals("Last 30 days", after.glucose(words).period)
+        assertEquals("0.75", before.water(words).amount)
+        assertEquals("0", after.water(words).amount)
+        assertEquals(midnight, nextWidgetRefresh(now, ZoneOffset.UTC))
+    }
+
+    @Test fun trackingPreferencesRoundTripAndEachMetricUsesItsOwnInputs() {
+        val now = Instant.parse("2026-04-07T15:00:00Z").toEpochMilli()
+        val p = Preferences(glucoseViewDays = 7, glucoseViewMetric = "latest", glucoseViewContext = "fasting",
+            waterViewDays = 14, waterViewMetric = "daily_average", waterViewUnit = "mL")
+        val state = State(preferences = p, entries = listOf(
+            Entry(kind = "glucose", value = 6.0, unit = "mmol/L", time = now - 1000, context = "fasting"),
+            Entry(kind = "glucose", value = 160.0, unit = "mg/dL", time = now, context = "after"),
+            Entry(kind = "glucose", value = 190.0, unit = "mg/dL", time = now + 1000, context = "fasting"),
+            Entry(kind = "water", value = 250.0, unit = "mL", time = now - 2000),
+            Entry(kind = "water", value = 500.0, unit = "mL", time = now),
+            Entry(kind = "water", value = 1000.0, unit = "mL", time = now - 2 * 86_400_000L),
+        ))
+        val restored = Codec.decode(Codec.encode(state))
+        assertEquals(p, restored.preferences)
+        val words = Words("en")
+        val stats = TrackingStats(restored, now, ZoneOffset.UTC)
+        assertEquals("108", stats.glucose(words).amount)
+        assertEquals(1, stats.glucoseReadings.size)
+        assertEquals("875", stats.water(words).amount)
+        assertEquals("Days with water logged: 2", stats.water(words).detail)
+        val withoutOptions = JSONObject(Codec.encode(State())).apply {
+            val stored = getJSONObject("preferences")
+            listOf("glucoseViewDays", "glucoseViewMetric", "glucoseViewContext",
+                "waterViewDays", "waterViewMetric", "waterViewUnit").forEach(stored::remove)
+        }
+        val legacy = Codec.decode(withoutOptions.toString()).preferences
+        assertEquals(30, legacy.glucoseViewDays)
+        assertEquals("average", legacy.glucoseViewMetric)
+        assertEquals(1, legacy.waterViewDays)
+        assertEquals("total", legacy.waterViewMetric)
+    }
+
 }

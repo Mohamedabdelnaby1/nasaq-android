@@ -78,6 +78,31 @@ class ExperienceUiTests{
         compose.onNodeWithContentDescription(words["edit"] + " " + words["glucose"]).assertDoesNotExist()
     }
 
+    @Test fun trackerOptionsPreviewAndSaveEachPeriodIndependently() {
+        val words = Words("en")
+        var state by mutableStateOf(sample(language = "en"))
+        var kind by mutableStateOf("glucose")
+        compose.setContent {
+            YawmiTheme(state.preferences) {
+                Column(Modifier.fillMaxSize().padding(12.dp)) {
+                    TrackingOptions(state, kind) { change -> state = state.copy(preferences = change(state.preferences)) }
+                }
+            }
+        }
+        compose.onAllNodes(hasText(trackingPeriod(90, words)) and isSelectable()).onFirst().performClick()
+        compose.runOnIdle { assertEquals(90, state.preferences.glucoseViewDays) }
+        capture("tracking-glucose")
+        compose.runOnIdle { kind = "water" }
+        compose.onAllNodes(hasText(words["water_daily_average_view"]) and isSelectable()).onFirst().performClick()
+        compose.onAllNodes(hasText(trackingPeriod(7, words)) and isSelectable()).onFirst().performClick()
+        compose.runOnIdle {
+            assertEquals(90, state.preferences.glucoseViewDays)
+            assertEquals(7, state.preferences.waterViewDays)
+            assertEquals("daily_average", state.preferences.waterViewMetric)
+        }
+        capture("tracking-water")
+    }
+
     @Test fun todayOverviewShowsDosesAndAverages() {
         val s = sample().let { it.copy(entries = it.entries + listOf(Entry(kind="dose", status="taken"), Entry(kind="water", value=1500.0, unit="mL", time=System.currentTimeMillis()-86_400_000L))) }
         compose.setContent { YawmiTheme(s.preferences) { DayOverviewScreen(s, onEdit = {}, onAdd = { _, _ -> }) {} } }

@@ -23,7 +23,8 @@ import java.time.*
 
 @Composable
 fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
-    initialFilter: String = "all", onAddReading: (() -> Unit)? = null, onImport: (() -> Unit)? = null) {
+    initialFilter: String = "all", onAddReading: (() -> Unit)? = null, onImport: (() -> Unit)? = null,
+    onTrackingOptions: (() -> Unit)? = null) {
     val w = LocalWords.current
     val c = MaterialTheme.colorScheme
     var filter by rememberSaveable(initialFilter) { mutableStateOf(initialFilter) }
@@ -48,7 +49,9 @@ fun Journal(s: State, onEdit: (Entry) -> Unit, onDelete: (Entry) -> Unit,
             }
         }
         if (initialFilter == "glucose" && onAddReading != null) item("daily-average") {
-            ReadingHero(dayOverview(s, System.currentTimeMillis()), s.preferences, onAdd = onAddReading)
+            val now = trackingTime()
+            val stats = remember(s.entries, s.preferences, now) { TrackingStats(s, now) }
+            ReadingHero(stats, onTrackingOptions, onAdd = onAddReading)
         }
         item("journal-controls") {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
