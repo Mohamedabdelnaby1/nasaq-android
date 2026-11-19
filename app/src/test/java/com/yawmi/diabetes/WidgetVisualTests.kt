@@ -43,6 +43,29 @@ class WidgetVisualTests{
     }
     @Test fun combinedWidget(){render("09-widget-combined",300,250,WidgetLook(visible=true))}
     @Test fun compactCombinedWidget(){render("15-widget-combined-compact",280,190,WidgetLook(visible=true))}
+    @Test fun wideAndCompactActionsKeepClearOfTheRoundedShell() {
+        val sample = state()
+        val color = android.graphics.Color.MAGENTA
+        for (language in listOf("ar", "en")) {
+            val s = sample.copy(preferences = sample.preferences.copy(language = language))
+            for ((width, height) in listOf(320 to 242, 320 to 152, 110 to 80)) {
+                val look = WidgetLook(style = "widget_midnight", visible = true, radius = 32, accent = "#FF00FF")
+                    .let { if (width == 110) it.copy(mode = "water", quickWater = true, undoWater = true) else it }
+                val bitmap = WidgetArt.bitmap(c, s, width, height, look, pixelScale = 1f)
+                val gutter = WidgetFrame(width.toFloat(), height.toFloat(), look.radius).gutter.toInt()
+                val pixels = IntArray(width * height)
+                bitmap.getPixels(pixels, 0, width, 0, 0, width, height)
+                val actionPixels = pixels.indices.filter { pixels[it] == color }
+                assertTrue(actionPixels.size > 120)
+                assertTrue(actionPixels.all {
+                    it % width in gutter until width - gutter && it / width in gutter until height - gutter
+                })
+                for (corner in listOf(0, width - 1, pixels.size - width, pixels.lastIndex)) {
+                    assertEquals(0, pixels[corner])
+                }
+            }
+        }
+    }
     @Test fun bottleVisualKeepsHiddenValuesPrivate(){
         val first=state();val second=first.copy(entries=listOf(Entry(kind="water",value=2000.0,unit="mL")))
         val look=WidgetLook(mode="water",style="blue",waterVisual="bottle")
@@ -56,6 +79,7 @@ class WidgetVisualTests{
         render("nasaq-focus",300,250,WidgetLook(visible=true,style="cream",layout="widget_focus"))
         render("nasaq-compact",154,162,WidgetLook(visible=true))
         render("nasaq-wide",320,152,WidgetLook(visible=true))
+        render("nasaq-dark-edge",320,242,WidgetLook(visible=true,style="widget_midnight",radius=32))
         render("v5-tiles",300,250,WidgetLook(visible=true,style="widget_midnight",layout="widget_tiles"))
         render("v5-rows",300,250,WidgetLook(visible=true,style="widget_rose",layout="widget_lines"))
         render("v5-day",300,250,WidgetLook(mode="day_summary",visible=true,style="cream",accent="#C9DEAB"))

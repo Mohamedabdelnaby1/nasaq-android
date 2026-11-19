@@ -204,8 +204,11 @@ fun WidgetStudio(
                                     look = look.copy(waterVisual = it)
                                 }
                                 val waterIndex = geometry.parts.indexOf("water")
-                                val cell = geometry.cells(preview.width.toFloat(), preview.height.toFloat()).getOrNull(waterIndex)
-                                if (cell == null || !WidgetArt.showsWaterGraphic(cell.width(), cell.height())) {
+                                val width = preview.width.toFloat()
+                                val height = preview.height.toFloat()
+                                val frame = WidgetFrame(width, height, look.radius)
+                                val card = geometry.cells(width, height).getOrNull(waterIndex)?.let { frame.inset(it) }
+                                if (card == null || !WidgetArt.showsWaterGraphic(card)) {
                                     Text(w["widget_water_visual_space"], style = MaterialTheme.typography.bodySmall)
                                 }
                             }

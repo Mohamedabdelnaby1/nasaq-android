@@ -1,6 +1,8 @@
 package com.yawmi.diabetes
 
 import android.graphics.RectF
+import kotlin.math.ceil
+import kotlin.math.min
 
 internal val widgetParts = listOf("glucose", "water", "medication")
 internal val widgetModes = listOf("summary") + widgetParts + "day_summary"
@@ -10,6 +12,22 @@ internal val widgetWaterVisuals = listOf("ring", "bottle", "widget_bars")
 internal val widgetActionTargets = listOf("auto") + widgetParts
 
 internal enum class WidgetBody { SINGLE, FOCUS, ROWS, TILES }
+
+internal class WidgetFrame(width: Float, height: Float, requestedRadius: Int) {
+    val outer = RectF(0f, 0f, width, height)
+    val radius = min(requestedRadius.toFloat(), min(width, height) / 2)
+    // At 45 degrees the rounded outline enters each axis by r * (1 - sqrt(1/2)).
+    val gutter = ceil(radius * .293f) + 3f
+    val innerRadius = (radius - gutter).coerceIn(6f, 19f)
+    private val safe = RectF(outer).apply { inset(gutter, gutter) }
+
+    fun inset(target: RectF, spacing: Float = 4f) = RectF(
+        maxOf(safe.left, target.left + spacing),
+        maxOf(safe.top, target.top + spacing),
+        minOf(safe.right, target.right - spacing),
+        minOf(safe.bottom, target.bottom - spacing)
+    )
+}
 
 internal data class WidgetLayout(
     val body: WidgetBody,

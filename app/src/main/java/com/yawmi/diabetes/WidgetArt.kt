@@ -54,9 +54,10 @@ internal class WidgetContent(private val state: State, look: WidgetLook, now: Lo
 
 object WidgetArt {
     private var fonts: Pair<Typeface, Typeface>? = null
+    private const val WATER_ART_WIDTH = 132f
 
-    internal fun showsWaterGraphic(width: Float, height: Float) =
-        height >= 113f && width >= 97f || width >= 143f && height >= 64f
+    internal fun showsWaterGraphic(card: RectF) =
+        card.height() >= 106f && card.width() >= 90f || card.width() >= WATER_ART_WIDTH && card.height() >= 57f
 
     @Synchronized private fun fonts(context: Context): Pair<Typeface, Typeface> =
         fonts ?: (Typeface.createFromAsset(context.assets, "fonts/tajawal_regular.ttf") to
@@ -100,6 +101,7 @@ object WidgetArt {
         val panel = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(surface, Color.WHITE, if (night) .055f else .67f), 255)
         val fontScale = when (look.font) { "compact" -> .89f; "large" -> 1.14f; else -> 1f }
         val geometry = WidgetLayout.calculate(width.toInt(), height.toInt(), look, rtl)
+        val frame = WidgetFrame(width, height, look.radius)
 
         private fun parse(value: String, fallback: Int) =
             runCatching { ColorUtils.setAlphaComponent(Color.parseColor(value), 255) }.getOrDefault(fallback)
@@ -146,6 +148,7 @@ object WidgetArt {
                 else -> area.left - layout.getLineLeft(0)
             }
             canvas.save()
+            canvas.clipRect(area)
             canvas.translate(x, top)
             layout.draw(canvas)
             canvas.restore()
@@ -267,9 +270,9 @@ object WidgetArt {
         }
 
         private fun metric(kind: String, bounds: RectF, hero: Boolean) {
-            val card = RectF(bounds).apply { inset(3.5f, 3.5f) }
+            val card = frame.inset(bounds)
             val rows = geometry.body == WidgetBody.ROWS
-            val radius = (look.radius * .56f).coerceIn(7f, 20f)
+            val radius = frame.innerRadius
             if (!rows) {
                 box(card, panel, radius)
                 box(RectF(card).apply { inset(.5f, .5f) }, seam, radius, true)
@@ -280,9 +283,10 @@ object WidgetArt {
             }
             val m = content.metric(kind)
             val hue = tone(kind)
-            val roomy = card.width() >= (if (kind == "water") 136f else 171f) && card.height() >= 57
+            val roomy = card.width() >= (if (kind == "water") WATER_ART_WIDTH else 171f) && card.height() >= 57
             val tall = card.height() >= 106
             val micro = card.width() < 90 || card.height() < 47
+            val cramped = card.height() < 34
             val inner = RectF(card).apply { inset(if (micro) 5f else 9f, 0f) }
             val artSize = if (roomy) min(card.height() - 18f, if (hero) 61f else 42f) else if (tall) 36f else 13f
             val artWidth = if (roomy && hero && kind == "glucose") min(102f, card.width() * .36f) else artSize
@@ -296,11 +300,18 @@ object WidgetArt {
                 if (rtl) titleArea.left = art.right + 4 else titleArea.right = art.left - 4
             }
             val readingArea = if (roomy) titleArea else inner
-            val labelY = card.top + if (micro) 3f else if (roomy && tall) 14f else 6f
-            val readingY = labelY + if (micro) 15f else 17f
-            val amountSize = when { micro -> 15f; hero && tall -> 34f; hero && roomy -> 27f; rows -> 18f; else -> 22f }
+            val labelY = card.top + when { cramped -> 1f; micro -> 3f; roomy && tall -> 14f; else -> 6f }
+            val readingY = labelY + when { cramped -> 9f; micro -> 15f; else -> 17f }
+            val amountSize = when {
+                cramped -> min(13f, (card.bottom - readingY - 1f) / fontScale)
+                micro -> 15f
+                hero && tall -> 34f
+                hero && roomy -> 27f
+                rows -> 18f
+                else -> 22f
+            }
             val useUnitLine = m.unit.isNotBlank() && (hero && tall || readingArea.width() < 80 && card.height() >= 62)
-            text(m.label, titleArea, labelY, if (micro) 9.5f else 12f, secondary, bold = true, fit = true)
+            text(m.label, titleArea, labelY, if (cramped) 7.5f else if (micro) 9.5f else 12f, secondary, bold = true, fit = true)
             text(if (useUnitLine) m.amount else m.value, readingArea, readingY, amountSize, ink, bold = true, fit = true)
             val noteY = readingY + amountSize * fontScale + 1f
             if (useUnitLine) text(m.unit, readingArea, noteY, 10f, hue)
@@ -315,7 +326,7 @@ object WidgetArt {
                 if (top + 11 * fontScale <= noteLimit - 2f) text(note, readingArea, top, 10f, secondary, fit = true)
             }
             if (micro) return
-            if (kind == "water" && showsWaterGraphic(bounds.width(), bounds.height())) water(art, hue)
+            if (kind == "water" && showsWaterGraphic(card)) water(art, hue)
             else if (kind == "glucose" && (roomy || tall) && trace(RectF(art).apply { inset(3f, 6f) }, hue)) Unit
             else {
                 val size = if (roomy || tall) min(20f, artSize) else artSize
@@ -325,10 +336,11 @@ object WidgetArt {
 
         private fun control(spot: RectF, kind: String, fill: Int, label: String = "") {
             val fg = contrast(fill)
-            box(spot, fill, (look.radius * .54f).coerceIn(7f, 18f))
+            box(spot, fill, minOf(frame.innerRadius, spot.width() / 2, spot.height() / 2))
             val described = label.isNotEmpty() && spot.width() >= 101f
             val x = if (described) if (rtl) spot.right - 20f else spot.left + 20f else spot.centerX()
-            glyph(kind, x - 7.5f, spot.centerY() - 7.5f, 15f, fg)
+            val icon = minOf(15f, spot.width() - 4f, spot.height() - 4f)
+            if (icon > 0) glyph(kind, x - icon / 2, spot.centerY() - icon / 2, icon, fg)
             if (described) {
                 val space = RectF(spot).apply { if (rtl) { right -= 33; left += 9 } else { left += 33; right -= 9 } }
                 text(label, space, spot.centerY() - 6.5f * fontScale, 12f, fg, bold = true, fit = true)
@@ -336,25 +348,28 @@ object WidgetArt {
         }
 
         fun draw() {
-            val radius = min(look.radius.toFloat(), min(width, height) / 2)
-            val outer = RectF(0f, 0f, width, height)
-            val clip = Path().apply { addRoundRect(outer, radius, radius, Path.Direction.CW) }
-            canvas.save()
-            canvas.clipPath(clip)
-            canvas.drawColor(ColorUtils.setAlphaComponent(surface, look.opacity * 255 / 100))
-            box(RectF(outer).apply { inset(.6f, .6f) }, ColorUtils.setAlphaComponent(seam, look.opacity * 255 / 100), radius, true)
+            val alpha = look.opacity * 255 / 100
+            box(frame.outer, ColorUtils.setAlphaComponent(surface, alpha), frame.radius)
+            box(RectF(frame.outer).apply { inset(.6f, .6f) }, ColorUtils.setAlphaComponent(seam, alpha),
+                frame.radius - .6f, true)
 
             if (geometry.header) {
                 fun headerButton(index: Int, kind: String) {
-                    val center = if (rtl) 22f + index * 44 else width - 22f - index * 44
-                    control(RectF(center - 15, 7f, center + 15, 37f), kind, panel)
+                    val left = if (rtl) index * 44f else width - (index + 1) * 44f
+                    val target = frame.inset(RectF(left, 0f, left + 44f, 44f))
+                    val size = minOf(28f, target.width(), target.height())
+                    val cx = target.centerX()
+                    // Keep both buttons on the same baseline even when one borders the shell.
+                    val cy = (frame.gutter + 40f) / 2
+                    control(RectF(cx - size / 2, cy - size / 2, cx + size / 2, cy + size / 2), kind, panel)
                 }
                 headerButton(0, "settings")
                 if (geometry.cycle) headerButton(1, "cycle")
                 if (look.title && width >= 145f) {
                     val margin = if (geometry.cycle) 91f else 47f
-                    val area = if (rtl) RectF(margin, 0f, width - 15, 44f) else RectF(15f, 0f, width - margin, 44f)
-                    text(words["app"], area, 12f, 19f, ink, bold = true, fit = true)
+                    val edge = frame.gutter + 5f
+                    val area = if (rtl) RectF(margin, 0f, width - edge, 44f) else RectF(edge, 0f, width - margin, 44f)
+                    text(words["app"], area, frame.gutter + 1f, 19f, ink, bold = true, fit = true)
                 }
             }
             geometry.parts.zip(geometry.cells(width, height)).forEachIndexed { i, (kind, area) ->
@@ -362,8 +377,7 @@ object WidgetArt {
             }
             val action = parse(look.accent, if (night) 0xFFBAE5DB.toInt() else 0xFF244C49.toInt())
             fun button(rect: RectF, key: String, color: Int, label: String = "") {
-                rect.inset(4f, 4f)
-                control(rect, key, color, label)
+                control(frame.inset(rect), key, color, label)
             }
             if (geometry.compactAction) {
                 val x = if (rtl) 0f else width - 42
@@ -382,7 +396,6 @@ object WidgetArt {
                     button(undo, "undo", panel)
                 }
             }
-            canvas.restore()
         }
     }
 }
