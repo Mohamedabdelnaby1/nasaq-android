@@ -52,7 +52,7 @@ internal fun prepareRestore(current: State, backup: State, useSettings: Boolean)
 
 @Composable
 internal fun BackupRestoreReview(current: State, backup: State, recovery: Boolean, busy: Boolean,
-    onDismiss: () -> Unit, onRestore: (Boolean, RestoreCounts) -> Unit) {
+    onDismiss: () -> Unit, onRestore: (Boolean, RestoreCounts, Long) -> Unit) {
     val w = LocalWords.current
     var useSettings by remember(backup) { mutableStateOf(current.entries.isEmpty() && current.medications.isEmpty() && current.care.items.isEmpty()) }
     val preview = remember(current, backup, useSettings) { prepareRestore(current, backup, useSettings) }
@@ -70,6 +70,7 @@ internal fun BackupRestoreReview(current: State, backup: State, recovery: Boolea
             if (!acceptable) Text(w["restore_limit"], color = MaterialTheme.colorScheme.error)
         }
     }, confirmButton = {
-        ActionButton(onClick = { onRestore(useSettings, preview.counts) }, enabled = acceptable && !busy) { Text(w["restore_confirm"]) }
+        ActionButton(onClick = { onRestore(useSettings, preview.counts, current.revision) },
+            enabled = acceptable && !busy) { Text(w["restore_confirm"]) }
     }, dismissButton = { TextAction(onDismiss, enabled = !busy) { Text(w["cancel"]) } })
 }

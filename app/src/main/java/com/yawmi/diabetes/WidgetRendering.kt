@@ -21,32 +21,50 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 
 object GraphicalWidgets {
-    fun render(c: Context, s: State, id: Int) {
-        val cfg = c.getSharedPreferences("home-widgets", Context.MODE_PRIVATE)
-        val base = Widgets.look(c, id)
-        val cycle = cfg.getInt("${id}_cycle", 0).coerceAtLeast(0)
-        val offset = cycle % base.parts.size
-        val quick = base.quickWater && !s.preferences.lock
-        val undo = if (quick) WidgetActions.latest(s, id) else null
-        val look = base.copy(parts = base.parts.drop(offset) + base.parts.take(offset), quickWater = quick, undoWater = undo != null)
-        val manager = AppWidgetManager.getInstance(c)
-        val options = manager.getAppWidgetOptions(id)
+    internal fun currentSize(c: Context, id: Int): Pair<Int, Int> {
+        val options = AppWidgetManager.getInstance(c).getAppWidgetOptions(id)
         val portrait = c.resources.configuration.orientation != Configuration.ORIENTATION_LANDSCAPE
         val width = options.getInt(if (portrait) AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH else AppWidgetManager.OPTION_APPWIDGET_MAX_WIDTH, 280).coerceIn(110, 600)
         val height = options.getInt(if (portrait) AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT else AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT, 230).coerceIn(80, 600)
-        val dark = c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
-        val density = c.resources.displayMetrics.density.coerceIn(1f, 2.5f)
-        val widgetSizes = if (Build.VERSION.SDK_INT >= 31) sizes(options) else emptyList()
-        val view = if (Build.VERSION.SDK_INT >= 31 && widgetSizes.isNotEmpty()) {
-            val area = widgetSizes.sumOf { it.width.coerceIn(110f, 600f).toDouble() * it.height.coerceIn(80f, 600f) }
-            val scale = kotlin.math.sqrt(1_150_000.0 / area).toFloat().coerceIn(1f, density)
-            RemoteViews(widgetSizes.associateWith { size ->
-                layout(c, s, id, look, size.width.toInt().coerceIn(110, 600), size.height.toInt().coerceIn(80, 600), dark, scale, cycle, undo)
-            })
-        } else layout(c, s, id, look, width, height, dark, density, cycle, undo)
-        manager.updateAppWidget(id, view)
+        val match = if (Build.VERSION.SDK_INT >= 31) sizes(options).minByOrNull {
+            kotlin.math.abs(it.width - width) + kotlin.math.abs(it.height - height)
+        } else null
+        return match?.let { it.width.toInt().coerceIn(110, 600) to it.height.toInt().coerceIn(80, 600) } ?: (width to height)
     }
 
+    fun render(c: Context, s: State, id: Int) {
+        val cfg = Widgets.config(c)
+        val base = Widgets.look(c, id)
+        val cycle = cfg.getInt("${id}_cycle", 0).coerceAtLeast(0)
+        val offset = cycle % base.parts.size
+        val quick = base.quickWater && base.action && !s.preferences.lock
+        val now = System.currentTimeMillis()
+        val undo = if (quick) WidgetActions.latest(s, id, now) else null
+        val look = base.copy(parts = base.parts.drop(offset) + base.parts.take(offset), quickWater = quick, undoWater = undo != null)
+        val content = WidgetContent(s, look, now)
+        val manager = AppWidgetManager.getInstance(c)
+        val options = manager.getAppWidgetOptions(id)
+        val (width, height) = currentSize(c, id)
+        val dark = when (s.preferences.theme) {
+            "dark" -> true
+            "light" -> false
+            else -> c.resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK == Configuration.UI_MODE_NIGHT_YES
+        }
+        val metrics = c.resources.displayMetrics
+        val sizes = if (Build.VERSION.SDK_INT >= 31) sizes(options) else emptyList()
+        val area = if (sizes.isEmpty()) width.toDouble() * height else sizes.sumOf {
+            it.width.coerceIn(110f, 600f).toDouble() * it.height.coerceIn(80f, 600f)
+        }
+        val maxPixels = minOf(1_150_000.0, metrics.widthPixels.toDouble() * metrics.heightPixels * 1.2)
+        val scale = kotlin.math.sqrt(maxPixels / area).toFloat().coerceAtMost(metrics.density.coerceIn(1f, 2.5f))
+        val remote = if (Build.VERSION.SDK_INT >= 31 && sizes.isNotEmpty()) {
+            RemoteViews(sizes.associateWith {
+                layout(c, s, id, look, it.width.toInt().coerceIn(110, 600), it.height.toInt().coerceIn(80, 600),
+                    dark, scale, cycle, undo, content)
+            })
+        } else layout(c, s, id, look, width, height, dark, scale, cycle, undo, content)
+        manager.updateAppWidget(id, remote)
+    }
     @RequiresApi(31)
     @Suppress("DEPRECATION")
     private fun sizes(options: Bundle): List<SizeF> =
@@ -56,10 +74,10 @@ object GraphicalWidgets {
 
     internal fun layout(
         c: Context, s: State, id: Int, look: WidgetLook, width: Int, height: Int,
-        dark: Boolean, scale: Float, cycle: Int, undo: Entry?
+        dark: Boolean, scale: Float, cycle: Int, undo: Entry?, content: WidgetContent = WidgetContent(s, look)
     ): RemoteViews {
-        val cfg = c.getSharedPreferences("home-widgets", Context.MODE_PRIVATE)
-        val w = Words(s.preferences.language)
+        val cfg = Widgets.config(c)
+        val w = content.words
         val quick = look.quickWater
         val geometry = WidgetLayout.calculate(width, height, look, w.rtl)
         val resource = if (geometry.compactAction) R.layout.home_widget_mini else when (geometry.body) {
@@ -69,25 +87,11 @@ object GraphicalWidgets {
             WidgetBody.TILES -> R.layout.home_widget_tiles
         }
         val view = RemoteViews(c.packageName, resource)
-        view.setImageViewBitmap(R.id.widget_background, WidgetArt.bitmap(c, s, width, height, look, dark, pixelScale = scale))
+        view.setImageViewBitmap(R.id.widget_background, WidgetArt.bitmap(c, content, width, height, look, dark, pixelScale = scale))
         fun show(viewId: Int, visible: Boolean) = view.setViewVisibility(viewId, if (visible) View.VISIBLE else View.GONE)
         fun open(kind: String, action: String = "open"): PendingIntent {
             return PendingIntent.getActivity(c, 0, WidgetDestination.intent(c, id, kind, action),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        }
-        val readValues = Widgets.valuesVisible(s.preferences.lock, look.visible)
-        val now = System.currentTimeMillis()
-        val summary by lazy { dayOverview(s, now) }
-        val tracking by lazy { TrackingStats(s, now) }
-        fun description(kind: String): String {
-            val name = w[if (kind == "day_summary") "day_overview" else kind]
-            if (!readValues) return "$name. ${w["widget_values_off"]}"
-            return when (kind) {
-                "glucose" -> tracking.glucose(w).description
-                "water" -> tracking.water(w).description
-                "day_summary" -> "$name. ${w.f("day_event_count", "count" to number(summary.activityCount.toDouble(), w))}"
-                else -> "$name. ${w["next_reminder"]}"
-            }
         }
         val cellIds = if (geometry.body == WidgetBody.SINGLE) listOf(R.id.widget_primary)
             else listOf(R.id.widget_primary, R.id.widget_secondary, R.id.widget_third)
@@ -96,7 +100,9 @@ object GraphicalWidgets {
             show(target, kind != null)
             if (kind != null) {
                 view.setOnClickPendingIntent(target, open(kind))
-                view.setContentDescription(target, description(kind))
+                val metric = content.metric(kind)
+                val spoken = if (look.details || !content.visible) metric.description else "${metric.label}. ${metric.value}"
+                view.setContentDescription(target, spoken)
             }
         }
         val settingsId = if (w.rtl) R.id.widget_settings_rtl else R.id.widget_settings
@@ -132,12 +138,7 @@ object GraphicalWidgets {
         show(undoId, geometry.undo)
         if (geometry.footer || geometry.compactAction) {
             val kind = geometry.footerKind
-            val actionKey = when (kind) {
-                "water" -> if (quick) "widget_add_cup" else "widget_log_water"
-                "glucose" -> "add_reading"
-                "day_summary" -> "details"
-                else -> "open"
-            }
+            val actionKey = geometry.actionLabel(look)
             val action = if (kind == "water" && quick) {
                 val saved = cfg.getString("${id}_token", null)
                 val token = if(saved != null && s.entries.none { it.id == "widget_$saved" }) saved else
@@ -156,7 +157,7 @@ object GraphicalWidgets {
 }
 
 @Composable
-fun WidgetPreview(s: State, look: WidgetLook, width: Int = 300, height: Int = 230, fitBox: Boolean = false, announce: Boolean = true) {
+fun WidgetPreview(s: State, look: WidgetLook, width: Int = 300, height: Int = 230, fitBox: Boolean = false, announce: Boolean = true, animate: Boolean = true) {
     val c = LocalContext.current
     val dark = MaterialTheme.colorScheme.background.red < .3f
     val bitmap = remember(s, look, width, height, dark) {
@@ -164,9 +165,10 @@ fun WidgetPreview(s: State, look: WidgetLook, width: Int = 300, height: Int = 23
     }
     val description = if (announce) LocalWords.current["widget_preview"] else null
     val layout = if (fitBox) Modifier.fillMaxSize() else Modifier.fillMaxWidth().aspectRatio(width.toFloat() / height)
-    if (announce && LocalMotion.current) {
+    if (announce && animate && LocalMotion.current) {
         androidx.compose.animation.Crossfade(bitmap, modifier = layout, label = "widget-preview") { frame ->
             Image(frame.asImageBitmap(), if (frame == bitmap) description else null, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
         }
     } else Image(bitmap.asImageBitmap(), description, layout, contentScale = ContentScale.Fit)
 }
+

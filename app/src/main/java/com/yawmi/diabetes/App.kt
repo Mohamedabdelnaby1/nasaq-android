@@ -245,8 +245,8 @@ fun mg(e:Entry)=com.yawmi.diabetes.core.Planner.toMg(e.value,e.unit)
             confirmButton={TextAction(onClick={repo.delete(e.id);delete=null}){Text(w["delete"])}},dismissButton={TextAction(onClick={delete=null}){Text(w["cancel"])}}) }
         activity.backupPreview?.let { incoming ->
             BackupRestoreReview(s, incoming, repo.error == "load_error", repo.busy,
-                onDismiss = { activity.backupPreview = null }) { useSettings, review ->
-                repo.restore(incoming, useSettings, review) {
+                onDismiss = { activity.backupPreview = null }) { useSettings, review, revision ->
+                repo.restore(incoming, useSettings, review, revision) {
                     activity.backupPreview = null
                     activity.message("restore_done")
                 }

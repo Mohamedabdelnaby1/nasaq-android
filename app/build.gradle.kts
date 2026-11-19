@@ -13,8 +13,8 @@ android {
         applicationId = "com.yawmi.diabetes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 15
-        versionName = "0.13.0"
+        versionCode = 16
+        versionName = "0.14.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8; isCoreLibraryDesugaringEnabled = true }
@@ -51,3 +51,4 @@ dependencies {
     testImplementation("androidx.compose.ui:ui-test-junit4:1.9.5")
     debugImplementation("androidx.compose.ui:ui-test-manifest:1.9.5")
 }
+

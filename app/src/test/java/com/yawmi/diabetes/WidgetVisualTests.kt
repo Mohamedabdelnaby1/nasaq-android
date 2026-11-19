@@ -104,6 +104,8 @@ class WidgetVisualTests{
             val undo = card.findViewById<View>(if (lang == "ar") R.id.widget_mini_undo_rtl else R.id.widget_mini_undo)
             assertTrue(plus.hasOnClickListeners() && undo.hasOnClickListeners())
             assertEquals(View.VISIBLE, undo.visibility)
+            assertEquals(40, plus.height)
+            assertEquals(40, undo.height)
             assertEquals(plus.bottom, undo.top)
             assertEquals(80, undo.bottom)
             val w = Words(lang)
@@ -136,6 +138,47 @@ class WidgetVisualTests{
         val first=state();val second=first.copy(entries=listOf(Entry(kind="glucose",value=280.0),Entry(kind="water",value=2000.0,unit="mL")))
         val look=WidgetLook(visible=false)
         assertTrue(WidgetArt.bitmap(c,first,300,250,look).sameAs(WidgetArt.bitmap(c,second,300,250,look)))
+    }
+    @Test fun chosenQuickActionOpensTheSelectedScreen() {
+        val app = shadowOf(c as Application)
+        val s = state()
+        val look = WidgetLook(visible = true, quickWater = true, actionTarget = "glucose")
+        val view = GraphicalWidgets.layout(c, s, 58, look, 320, 242, false, 1f, 0, null)
+            .apply(c, FrameLayout(c))
+        val add = view.findViewById<View>(R.id.widget_add_rtl)
+        assertTrue(add.performClick())
+        val intent = app.nextStartedActivity
+        assertEquals("glucose_log", intent.getStringExtra("screen"))
+        assertEquals("glucose", intent.getStringExtra("entry"))
+        assertEquals(View.GONE, view.findViewById<View>(R.id.widget_undo_rtl).visibility)
+    }
+
+    @Test fun customizationSurvivesRecreationAndOldPreferencesAreRecovered() {
+        val look = WidgetLook(style = "blue", layout = "widget_tiles", opacity = 73, radius = 18,
+            actionTarget = "water", parts = listOf("water", "glucose"), visible = true, quickWater = true)
+        assertEquals(look, widgetLook(look.toBundle()))
+        val id = 111
+        Widgets.config(c).edit().putString("${id}_parts", "bad,water,glucose,water")
+            .putInt("${id}_radius", 99).putString("${id}_background", "invalid").apply()
+        val saved = Widgets.look(c, id)
+        assertEquals(listOf("water", "glucose"), saved.parts)
+        assertEquals(32, saved.radius)
+        assertEquals("", saved.background)
+        assertEquals("auto", saved.actionTarget)
+        Widgets.remove(c, intArrayOf(id))
+        assertEquals(WidgetLook(), Widgets.look(c, id))
+    }
+
+    @Test fun appearanceControlsChangePixelsAtSupportedSizes() {
+        val s = state()
+        val look = WidgetLook(mode = "water", visible = true)
+        fun paint(config: WidgetLook) = WidgetArt.bitmap(c, s, 174, 244, config)
+        val baseline = paint(look)
+        listOf(look.copy(waterVisual = "bottle"), look.copy(waterVisual = "widget_bars"),
+            look.copy(background = "#D8E5F2"), look.copy(accent = "#964764"), look.copy(radius = 12),
+            look.copy(opacity = 50), look.copy(font = "large"), look.copy(title = false)).forEach {
+            assertFalse("No visible effect for $it", baseline.sameAs(paint(it)))
+        }
     }
     @Test fun appLockOverridesVisibleValues(){
         val first=state();val locked=first.copy(preferences=first.preferences.copy(lock=true))

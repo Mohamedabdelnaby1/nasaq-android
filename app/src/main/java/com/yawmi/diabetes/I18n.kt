@@ -65,6 +65,22 @@ habit_water|كميتك المعتادة · {amount} مل|Usually logged · {amou
 previous_day|اليوم السابق|Previous day
 next_day|اليوم التالي|Next day
 preset_water_mini|كوب سريع · مقاس صغير|Compact water cup
+widget_actual_size|مقاس الويدجت|Current size
+widget_sample_active|معاينة بأرقام تجريبية|Preview with sample values
+widget_type|نوع الويدجت|Widget type
+widget_controls|الأزرار والتفاصيل|Buttons and details
+widget_action_target|وظيفة الزر السريع|Quick action destination
+widget_action_auto|تلقائي|Automatic
+widget_rotate_hint|المقاس ده يعرض بطاقة واحدة. اضغط زر التبديل في الويدجت عشان تشوف باقي البطاقات.|This size shows one card. Use the switch button on the widget to see the others.
+widget_action_space|كبّر الويدجت على الشاشة الرئيسية لإظهار الزر السريع.|Resize the widget on your home screen to show the quick action.
+widget_layout_space|جرّب مقاس أكبر لمعاينة التوزيع المختار بالكامل.|Try a larger size to preview the full selected layout.
+widget_water_visual_space|مؤشر المياه الكامل بيظهر في المقاسات الأكبر.|The full water graphic appears at larger sizes.
+widget_goal_pct|{amount}٪ من الهدف|{amount}% of goal
+widget_button_color|لون الزر السريع|Quick action color
+widget_ink_teal|أخضر بترولي|Deep teal
+widget_ink_ochre|نحاسي|Copper
+widget_custom_colors|ألوان مخصصة|Custom colors
+widget_reset_style|إعادة ضبط المظهر|Reset appearance
 widget_space_hint|المقاس ده بيخفي بعض التفاصيل أو الأزرار. اختار مقاس أكبر للعرض الكامل.|This size hides some details or controls. A larger size shows more.
 widget_locked_preview|قفل التطبيق يخفي القياسات على الشاشة الرئيسية.|App lock hides measurements on the home screen.
 widget_preview_pin|صمّم وشوف المعاينة قبل الإضافة|Design and preview before adding
@@ -144,7 +160,7 @@ comfortable|متوسط|Comfortable
 large|كبير|Large
 widget_title_toggle|إظهار العنوان|Show title
 widget_time_toggle|إظهار الوقت والتفاصيل|Show time and details
-widget_action_toggle|إظهار زر التسجيل|Show logging button
+widget_action_toggle|إظهار زر سريع|Show quick action
 widget_custom_background|لون الخلفية الاختياري مثل #153F36|Optional background colour, e.g. #153F36
 widget_custom_accent|لون الزر الاختياري مثل #EBC75F|Optional button colour, e.g. #EBC75F
 widget_size_hint|اسحب حدود الويدجت لتغيير حجمه. حدود الحجم يحددها لانشر الهاتف.|Drag the widget edges to resize. Size limits depend on your launcher.
@@ -663,8 +679,8 @@ settings_data_body|القفل والنسخ الاحتياطي|App lock and backu
 back_settings|العودة للإعدادات|Back to settings
 widget_preview|معاينة مباشرة|Live preview
 widget_preview_hint|معاينة بنفس رسم الويدجت الفعلي؛ الحجم النهائي يتبع مساحة الهاتف.|Rendered by the actual widget; final size follows your launcher.
-widget_designs|ويدجت بتصميم جديد|Widgets with a new look
-widget_designs_body|أيقونات وحلقات تقدم وبطاقات تتكيف مع المساحة.|Icons, progress rings and cards that adapt to your space.
+widget_designs|ويدجتس الشاشة الرئيسية|Home screen widgets
+widget_designs_body|خصّص المحتوى والشكل والزر السريع لكل ويدجت.|Choose the content, style and quick action for each widget.
 widget_values_off|القيم مخفية|Values are hidden
 sleep_card|روتين النوم|Sleep routine
 entry_now|تسجيل الآن|Log now
@@ -728,3 +744,4 @@ sample_warning|نسخة تطوير تحتاج اختبارًا على هاتف �
     }
 }
 val LocalWords=staticCompositionLocalOf { Words() }
+

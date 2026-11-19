@@ -2,386 +2,389 @@ package com.yawmi.diabetes
 
 import android.content.Context
 import android.graphics.*
+import android.text.Layout
+import android.text.StaticLayout
+import android.text.TextDirectionHeuristics
 import android.text.TextPaint
 import android.text.TextUtils
 import androidx.core.graphics.ColorUtils
-import kotlin.math.min
-import kotlin.math.sqrt
+import kotlin.math.*
 
-data class WidgetLook(val mode:String="summary",val style:String="auto",val visible:Boolean=false,
-    val parts:List<String> = listOf("glucose","water","medication"),val opacity:Int=100,val font:String="comfortable",
-    val title:Boolean=true,val details:Boolean=true,val action:Boolean=true,val background:String="",val accent:String="",
-    val waterVisual:String="ring",val radius:Int=24,val quickWater:Boolean=false,val undoWater:Boolean=false,val layout:String="widget_focus")
+data class WidgetLook(
+    val mode: String = "summary", val style: String = "auto", val visible: Boolean = false,
+    val parts: List<String> = listOf("glucose", "water", "medication"), val opacity: Int = 100,
+    val font: String = "comfortable", val title: Boolean = true, val details: Boolean = true,
+    val action: Boolean = true, val background: String = "", val accent: String = "",
+    val waterVisual: String = "ring", val radius: Int = 24, val quickWater: Boolean = false,
+    val undoWater: Boolean = false, val layout: String = "widget_focus", val actionTarget: String = "auto"
+)
 
-/** One canvas shared by configuration previews and the launcher, with the same cell geometry as its touch targets. */
-object WidgetArt {
-    fun bitmap(
-        c: Context, s: State, width: Int, height: Int, look: WidgetLook,
-        darkSystem: Boolean = false, pixelScale: Float = 1.5f
-    ): Bitmap {
-        val w = width.coerceIn(110, 600)
-        val h = height.coerceIn(80, 600)
-        val density = pixelScale.coerceIn(1f, 3f).coerceAtMost(sqrt(1_300_000f / (w * h)))
-        val result = Bitmap.createBitmap((w * density).toInt(), (h * density).toInt(), Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(result).apply { scale(density, density) }
-        DeskWidget(c, canvas, w, h, s, look, darkSystem).draw()
-        return result
-    }
-}
-
-private data class WidgetMetric(val label: String, val amount: String, val unit: String, val detail: String)
-
-private class DeskWidget(
-    context: Context, private val canvas: Canvas, width: Int, height: Int, private val state: State,
-    private val look: WidgetLook, darkSystem: Boolean
-) {
-    private val w = width.toFloat()
-    private val h = height.toFloat()
-    private val words = Words(state.preferences.language)
-    private val rtl = words.rtl
-    private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val type = TextPaint(Paint.ANTI_ALIAS_FLAG)
-    private val normal = Typeface.createFromAsset(context.assets, "fonts/tajawal_medium.ttf")
-    private val bold = Typeface.createFromAsset(context.assets, "fonts/tajawal_bold.ttf")
-    private val scale = when (look.font) { "compact" -> .86f; "large" -> 1.19f; else -> 1f }
-    private val base = parse(look.background, when (look.style) {
-        "forest" -> 0xFF163A30.toInt()
-        "cream" -> 0xFFFFF3D6.toInt()
-        "blue" -> 0xFFDBF3FF.toInt()
-        "widget_rose" -> 0xFFF8DFE7.toInt()
-        "widget_midnight" -> 0xFF1E243A.toInt()
-        else -> if (darkSystem) 0xFF182D29.toInt() else 0xFFF3F0E5.toInt()
-    })
-    private val dark = ColorUtils.calculateLuminance(base) < .25
-    private val baseInk = ink(base)
-    private val accent = parse(look.accent, if (dark) 0xFFBBD4FF.toInt() else 0xFF36579B.toInt())
-    private val opacity = look.opacity.coerceIn(0, 100) / 100f
-    private val visible = Widgets.valuesVisible(state.preferences.lock, look.visible)
-    private val geometry = WidgetLayout.calculate(width, height, look, rtl)
-    private val now = System.currentTimeMillis()
+internal class WidgetContent(private val state: State, look: WidgetLook, now: Long = System.currentTimeMillis()) {
+    val words = Words(state.preferences.language)
+    val visible = Widgets.valuesVisible(state.preferences.lock, look.visible)
+    private val stats by lazy { TrackingStats(state, now) }
     private val day by lazy { dayOverview(state, now) }
-    private val tracking by lazy { TrackingStats(state, now) }
-
-    private fun parse(raw: String, fallback: Int) =
-        ColorUtils.setAlphaComponent(runCatching { Color.parseColor(raw) }.getOrDefault(fallback), 255)
-
-    private fun translucent(color: Int) = ColorUtils.setAlphaComponent(color, (Color.alpha(color) * opacity).toInt())
-    private fun merge(a: Int, b: Int, fraction: Float) = ColorUtils.blendARGB(a,b,fraction)
-    private fun ink(background: Int): Int {
-        val candidates = intArrayOf(0xFF152944.toInt(), Color.WHITE, Color.BLACK)
-        return candidates.firstOrNull { ColorUtils.calculateContrast(it, background) >= 4.5 }
-            ?: candidates.maxBy { ColorUtils.calculateContrast(it, background) }
+    private val next by lazy { Reminders.plan(state, now).firstOrNull { it.kind == "medication" } }
+    val readings get() = if (visible) stats.glucoseReadings.take(14).asReversed().map(::mg) else emptyList()
+    val hydration: Float? get() = state.preferences.let { p ->
+        if (visible && p.waterGoal > 0 && p.waterViewDays == 1 && p.waterViewMetric == "total")
+            (stats.todayWaterMl / p.waterGoal).toFloat()
+        else null
     }
-    private fun panelColor(kind: String, featured: Boolean): Int {
-        val tone = when (kind) {
-            "water" -> 0xFF9BDFF2.toInt()
-            "medication" -> 0xFFFFBA93.toInt()
-            "day_summary" -> 0xFFD7F483.toInt()
-            else -> 0xFFC4ADF4.toInt()
-        }
-        val customized = if (look.accent.isNotBlank()) merge(tone, accent, .64f) else tone
-        return merge(base, customized, if (featured) .92f else if (dark) .54f else .62f)
-    }
-
-    private fun rect(area: RectF, color: Int, round: Float) {
-        if (area.width() <= 0 || area.height() <= 0) return
-        paint.style = Paint.Style.FILL
-        paint.color = color
-        canvas.drawRoundRect(area, round, round, paint)
-    }
-
-    private fun facet(area: RectF, color: Int, radius: Float, reverse: Boolean = rtl) {
-        paint.color = translucent(color)
-        paint.style = Paint.Style.FILL
-        val big = radius
-        val small = radius * .49f
-        val left = if (reverse) small else big
-        val right = if (reverse) big else small
-        val path = Path().apply {
-            addRoundRect(area, floatArrayOf(left, left, right, right, left, left, right, right), Path.Direction.CW)
-        }
-        canvas.drawPath(path, paint)
-    }
-    private fun text(value: String, x: Float, baseline: Float, size: Float, limit: Float, color: Int,
-        strong: Boolean = false, align: Paint.Align = if (rtl) Paint.Align.RIGHT else Paint.Align.LEFT) {
-        if (limit <= 0 || value.isBlank()) return
-        type.typeface = if (strong) bold else normal
-        type.textSize = size * scale
-        val required = type.measureText(value)
-        if (required > limit) type.textSize = (type.textSize * limit / required).coerceAtLeast(7.4f)
-        type.textAlign = align
-        type.color = color
-        val displayed = TextUtils.ellipsize(value, type, limit, TextUtils.TruncateAt.END)
-        canvas.drawText(displayed.toString(), x, baseline, type)
-    }
-    private fun line(x1: Float, y1: Float, x2: Float, y2: Float, color: Int, width: Float = 1.5f) {
-        paint.style = Paint.Style.STROKE
-        paint.strokeWidth = width
-        paint.strokeCap = Paint.Cap.ROUND
-        paint.color = color
-        canvas.drawLine(x1, y1, x2, y2, paint)
-    }
-    private fun glyph(key: String, x: Float, y: Float, color: Int, radius: Float = 7f) {
-        paint.strokeWidth = 1.6f
-        paint.strokeCap = Paint.Cap.ROUND
-        paint.strokeJoin = Paint.Join.ROUND
-        paint.style = Paint.Style.STROKE
-        paint.color = color
-        when (key) {
-            "water", "glucose" -> {
-                val path = Path().apply {
-                    moveTo(x, y-radius)
-                    cubicTo(x-radius*.42f,y-radius*.25f,x-radius*.86f,y+radius*.13f,x-radius*.86f,y+radius*.48f)
-                    cubicTo(x-radius*.86f,y+radius*1.4f,x+radius*.86f,y+radius*1.4f,x+radius*.86f,y+radius*.48f)
-                    cubicTo(x+radius*.86f,y+radius*.13f,x+radius*.42f,y-radius*.25f,x,y-radius)
-                }
-                canvas.drawPath(path, paint)
-                if (key=="glucose") {
-                    line(x-4,y+2,x-1,y+2,color); line(x-1,y+2,x+1,y-1,color); line(x+1,y-1,x+4,y+3,color)
-                }
-            }
-            "medication" -> {
-                canvas.save()
-                canvas.rotate(45f,x,y)
-                canvas.drawRoundRect(x-radius*.5f,y-radius,x+radius*.5f,y+radius,radius/2,radius/2,paint)
-                line(x-radius*.5f,y,x+radius*.5f,y,color)
-                canvas.restore()
-            }
-            "settings" -> {
-                line(x-7,y-3,x+7,y-3,color); line(x-7,y+3,x+7,y+3,color)
-                paint.style = Paint.Style.FILL
-                canvas.drawCircle(x-2,y-3,2.2f,paint); canvas.drawCircle(x+3,y+3,2.2f,paint)
-            }
-            "cycle" -> {
-                canvas.drawArc(x-6,y-6,x+6,y+6,-5f,292f,false,paint)
-                line(x+6,y-5,x+6,y-1,color); line(x+6,y-1,x+2,y-1,color)
-            }
-            "plus" -> {
-                line(x-5,y,x+5,y,color,2f); line(x,y-5,x,y+5,color,2f)
-            }
-            else -> {
-                line(x-6,y,x+6,y,color); val sign = if (rtl) -1 else 1
-                line(x+sign*6,y,x+sign*2,y-4,color); line(x+sign*6,y,x+sign*2,y+4,color)
-            }
-        }
-        paint.style = Paint.Style.FILL
-    }
-
-    private fun metrics(kind: String): WidgetMetric {
-        val key = when (kind) {
-            "glucose" -> if (state.preferences.glucoseViewMetric == "latest") "latest_glucose_view" else "widget_glucose_average"
-            "water" -> when {
-                state.preferences.waterViewMetric == "daily_average" -> "widget_water_average"
-                state.preferences.waterViewDays == 1 -> "water_today_short"
-                else -> "water_total_view"
-            }
+    fun metric(kind: String): MetricDisplay {
+        val name = words[when (kind) {
             "day_summary" -> "day_overview"
+            "medication" -> "next_reminder"
             else -> kind
-        }
-        val label = words[key]
-        if (!visible) return WidgetMetric(label, "•••", "", words["widget_values_off"])
+        }]
+        if (!visible) return MetricDisplay(name, "—", "", "", words["widget_values_off"])
         return when (kind) {
-            "water", "glucose" -> {
-                val metric = if (kind == "water") tracking.water(words) else tracking.glucose(words)
-                WidgetMetric(metric.label, metric.amount, metric.unit, metric.period.ifEmpty { metric.detail })
-            }
-            "medication" -> {
-                val next = Reminders.plan(state, now, now + 86_400_000).firstOrNull { it.kind == "medication" }
-                WidgetMetric(label, next?.let { timeText(it.due, words) } ?: "—", "",
-                    next?.let { r -> state.medications.firstOrNull { it.id == r.medicationId }?.name } ?: words["widget_no_dose"])
-            }
-            "day_summary" -> WidgetMetric(label, number(day.activityCount.toDouble(), words), "",
-                words.f("day_event_count", "count" to number(day.activityCount.toDouble(), words)))
-            else -> WidgetMetric(label, "—", "", "")
+            "glucose" -> stats.glucose(words)
+            "water" -> stats.water(words)
+            "medication" -> next?.let { dose ->
+                MetricDisplay(name, timeText(dose.due, words), "", dateText(dose.due, words),
+                    state.medications.firstOrNull { it.id == dose.medicationId }?.name.orEmpty())
+            } ?: MetricDisplay(name, "—", "", words["no_doses"], "")
+            else -> MetricDisplay(name, number(day.activityCount.toDouble(), words), "",
+                words.f("day_event_count", "count" to number(day.activityCount.toDouble(), words)),
+                words.f("day_dose_count", "count" to number(day.takenDoses.toDouble(), words)))
         }
-    }
-
-    private fun visual(kind: String, area: RectF, color: Int) {
-        if (area.width() < 21 || area.height() < 20) return
-        val cx = area.centerX(); val cy = area.centerY()
-        val faded = ColorUtils.setAlphaComponent(color, 66)
-        when (kind) {
-            "water" -> {
-                if (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total") {
-                    glyph(kind, cx, cy, color, min(area.width(), area.height()) * .21f)
-                    return
-                }
-                val fill = if (visible && state.preferences.waterGoal > 0)
-                    (tracking.todayWaterMl / state.preferences.waterGoal).toFloat().coerceIn(0f,1f) else 0f
-                val max = min(area.width(),area.height())
-                when (look.waterVisual) {
-                    "bottle" -> {
-                        val half = max * .254f
-                        val body = RectF(cx-half,cy-max*.26f,cx+half,cy+max*.39f)
-                        rect(body, faded, 6f)
-                        rect(RectF(cx-half*.57f,cy-max*.42f,cx+half*.57f,cy-max*.20f),color,3f)
-                        if (fill > 0f) {
-                            canvas.save()
-                            val outline = Path().apply { addRoundRect(body, 6f, 6f, Path.Direction.CW) }
-                            canvas.clipPath(outline)
-                            rect(RectF(body.left, body.bottom-body.height()*fill, body.right, body.bottom), color, 1f)
-                            canvas.restore()
-                        }
-                    }
-                    "widget_bars" -> repeat(5) { i ->
-                        val width = max * .105f
-                        val x = cx - max*.38f + i*max*.16f
-                        val y = cy + max*.32f
-                        val height = max*(.36f+i*.09f)
-                        rect(RectF(x,y-height,x+width,y),faded,3f)
-                        val partial = (fill*5-i).coerceIn(0f,1f)
-                        if(partial>0) rect(RectF(x,y-height*partial,x+width,y),color,3f)
-                    }
-                    else -> {
-                        val radius = max * .34f
-                        paint.color = faded; paint.style = Paint.Style.STROKE; paint.strokeWidth = 4f
-                        canvas.drawCircle(cx,cy,radius,paint)
-                        paint.color = color
-                        if (fill > 0) canvas.drawArc(cx-radius,cy-radius,cx+radius,cy+radius,-90f,360f*fill,false,paint)
-                        paint.style = Paint.Style.FILL
-                        glyph("water", cx, cy, color, max*.12f)
-                    }
-                }
-            }
-            "glucose" -> {
-                val readings = if (visible) tracking.glucoseReadings.take(10).asReversed().map(::mg) else emptyList()
-                if (readings.size < 2) { glyph(kind,cx,cy,faded,13f); return }
-                val lo = readings.min()
-                val span = (readings.max()-lo).coerceAtLeast(1.0)
-                val points = readings.mapIndexed { i, value ->
-                    PointF(area.left + area.width() * i / readings.lastIndex,
-                        area.bottom - area.height() * (.19f + .65f * ((value - lo) / span).toFloat()))
-                }
-                repeat(3) { i ->
-                    val y = area.top + area.height() * (.17f+i*.33f)
-                    line(area.left,y,area.right,y,faded,1f)
-                }
-                points.zipWithNext().forEach { (a,b) -> line(a.x,a.y,b.x,b.y,color,2f) }
-                paint.style=Paint.Style.FILL;paint.color=color
-                points.forEach { canvas.drawCircle(it.x,it.y,2.3f,paint) }
-            }
-            else -> glyph(if(kind=="medication") kind else "arrow",cx,cy,color,12f)
-        }
-    }
-
-    private fun metricCard(kind: String, hit: RectF, featured: Boolean) {
-        val area = RectF(hit).apply { inset(5f, if (geometry.body == WidgetBody.ROWS) 3f else 5f) }
-        val bg = panelColor(kind, featured)
-        val fg = ink(bg)
-        val muted = merge(bg, fg, .75f)
-        facet(area, bg, if (featured) 22f else 17f)
-        val item = metrics(kind)
-        val showDetails = look.details || kind == "glucose" ||
-            kind == "water" && (state.preferences.waterViewDays != 1 || state.preferences.waterViewMetric != "total")
-        val pad = if (area.width() < 81f) 6f else 10f
-        val start = if(rtl)area.right-pad else area.left+pad
-        val end = if(rtl)area.left+pad else area.right-pad
-        val direction = if (rtl) -1 else 1
-        val space = area.width()-2*pad
-        if (geometry.compactAction && area.height() <= 85f) {
-            val x = area.centerX()
-            text(item.label, x, area.top + 16f, 10f, space, fg, true, Paint.Align.CENTER)
-            text(item.amount, x, area.top + 37f, 23f, space, fg, true, Paint.Align.CENTER)
-            text(item.unit, x, area.top + 48f, 8.5f, space, muted, align = Paint.Align.CENTER)
-            if (showDetails)
-                text(item.detail, x, area.top + 62f, 8.5f, space, muted, align = Paint.Align.CENTER)
-            return
-        }
-        if (area.height() < 61f && area.width() >= 120f) {
-            val mid = area.centerY()
-            val amountSpace = (space * .40f).coerceAtLeast(31f)
-            if (area.width() >= 155) glyph(kind,start+direction*6f,mid-2,fg,5.5f)
-            val iconSpace = if(area.width()>=155) 16 else 0
-            text(item.label, start+direction*iconSpace, mid-1f, 11.5f, space-amountSpace-iconSpace-3, fg, true)
-            if (showDetails && area.height() >= 39f && item.detail.isNotEmpty())
-                text(item.detail,start+direction*iconSpace,mid+12f,8f,space-amountSpace-iconSpace-3,muted)
-            val align=if(rtl)Paint.Align.LEFT else Paint.Align.RIGHT
-            text(item.amount,end,mid+2f,18f,amountSpace,fg,true,align)
-            text(item.unit,end,mid+13f,8.5f,amountSpace,muted,false,align)
-            return
-        }
-        val hasVisual = area.width() > 126f && area.height() >= 65f
-        val chartSpace = if (hasVisual) (space*.41f).coerceAtMost(134f) else 0f
-        val textArea = space - chartSpace
-        text(item.label, start, area.top + 17f, 12f, textArea, fg, true)
-        val amountSize = when {
-            area.height() >= 96f && featured -> 38f
-            area.height() >= 69f -> 24f
-            else -> 18f
-        }
-        val baseline = area.top + min(area.height() - 16f, if (amountSize > 30f) 58f else 40f)
-        text(item.amount, start, baseline, amountSize, textArea, fg, true)
-        if (item.unit.isNotBlank() && baseline + 13f <= area.bottom)
-            text(item.unit,start,baseline+10f,9f,textArea,muted)
-        if (showDetails && baseline + 24f <= area.bottom && item.detail.isNotBlank())
-            text(item.detail,start,baseline+20f,8.5f,textArea,muted)
-        if (hasVisual) {
-            val left = if (rtl) area.left+pad else area.right-pad-chartSpace+4
-            val right = if (rtl) area.left+pad+chartSpace-4 else area.right-pad
-            val chart = RectF(left, area.top + 10f, right, area.bottom - 9f)
-            facet(chart, merge(bg, fg, .095f), 13f, reverse = !rtl)
-            chart.inset(6f, 8f)
-            visual(kind, chart, fg)
-        }
-    }
-
-    fun draw() {
-        val radius = look.radius.coerceIn(12,32).toFloat()
-        val frame = RectF(0f,0f,w,h)
-        canvas.save()
-        canvas.clipPath(Path().apply { addRoundRect(frame,radius,radius,Path.Direction.CW) })
-        rect(frame, translucent(base), radius)
-        if (geometry.header) {
-            val from = if (rtl) w-12 else 12f
-            val settings = if (rtl) 22f else w-22f
-            val hold = if (geometry.cycle) 88f else 44f
-            val control = merge(base, baseInk, .11f)
-            facet(RectF(settings-15f, 7f, settings+15f, 37f), control, 11f)
-            glyph("settings", settings,22f,baseInk)
-            if (geometry.cycle) {
-                val cycleX = if (rtl) 66f else w - 66f
-                facet(RectF(cycleX-15f, 7f, cycleX+15f, 37f), control, 11f)
-                glyph("cycle", cycleX,22f,baseInk)
-            }
-            if (look.title) text(words["app"],from,27f,18f,w-hold-18f,baseInk,true)
-        }
-        geometry.parts.zip(geometry.cells(w,h)).forEachIndexed { i, (kind, area) ->
-            metricCard(kind,area,(i==0 && geometry.body in setOf(WidgetBody.FOCUS, WidgetBody.SINGLE)))
-        }
-        if (geometry.compactAction) {
-            val x = if (rtl) 5f else w-37f
-            val fill = merge(panelColor("water", true), 0xFF0D4459.toInt(), .87f)
-            val split = if (geometry.undo) h / 2 else h
-            facet(RectF(x, 5f, x+32f, split-4f), fill, 14f)
-            glyph("plus", x + 16f, split / 2, ink(fill))
-            if (geometry.undo) {
-                val undoTone = merge(base, panelColor("day_summary", true), .65f)
-                facet(RectF(x, split+3f, x+32f, h-5f), undoTone, 13f, reverse = !rtl)
-                glyph("cycle", x + 16f, split + split / 2, ink(undoTone))
-            }
-        }
-        if (geometry.footer) {
-            val active = merge(panelColor(geometry.footerKind,true), 0xFF16352E.toInt(), .86f)
-            val fg = ink(active)
-            val area = if (geometry.undo) {
-                if(rtl)RectF(49f,h-39f,w-6f,h-6f) else RectF(6f,h-39f,w-49f,h-6f)
-            } else RectF(6f,h-39f,w-6f,h-6f)
-            facet(area,active,15f)
-            val label = words[when(geometry.footerKind) {
-                "water" -> if(look.quickWater) "widget_add_cup" else "widget_log_water"
-                "glucose" -> "add_reading"
-                else -> "details"
-            }]
-            glyph(if(geometry.footerKind in listOf("water","glucose"))"plus" else "arrow",
-                if(rtl)area.right-14 else area.left+14,area.centerY(),fg)
-            text(label,if(rtl)area.right-26 else area.left+26,h-17,11.5f,area.width()-36,fg,true)
-            if (geometry.undo) {
-                val undoX = if (rtl) 22f else w - 22f
-                val undoTone = panelColor("day_summary", false)
-                facet(RectF(undoX - 16f, h-39f, undoX + 16f, h-6f), undoTone, 13f)
-                glyph("cycle", undoX, h - 23f, ink(undoTone))
-            }
-        }
-        canvas.restore()
     }
 }
+
+object WidgetArt {
+    private var fonts: Pair<Typeface, Typeface>? = null
+
+    internal fun showsWaterGraphic(width: Float, height: Float) =
+        height >= 113f && width >= 97f || width >= 143f && height >= 64f
+
+    @Synchronized private fun fonts(context: Context): Pair<Typeface, Typeface> =
+        fonts ?: (Typeface.createFromAsset(context.assets, "fonts/tajawal_regular.ttf") to
+            Typeface.createFromAsset(context.assets, "fonts/tajawal_bold.ttf")).also { fonts = it }
+
+    fun bitmap(c: Context, s: State, width: Int, height: Int, look: WidgetLook,
+               darkSystem: Boolean = false, pixelScale: Float = 1.5f): Bitmap =
+        bitmap(c, WidgetContent(s, look), width, height, look, darkSystem, pixelScale)
+
+    internal fun bitmap(c: Context, content: WidgetContent, width: Int, height: Int, look: WidgetLook,
+                        darkSystem: Boolean, pixelScale: Float): Bitmap {
+        val scale = pixelScale.coerceIn(.25f, 3f).coerceAtMost(sqrt(1_150_000f / (width * height)))
+        val bitmap = Bitmap.createBitmap((width * scale).roundToInt(), (height * scale).roundToInt(), Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        canvas.scale(bitmap.width.toFloat() / width, bitmap.height.toFloat() / height)
+        Painter(canvas, width.toFloat(), height.toFloat(), look, content, darkSystem, fonts(c)).draw()
+        return bitmap
+    }
+
+    private class Painter(
+        val canvas: Canvas, val width: Float, val height: Float, val look: WidgetLook,
+        val content: WidgetContent, darkSystem: Boolean, val fonts: Pair<Typeface, Typeface>
+    ) {
+        val words = content.words
+        val rtl = words.rtl
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG)
+        val type = TextPaint(Paint.ANTI_ALIAS_FLAG)
+        val dark = look.style in listOf("widget_midnight", "forest") || look.style == "auto" && darkSystem
+        val surface = parse(look.background, when (look.style) {
+            "widget_midnight" -> 0xFF171D30.toInt()
+            "forest" -> 0xFF142A26.toInt()
+            "blue" -> 0xFFEAF3FC.toInt()
+            "cream" -> 0xFFFBF3E5.toInt()
+            "widget_rose" -> 0xFFF9EBEE.toInt()
+            else -> if (dark) 0xFF18252C.toInt() else 0xFFF6F8FA.toInt()
+        })
+        val night = ColorUtils.calculateLuminance(surface) < .29
+        val ink = contrast(surface)
+        val secondary = ColorUtils.blendARGB(ink, surface, .24f)
+        val seam = ColorUtils.blendARGB(surface, ink, if (night) .14f else .10f)
+        val panel = ColorUtils.setAlphaComponent(ColorUtils.blendARGB(surface, Color.WHITE, if (night) .055f else .67f), 255)
+        val fontScale = when (look.font) { "compact" -> .89f; "large" -> 1.14f; else -> 1f }
+        val geometry = WidgetLayout.calculate(width.toInt(), height.toInt(), look, rtl)
+
+        private fun parse(value: String, fallback: Int) =
+            runCatching { ColorUtils.setAlphaComponent(Color.parseColor(value), 255) }.getOrDefault(fallback)
+        private fun contrast(color: Int): Int =
+            if (ColorUtils.calculateContrast(Color.WHITE, color) >= 4.5) Color.WHITE else 0xFF101416.toInt()
+                .takeIf { ColorUtils.calculateContrast(it, color) >= 4.5 } ?: Color.BLACK
+        private fun tone(kind: String): Int = when (kind) {
+            "water" -> if (night) 0xFF79CDFF.toInt() else 0xFF176EA4.toInt()
+            "medication" -> if (night) 0xFFFFC17A.toInt() else 0xFF9B4C18.toInt()
+            "day_summary" -> if (night) 0xFF85DEC2.toInt() else 0xFF18775E.toInt()
+            else -> if (night) 0xFFF6AFBC.toInt() else 0xFFAB3859.toInt()
+        }
+        private fun box(rect: RectF, color: Int, radius: Float, stroke: Boolean = false) {
+            if (rect.isEmpty) return
+            paint.color = color
+            paint.style = if (stroke) Paint.Style.STROKE else Paint.Style.FILL
+            paint.strokeWidth = 1f
+            canvas.drawRoundRect(rect, radius, radius, paint)
+            paint.style = Paint.Style.FILL
+        }
+        private fun line(x: Float, y: Float, x2: Float, y2: Float, color: Int, stroke: Float = 1f) {
+            paint.color = color
+            paint.strokeWidth = stroke
+            paint.strokeCap = Paint.Cap.ROUND
+            canvas.drawLine(x, y, x2, y2, paint)
+        }
+        private fun text(value: String, area: RectF, top: Float, size: Float, color: Int, bold: Boolean = false,
+                         fit: Boolean = false, center: Boolean = false) {
+            if (value.isBlank() || area.width() < 8) return
+            type.color = color
+            type.typeface = if (bold) fonts.second else fonts.first
+            type.textSize = size * fontScale
+            if (fit && type.measureText(value) > area.width()) {
+                type.textSize *= (area.width() / type.measureText(value)).coerceAtLeast(.60f)
+            }
+            val layout = StaticLayout.Builder.obtain(value, 0, value.length, type, area.width().toInt())
+                .setTextDirection(if (rtl) TextDirectionHeuristics.FIRSTSTRONG_RTL else TextDirectionHeuristics.FIRSTSTRONG_LTR)
+                .setAlignment(if (center) Layout.Alignment.ALIGN_CENTER else Layout.Alignment.ALIGN_NORMAL)
+                .setIncludePad(false)
+                .setMaxLines(1).setEllipsize(TextUtils.TruncateAt.END).build()
+            val x = when {
+                center -> area.left
+                rtl -> area.right - layout.getLineRight(0)
+                else -> area.left - layout.getLineLeft(0)
+            }
+            canvas.save()
+            canvas.translate(x, top)
+            layout.draw(canvas)
+            canvas.restore()
+        }
+        private fun glyph(kind: String, x: Float, y: Float, size: Float, color: Int) {
+            canvas.save()
+            canvas.translate(x, y)
+            canvas.scale(size / 24, size / 24)
+            paint.color = color
+            paint.strokeWidth = 1.65f
+            paint.strokeCap = Paint.Cap.ROUND
+            paint.strokeJoin = Paint.Join.ROUND
+            paint.style = Paint.Style.STROKE
+            val path = Path()
+            fun mark(x1: Float, y1: Float, x2: Float, y2: Float) = canvas.drawLine(x1, y1, x2, y2, paint)
+            when (kind) {
+                "water" -> {
+                    path.moveTo(12f, 2f)
+                    path.cubicTo(9f, 7f, 5f, 10f, 5f, 15f)
+                    path.cubicTo(5f, 24f, 19f, 24f, 19f, 15f)
+                    path.cubicTo(19f, 10f, 15f, 7f, 12f, 2f)
+                    canvas.drawPath(path, paint)
+                }
+                "glucose" -> { path.moveTo(2f, 13f); path.lineTo(7f, 13f); path.lineTo(10f, 5f)
+                    path.lineTo(14f, 19f); path.lineTo(17f, 11f); path.lineTo(22f, 11f); canvas.drawPath(path, paint) }
+                "medication" -> {
+                    canvas.rotate(42f, 12f, 12f)
+                    canvas.drawRoundRect(7f, 2f, 17f, 22f, 5f, 5f, paint)
+                    mark(7f, 12f, 17f, 12f)
+                }
+                "settings" -> { mark(3f, 8f, 21f, 8f); mark(3f, 16f, 21f, 16f)
+                    mark(9f, 5f, 9f, 11f); mark(15f, 13f, 15f, 19f) }
+                "plus" -> { mark(5f, 12f, 19f, 12f); mark(12f, 5f, 12f, 19f) }
+                "cycle" -> { mark(4f, 8f, 20f, 8f); mark(20f, 8f, 16f, 4f)
+                    mark(4f, 16f, 20f, 16f); mark(4f, 16f, 8f, 20f) }
+                "undo" -> { canvas.drawArc(4f, 7f, 21f, 20f, -142f, 240f, false, paint)
+                    mark(4f, 9f, 4f, 3f); mark(4f, 9f, 10f, 9f) }
+                "arrow" -> { val end = if (rtl) 5f else 19f; val bend = if (rtl) 11f else 13f
+                    mark(5f, 12f, 19f, 12f); mark(end, 12f, bend, 6f); mark(end, 12f, bend, 18f) }
+                else -> { canvas.drawRoundRect(4f, 4f, 20f, 20f, 4f, 4f, paint)
+                    mark(8f, 10f, 16f, 10f); mark(8f, 15f, 13f, 15f) }
+            }
+            paint.style = Paint.Style.FILL
+            canvas.restore()
+        }
+
+        private fun trace(a: RectF, color: Int): Boolean {
+            val values = content.readings
+            if (values.size < 2) return false
+            val low = values.min()
+            val range = (values.max() - low).coerceAtLeast(10.0)
+            repeat(3) { index -> val y = a.top + a.height() * index / 2; line(a.left, y, a.right, y, seam) }
+            val path = Path()
+            val points = values.mapIndexed { i, value ->
+                val x = a.left + a.width() * i / values.lastIndex
+                val y = a.bottom - a.height() * (.12f + .76f * ((value - low) / range).toFloat())
+                if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
+                PointF(x, y)
+            }
+            val fill = Path(path).apply { lineTo(a.right, a.bottom); lineTo(a.left, a.bottom); close() }
+            paint.shader = LinearGradient(0f, a.top, 0f, a.bottom, ColorUtils.setAlphaComponent(color, 55),
+                ColorUtils.setAlphaComponent(color, 0), Shader.TileMode.CLAMP)
+            canvas.drawPath(fill, paint)
+            paint.shader = null
+            paint.color = color
+            paint.style = Paint.Style.STROKE
+            paint.strokeWidth = 2f
+            paint.strokeJoin = Paint.Join.ROUND
+            canvas.drawPath(path, paint)
+            paint.style = Paint.Style.FILL
+            points.last().let { canvas.drawCircle(it.x, it.y, 3f, paint) }
+            return true
+        }
+
+        private fun water(a: RectF, color: Int) {
+            val progress = content.hydration?.coerceIn(0f, 1f)
+            val edge = min(a.width(), a.height())
+            val x = a.centerX()
+            val y = a.centerY()
+            val track = ColorUtils.blendARGB(panel, color, if (night) .28f else .17f)
+            when (look.waterVisual) {
+                "bottle" -> {
+                    val jar = RectF(x - edge * .23f, y - edge * .27f, x + edge * .23f, y + edge * .41f)
+                    val corners = edge * .12f
+                    box(jar, track, corners)
+                    progress?.let {
+                        canvas.save()
+                        canvas.clipPath(Path().apply { addRoundRect(jar, corners, corners, Path.Direction.CW) })
+                        box(RectF(jar.left, jar.bottom - jar.height() * it, jar.right, jar.bottom), color, 2f)
+                        canvas.restore()
+                    }
+                    box(jar, color, corners, true)
+                    box(RectF(x - edge * .125f, y - edge * .43f, x + edge * .125f, y - edge * .29f),
+                        if (progress == null) track else color, 2f)
+                }
+                "widget_bars" -> repeat(7) { i ->
+                    val left = x - edge * .48f + i * edge * .14f
+                    val bar = RectF(left, y - edge * .27f, left + edge * .085f, y + edge * .27f)
+                    box(bar, track, 3f)
+                    val fraction = ((progress ?: 0f) * 7 - i).coerceIn(0f, 1f)
+                    box(RectF(bar.left, bar.bottom - bar.height() * fraction, bar.right, bar.bottom), color, 3f)
+                }
+                else -> {
+                    val radius = edge * .39f
+                    val dial = RectF(x - radius, y - radius, x + radius, y + radius)
+                    paint.style = Paint.Style.STROKE
+                    paint.strokeCap = Paint.Cap.ROUND
+                    paint.strokeWidth = (edge * .105f).coerceAtLeast(2f)
+                    paint.color = track
+                    canvas.drawArc(dial, 140f, 260f, false, paint)
+                    if (progress != null && progress > 0f) {
+                        paint.color = color
+                        canvas.drawArc(dial, 140f, 260 * progress, false, paint)
+                    }
+                    paint.style = Paint.Style.FILL
+                    glyph("water", x - edge * .14f, y - edge * .14f, edge * .28f, color)
+                }
+            }
+        }
+
+        private fun metric(kind: String, bounds: RectF, hero: Boolean) {
+            val card = RectF(bounds).apply { inset(3.5f, 3.5f) }
+            val rows = geometry.body == WidgetBody.ROWS
+            val radius = (look.radius * .56f).coerceIn(7f, 20f)
+            if (!rows) {
+                box(card, panel, radius)
+                box(RectF(card).apply { inset(.5f, .5f) }, seam, radius, true)
+            } else {
+                box(card, panel, 6f)
+                val hasNextRow = bounds.bottom < height - if (geometry.footer) 47f else 1f
+                if (hasNextRow) line(card.left + 8, bounds.bottom, card.right - 8, bounds.bottom, seam)
+            }
+            val m = content.metric(kind)
+            val hue = tone(kind)
+            val roomy = card.width() >= (if (kind == "water") 136f else 171f) && card.height() >= 57
+            val tall = card.height() >= 106
+            val micro = card.width() < 90 || card.height() < 47
+            val inner = RectF(card).apply { inset(if (micro) 5f else 9f, 0f) }
+            val artSize = if (roomy) min(card.height() - 18f, if (hero) 61f else 42f) else if (tall) 36f else 13f
+            val artWidth = if (roomy && hero && kind == "glucose") min(102f, card.width() * .36f) else artSize
+            val art = if (roomy && rtl) RectF(inner.left, card.centerY() - artSize / 2, inner.left + artWidth, card.centerY() + artSize / 2)
+            else if (roomy) RectF(inner.right - artWidth, card.centerY() - artSize / 2, inner.right, card.centerY() + artSize / 2)
+            else if (tall) RectF(inner.centerX() - artSize / 2, card.bottom - artSize - 5, inner.centerX() + artSize / 2, card.bottom - 5)
+            else if (rtl) RectF(inner.left, card.top + 6, inner.left + artSize, card.top + artSize + 6)
+            else RectF(inner.right - artSize, card.top + 6, inner.right, card.top + artSize + 6)
+            val titleArea = RectF(inner)
+            if (!micro && (roomy || !tall)) {
+                if (rtl) titleArea.left = art.right + 4 else titleArea.right = art.left - 4
+            }
+            val readingArea = if (roomy) titleArea else inner
+            val labelY = card.top + if (micro) 3f else if (roomy && tall) 14f else 6f
+            val readingY = labelY + if (micro) 15f else 17f
+            val amountSize = when { micro -> 15f; hero && tall -> 34f; hero && roomy -> 27f; rows -> 18f; else -> 22f }
+            val useUnitLine = m.unit.isNotBlank() && (hero && tall || readingArea.width() < 80 && card.height() >= 62)
+            text(m.label, titleArea, labelY, if (micro) 9.5f else 12f, secondary, bold = true, fit = true)
+            text(if (useUnitLine) m.amount else m.value, readingArea, readingY, amountSize, ink, bold = true, fit = true)
+            val noteY = readingY + amountSize * fontScale + 1f
+            if (useUnitLine) text(m.unit, readingArea, noteY, 10f, hue)
+            val goal = if (kind == "water") content.hydration?.let {
+                words.f("widget_goal_pct", "amount" to number(it.toDouble() * 100, words))
+            }.orEmpty() else ""
+            val notes = if (look.details) listOf(m.period, m.detail, goal).filter(String::isNotBlank) else emptyList()
+            val noteStart = noteY + if (useUnitLine) 12 * fontScale else 0f
+            val noteLimit = if (!roomy && tall) art.top else card.bottom
+            notes.forEachIndexed { i, note ->
+                val top = noteStart + i * 12 * fontScale
+                if (top + 11 * fontScale <= noteLimit - 2f) text(note, readingArea, top, 10f, secondary, fit = true)
+            }
+            if (micro) return
+            if (kind == "water" && showsWaterGraphic(bounds.width(), bounds.height())) water(art, hue)
+            else if (kind == "glucose" && (roomy || tall) && trace(RectF(art).apply { inset(3f, 6f) }, hue)) Unit
+            else {
+                val size = if (roomy || tall) min(20f, artSize) else artSize
+                glyph(kind, art.centerX() - size / 2, art.centerY() - size / 2, size, hue)
+            }
+        }
+
+        private fun control(spot: RectF, kind: String, fill: Int, label: String = "") {
+            val fg = contrast(fill)
+            box(spot, fill, (look.radius * .54f).coerceIn(7f, 18f))
+            val described = label.isNotEmpty() && spot.width() >= 101f
+            val x = if (described) if (rtl) spot.right - 20f else spot.left + 20f else spot.centerX()
+            glyph(kind, x - 7.5f, spot.centerY() - 7.5f, 15f, fg)
+            if (described) {
+                val space = RectF(spot).apply { if (rtl) { right -= 33; left += 9 } else { left += 33; right -= 9 } }
+                text(label, space, spot.centerY() - 6.5f * fontScale, 12f, fg, bold = true, fit = true)
+            }
+        }
+
+        fun draw() {
+            val radius = min(look.radius.toFloat(), min(width, height) / 2)
+            val outer = RectF(0f, 0f, width, height)
+            val clip = Path().apply { addRoundRect(outer, radius, radius, Path.Direction.CW) }
+            canvas.save()
+            canvas.clipPath(clip)
+            canvas.drawColor(ColorUtils.setAlphaComponent(surface, look.opacity * 255 / 100))
+            box(RectF(outer).apply { inset(.6f, .6f) }, ColorUtils.setAlphaComponent(seam, look.opacity * 255 / 100), radius, true)
+
+            if (geometry.header) {
+                fun headerButton(index: Int, kind: String) {
+                    val center = if (rtl) 22f + index * 44 else width - 22f - index * 44
+                    control(RectF(center - 15, 7f, center + 15, 37f), kind, panel)
+                }
+                headerButton(0, "settings")
+                if (geometry.cycle) headerButton(1, "cycle")
+                if (look.title && width >= 145f) {
+                    val margin = if (geometry.cycle) 91f else 47f
+                    val area = if (rtl) RectF(margin, 0f, width - 15, 44f) else RectF(15f, 0f, width - margin, 44f)
+                    text(words["app"], area, 12f, 19f, ink, bold = true, fit = true)
+                }
+            }
+            geometry.parts.zip(geometry.cells(width, height)).forEachIndexed { i, (kind, area) ->
+                metric(kind, area, geometry.body == WidgetBody.SINGLE || geometry.body == WidgetBody.FOCUS && i == 0)
+            }
+            val action = parse(look.accent, if (night) 0xFFBAE5DB.toInt() else 0xFF244C49.toInt())
+            fun button(rect: RectF, key: String, color: Int, label: String = "") {
+                rect.inset(4f, 4f)
+                control(rect, key, color, label)
+            }
+            if (geometry.compactAction) {
+                val x = if (rtl) 0f else width - 42
+                val split = if (geometry.undo) height / 2 else height
+                button(RectF(x, 0f, x + 42, split), "plus", action)
+                if (geometry.undo) button(RectF(x, split, x + 42, height), "undo", panel)
+            }
+            if (geometry.footer) {
+                val size = if (geometry.undo) 48f else 0f
+                val footer = RectF(if (rtl) size else 0f, height - 46, if (rtl) width else width - size, height)
+                val key = geometry.footerKind
+                val adding = key == "water" || key == "glucose"
+                button(footer, if (adding) "plus" else "arrow", action, words[geometry.actionLabel(look)])
+                if (geometry.undo) {
+                    val undo = if (rtl) RectF(0f, footer.top, size, height) else RectF(width - size, footer.top, width, height)
+                    button(undo, "undo", panel)
+                }
+            }
+            canvas.restore()
+        }
+    }
+}
+
+

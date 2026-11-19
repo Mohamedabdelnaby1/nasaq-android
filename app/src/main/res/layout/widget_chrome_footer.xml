@@ -3,11 +3,11 @@
     <LinearLayout android:id="@+id/widget_footer_ltr" android:layout_width="match_parent"
         android:layout_height="match_parent" android:orientation="horizontal">
         <TextView android:id="@+id/widget_add" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
-        <TextView android:id="@+id/widget_undo" android:layout_width="72dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
+        <TextView android:id="@+id/widget_undo" android:layout_width="48dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
     </LinearLayout>
     <LinearLayout android:id="@+id/widget_footer_rtl" android:layout_width="match_parent"
         android:layout_height="match_parent" android:orientation="horizontal" android:visibility="gone">
-        <TextView android:id="@+id/widget_undo_rtl" android:layout_width="72dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
+        <TextView android:id="@+id/widget_undo_rtl" android:layout_width="48dp" android:layout_height="match_parent" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
         <TextView android:id="@+id/widget_add_rtl" android:layout_width="0dp" android:layout_height="match_parent" android:layout_weight="1" android:focusable="true" android:background="?android:attr/selectableItemBackground" />
     </LinearLayout>
 </FrameLayout>

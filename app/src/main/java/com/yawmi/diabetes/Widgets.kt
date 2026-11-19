@@ -1,31 +1,81 @@
 package com.yawmi.diabetes
 
-import android.app.*
-import android.appwidget.*
-import android.content.*
-import android.content.res.Configuration
+import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
+import android.appwidget.AppWidgetProvider
+import android.content.BroadcastReceiver
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.Bundle
-import android.view.View
-import android.graphics.*
-import android.util.TypedValue
-import androidx.core.graphics.ColorUtils
-import android.widget.RemoteViews
+import android.util.Log
+import android.view.WindowManager
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+
+// Keep the installed preference keys readable across app upgrades.
+private fun WidgetLook.fields(): Map<String, Any> = mapOf(
+    "mode" to mode, "style" to style, "visible" to visible, "parts" to parts.joinToString(","),
+    "opacity" to opacity, "font" to font, "title" to title, "time" to details, "action" to action,
+    "background" to background, "accent" to accent, "waterVisual" to waterVisual, "radius" to radius,
+    "quickWater" to quickWater, "layout" to layout, "actionTarget" to actionTarget
+)
+
+internal fun WidgetLook.toBundle(): Bundle = Bundle().apply {
+    fields().forEach { (name, value) ->
+        when (value) {
+            is String -> putString(name, value)
+            is Int -> putInt(name, value)
+            is Boolean -> putBoolean(name, value)
+        }
+    }
+}
+
+internal fun widgetColor(value: String): Boolean =
+    value.isBlank() || runCatching { android.graphics.Color.parseColor(value.trim()) }.isSuccess
+
+private fun widgetLook(read: (String) -> Any?): WidgetLook {
+    fun str(name: String, fallback: String) = read(name) as? String ?: fallback
+    fun bool(name: String, fallback: Boolean) = read(name) as? Boolean ?: fallback
+    fun int(name: String, fallback: Int) = read(name) as? Int ?: fallback
+    fun choice(name: String, values: List<String>, fallback: String) =
+        str(name, fallback).takeIf { it in values } ?: fallback
+    fun color(name: String) = str(name, "").trim().takeIf(::widgetColor).orEmpty()
+    return WidgetLook(
+        mode = choice("mode", widgetModes, "summary"), style = choice("style", widgetStyles, "auto"),
+        visible = bool("visible", false),
+        parts = str("parts", "").split(',').filter { it in widgetParts }.distinct().ifEmpty { widgetParts },
+        opacity = int("opacity", 100).coerceIn(0, 100),
+        font = choice("font", listOf("compact", "comfortable", "large"), "comfortable"),
+        title = bool("title", true), details = bool("time", true), action = bool("action", true),
+        background = color("background"), accent = color("accent"),
+        waterVisual = choice("waterVisual", widgetWaterVisuals, "ring"),
+        radius = int("radius", 24).coerceIn(12, 32), quickWater = bool("quickWater", false),
+        layout = choice("layout", widgetLayouts, "widget_focus"),
+        actionTarget = choice("actionTarget", widgetActionTargets, "auto")
+    )
+}
+
+@Suppress("DEPRECATION")
+internal fun widgetLook(bundle: Bundle): WidgetLook = widgetLook(bundle::get)
 
 object Widgets {
-    fun valuesVisible(locked:Boolean,optIn:Boolean)=optIn && !locked
-    private fun config(c:Context)=c.getSharedPreferences("home-widgets",Context.MODE_PRIVATE)
-    internal fun ids(c: Context): List<Int> = AppWidgetManager.getInstance(c)
-        .getAppWidgetIds(ComponentName(c, YawmiWidget::class.java)).sorted()
+    fun valuesVisible(locked: Boolean, optIn: Boolean) = optIn && !locked
+    internal fun config(c: Context) = c.getSharedPreferences("home-widgets", Context.MODE_PRIVATE)
+    private fun provider(c: Context) = ComponentName(c, YawmiWidget::class.java)
+    internal fun ids(c: Context): List<Int> = AppWidgetManager.getInstance(c).getAppWidgetIds(provider(c)).sorted()
+    internal fun exists(c: Context, id: Int) = id != AppWidgetManager.INVALID_APPWIDGET_ID &&
+        AppWidgetManager.getInstance(c).getAppWidgetInfo(id)?.provider == provider(c)
 
     internal fun configIntent(c: Context, id: Int) = Intent(c, WidgetConfigActivity::class.java)
         .putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id)
@@ -33,94 +83,132 @@ object Widgets {
     fun pin(c: Context, look: WidgetLook = WidgetLook()): Boolean {
         val manager = AppWidgetManager.getInstance(c)
         if (!manager.isRequestPinAppWidgetSupported) return false
-        val payload = Bundle().apply {
-            putString("mode",look.mode); putString("style",look.style); putBoolean("visible",look.visible)
-            putStringArrayList("parts",ArrayList(look.parts)); putInt("opacity",look.opacity); putString("font",look.font)
-            putBoolean("title",look.title); putBoolean("details",look.details); putBoolean("action",look.action)
-            putString("background",look.background); putString("accent",look.accent); putString("waterVisual",look.waterVisual)
-            putInt("radius",look.radius); putBoolean("quickWater",look.quickWater); putString("layout",look.layout)
-        }
         val call = Intent(c, WidgetPinReceiver::class.java)
-            .setData(android.net.Uri.parse("yawmi://widget-pin/${java.util.UUID.randomUUID()}"))
-            .putExtra("look", payload)
-        val flags = PendingIntent.FLAG_ONE_SHOT or if (android.os.Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
+            .setData(android.net.Uri.parse("yawmi://widget-pin/" + java.util.UUID.randomUUID()))
+            .putExtra("look", look.toBundle())
+        val flags = PendingIntent.FLAG_ONE_SHOT or if (Build.VERSION.SDK_INT >= 31) PendingIntent.FLAG_MUTABLE else 0
         val callback = PendingIntent.getBroadcast(c, 0, call, flags)
-        return runCatching { manager.requestPinAppWidget(ComponentName(c, YawmiWidget::class.java), null, callback) }
+        return runCatching { manager.requestPinAppWidget(provider(c), null, callback) }
             .getOrDefault(false).also { if (!it) callback.cancel() }
     }
-    fun updateAll(c:Context,s:State) {
-        ids(c).forEach { render(c,s,it) }
+
+    fun updateAll(c: Context, s: State) = update(c, s, ids(c))
+    internal fun update(c: Context, s: State, ids: Iterable<Int>) {
+        ids.forEach { id ->
+            runCatching { GraphicalWidgets.render(c, s, id) }
+                .onFailure {
+                    Log.w("NasaqWidget", "Widget refresh failed", it)
+                    if (s.preferences.lock) runCatching { placeholder(c, id) }
+                }
+        }
     }
-    internal fun save(c: Context, id: Int, look: WidgetLook) = save(c, id, look.mode, look.style, look.visible, look.parts,
-        look.opacity, look.font, look.title, look.details, look.action, look.background, look.accent,
-        look.waterVisual, look.radius, look.quickWater, look.layout)
-    fun render(c:Context,s:State,id:Int)=GraphicalWidgets.render(c,s,id)
-    fun save(c:Context,id:Int,mode:String,style:String,visible:Boolean,parts:List<String>,opacity:Int,font:String,title:Boolean,time:Boolean,action:Boolean,background:String,accent:String,waterVisual:String="ring",radius:Int=24,quickWater:Boolean=false,layout:String="widget_focus"){
-        require(waterVisual in widgetWaterVisuals && radius in 12..32 && layout in widgetLayouts)
-        require(mode in widgetModes && style in widgetStyles)
-        require(parts.isNotEmpty() && parts.distinct().size==parts.size && parts.all{it in widgetParts})
-        require(opacity in 0..100 && font in setOf("compact","comfortable","large"))
-        if(background.isNotBlank())Color.parseColor(background);if(accent.isNotBlank())Color.parseColor(accent)
-        config(c).edit().putString("${id}_mode",mode).putString("${id}_style",style).putBoolean("${id}_visible",visible)
-            .putString("${id}_parts",parts.joinToString(",")).putInt("${id}_opacity",opacity).putString("${id}_font",font)
-            .putBoolean("${id}_title",title).putBoolean("${id}_time",time).putBoolean("${id}_action",action)
-            .putString("${id}_background",background).putString("${id}_accent",accent).putString("${id}_waterVisual",waterVisual).putInt("${id}_radius",radius)
-            .putString("${id}_layout",layout).putBoolean("${id}_quickWater",quickWater).putInt("${id}_cycle",0).remove("${id}_token").apply()
-        render(c,Store.get(c).read(),id)
+    internal fun placeholder(c: Context, id: Int) = AppWidgetManager.getInstance(c).updateAppWidget(
+        id, android.widget.RemoteViews(c.packageName, R.layout.widget_placeholder))
+
+    internal fun save(c: Context, id: Int, look: WidgetLook) {
+        check(exists(c, id))
+        val editor = config(c).edit()
+        widgetLook(look.toBundle()).fields().forEach { (key, value) ->
+            val name = "${id}_$key"
+            when (value) {
+                is String -> editor.putString(name, value)
+                is Int -> editor.putInt(name, value)
+                is Boolean -> editor.putBoolean(name, value)
+            }
+        }
+        check(editor.putInt("${id}_cycle", 0).remove("${id}_token").commit())
+        Store.get(c).renderWidget(id)
     }
+
     fun look(c: Context, id: Int): WidgetLook {
-        val config = config(c)
-        fun str(key: String, fallback: String) = config.getString("${id}_$key", fallback) ?: fallback
-        fun bool(key: String, default: Boolean) = config.getBoolean("${id}_$key", default)
-        return WidgetLook(
-            mode = str("mode", "summary"), style = str("style", "auto"),
-            visible = bool("visible", false), parts = str("parts", widgetParts.joinToString(","))
-                .split(',').filter { it in widgetParts }.distinct().ifEmpty { widgetParts },
-            opacity = config.getInt("${id}_opacity", 100), font = str("font", "comfortable"),
-            title = bool("title", true), details = bool("time", true), action = bool("action", true),
-            background = str("background", ""), accent = str("accent", ""),
-            waterVisual = str("waterVisual", "ring"), radius = config.getInt("${id}_radius", 24),
-            quickWater = bool("quickWater", false), layout = str("layout", "widget_focus")
-        )
+        val all = config(c).all
+        return widgetLook { key -> all["${id}_$key"] }
     }
-    fun remove(c:Context,ids:IntArray){val edit=config(c).edit();ids.forEach{id->listOf("mode","style","visible","parts","opacity","font","title","time","action","background","accent","waterVisual","radius","quickWater","layout","cycle","token").forEach{edit.remove("${id}_$it")}};edit.apply()}
+
+    internal fun remove(c: Context, ids: IntArray) {
+        val prefs = config(c)
+        val prefixes = ids.map { "${it}_" }
+        val edit = prefs.edit()
+        prefs.all.keys.filter { key -> prefixes.any(key::startsWith) }.forEach(edit::remove)
+        edit.apply()
+    }
 }
 
-class YawmiWidget:AppWidgetProvider(){
-    override fun onUpdate(c:Context,m:AppWidgetManager,ids:IntArray){runCatching{val s=Store.get(c).read();ids.forEach{Widgets.render(c,s,it)}}}
-    override fun onAppWidgetOptionsChanged(c:Context,m:AppWidgetManager,id:Int,options:Bundle){onUpdate(c,m,intArrayOf(id))}
-    override fun onDeleted(c:Context,ids:IntArray){Widgets.remove(c,ids)}
+class YawmiWidget : AppWidgetProvider() {
+    override fun onUpdate(c: Context, m: AppWidgetManager, ids: IntArray) {
+        val task = goAsync()
+        Reminders.worker.execute {
+            try {
+                Store.get(c).refreshWidgets(ids.asIterable())
+            } catch (error: Exception) {
+                Log.w("NasaqWidget", "Could not read local widget data", error)
+                ids.forEach { id -> runCatching { Widgets.placeholder(c, id) } }
+            } finally {
+                task?.finish()
+            }
+        }
+    }
+    override fun onAppWidgetOptionsChanged(c: Context, m: AppWidgetManager, id: Int, options: Bundle) =
+        onUpdate(c, m, intArrayOf(id))
+
+    override fun onDeleted(c: Context, ids: IntArray) {
+        Reminders.worker.execute { Widgets.remove(c, ids) }
+    }
 }
 
 class WidgetPinReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
-        if (id !in Widgets.ids(context)) return
-        val data = intent.getBundleExtra("look") ?: return
-        val look = WidgetLook(mode = data.getString("mode","summary"), style = data.getString("style","auto"),
-            visible = data.getBoolean("visible"), parts = data.getStringArrayList("parts") ?: widgetParts,
-            opacity = data.getInt("opacity",100), font = data.getString("font","comfortable"),
-            title = data.getBoolean("title",true), details = data.getBoolean("details",true), action = data.getBoolean("action",true),
-            background = data.getString("background",""), accent = data.getString("accent",""),
-            waterVisual = data.getString("waterVisual","ring"), radius = data.getInt("radius",24),
-            quickWater = data.getBoolean("quickWater"), layout = data.getString("layout","widget_focus"))
+        if (!Widgets.exists(context, id)) return
+        val look = intent.getBundleExtra("look")?.let(::widgetLook) ?: return
         val task = goAsync()
         Reminders.worker.execute {
-            try { Widgets.save(context, id, look) } finally { task.finish() }
+            try { Widgets.save(context, id, look) }
+            catch (error: Exception) { Log.w("NasaqWidget", "Could not save pinned widget", error) }
+            finally { task.finish() }
         }
     }
 }
 
-class WidgetConfigActivity:ComponentActivity(){
-    override fun onCreate(savedInstanceState:Bundle?){
-        super.onCreate(savedInstanceState);setResult(RESULT_CANCELED)
-        val id=intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,AppWidgetManager.INVALID_APPWIDGET_ID)
-        val info=AppWidgetManager.getInstance(this).getAppWidgetInfo(id)
-        if(id==AppWidgetManager.INVALID_APPWIDGET_ID || info?.provider!=ComponentName(this,YawmiWidget::class.java)){finish();return}
-        val s=runCatching{Store.get(this).read()}.getOrElse{finish();return}
-        setContent { YawmiTheme(s.preferences) { WidgetStudio(s, Widgets.look(this@WidgetConfigActivity, id), onDismiss={finish()}, onSave={next->
-            Widgets.save(this@WidgetConfigActivity, id, next)
-            setResult(RESULT_OK,Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id));finish()
-        })}}
+class WidgetConfigActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        enableEdgeToEdge()
+        setResult(RESULT_CANCELED)
+        val id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+        if (!Widgets.exists(this, id)) { finish(); return }
+        lifecycleScope.launch {
+            val state = withContext(Dispatchers.IO) { runCatching { Store.get(applicationContext).read() }.getOrNull() }
+            if (state == null) {
+                Toast.makeText(this@WidgetConfigActivity, Words("system")["load_error"], Toast.LENGTH_LONG).show()
+                finish()
+                return@launch
+            }
+            if (state.preferences.secureScreen || state.preferences.lock) window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+            val initial = Widgets.look(applicationContext, id)
+            val size = GraphicalWidgets.currentSize(applicationContext, id)
+            var saving by mutableStateOf(false)
+            setContent {
+                YawmiTheme(state.preferences) {
+                    WidgetStudio(state, initial, onDismiss = { if (!saving) finish() }, onSave = { next ->
+                        if (!saving) {
+                            saving = true
+                            lifecycleScope.launch {
+                                val saved = withContext(Dispatchers.IO) {
+                                    runCatching { Widgets.save(applicationContext, id, next) }.isSuccess
+                                }
+                                saving = false
+                                if (saved) {
+                                    setResult(RESULT_OK, Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id))
+                                    finish()
+                                } else Toast.makeText(this@WidgetConfigActivity,
+                                    Words(state.preferences.language)["save_error"], Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }, actualSize = size, saving = saving)
+                }
+            }
+        }
     }
 }
+

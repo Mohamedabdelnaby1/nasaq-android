@@ -5,7 +5,7 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.13.0/Nasaq-v0.13.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-205449?style=for-the-badge" alt="تنزيل APK"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.14.0/Nasaq-v0.14.0.apk"><img src="https://img.shields.io/badge/Android-0.14.0-205449?style=for-the-badge" alt="تنزيل نَسَق 0.14.0"></a>
   <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="كل الإصدارات"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
@@ -17,11 +17,18 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-1. [نزّل Nasaq-v0.13.0.apk مباشرة](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.13.0/Nasaq-v0.13.0.apk) من GitHub.
-2. ثبّت الملف أو افتحه كتحديث لو النسخة الحالية من إصدارات المشروع بنفس التوقيع.
-3. [أحدث إصدار](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/latest) فيه بصمة **SHA-256** للملف وكود الإصدار. الإصدارات القديمة متاحة في [الأرشيف](https://github.com/Mohamedabdelnaby1/nasaq-android/releases).
+[نزّل Nasaq-v0.14.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.14.0/Nasaq-v0.14.0.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
 
-### الجديد في 0.13.0
+[الإصدارات المنشورة وبصمات SHA-256](https://github.com/Mohamedabdelnaby1/nasaq-android/releases)
+
+### التغييرات في 0.14.0
+
+- ويدجتس جديدة برسوم للسكر والمياه، وتوزيعات تتكيف مع المقاس.
+- معاينة بمقاس الويدجت الفعلي وإعدادات مستقلة لكل نسخة، تشمل ترتيب البطاقات ووظيفة الزر السريع والألوان.
+- كل بطاقة تفتح قسمها، وقفل التطبيق يخفي بيانات الويدجت ويمنع التسجيل المباشر.
+- تحقّق إضافي من أن معاينة استرجاع النسخة المشفّرة ما زالت مطابقة لحالة السجل وقت الحفظ.
+
+### الجديد في الإصدار المنشور 0.13.0
 
 - تقرير PDF بتصميم نَسَق الجديد، مع شعار وفترة واضحة في أول صفحة.
 - ملخص ملوّن للسكر والسوائل والجرعات، ورسم للقراءات بدليل ألوان ونطاق الهدف.
@@ -83,3 +90,4 @@ measured_at_iso,kind,value,unit
 ## الترخيص
 
 تطوير [محمد عبدالنبي](https://fb.com/mohamedabdelnaby190) · [رخصة MIT](LICENSE) · [ترخيص خط تجوال](app/src/main/assets/licenses/Tajawal-OFL.txt).
+

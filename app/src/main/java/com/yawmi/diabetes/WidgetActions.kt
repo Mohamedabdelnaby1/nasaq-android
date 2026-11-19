@@ -45,17 +45,20 @@ class WidgetActionReceiver:BroadcastReceiver() {
             try {
                 val manager=AppWidgetManager.getInstance(context)
                 if(manager.getAppWidgetInfo(id)?.provider!=ComponentName(context,YawmiWidget::class.java))return@execute
-                val config=context.getSharedPreferences("home-widgets",Context.MODE_PRIVATE)
+                val config=Widgets.config(context)
                 val store=Store.get(context)
                 if(action=="cycle"){
                     if(config.getString("${id}_mode","summary")!="summary")return@execute
                     val index=config.getInt("${id}_cycle",0).coerceAtLeast(0)
                     if(index.toString()!=token)return@execute
                     config.edit().putInt("${id}_cycle",(index+1)%60).apply()
-                    Widgets.render(context,store.read(),id)
+                    store.refreshWidgets(listOf(id))
                     return@execute
                 }
-                if(action !in setOf("add","undo") || !config.getBoolean("${id}_quickWater",false) ||
+                val look = Widgets.look(context, id)
+                val water = look.mode == "water" || look.mode == "summary" && "water" in look.parts &&
+                    (look.actionTarget !in look.parts || look.actionTarget == "water")
+                if(action !in setOf("add","undo") || !look.action || !look.quickWater || !water ||
                     context.getSystemService(KeyguardManager::class.java).isDeviceLocked)return@execute
                 val now=System.currentTimeMillis()
                 var changed=false
@@ -68,6 +71,10 @@ class WidgetActionReceiver:BroadcastReceiver() {
                     next
                 }
                 if(changed){
+                    if (action == "add" && config.getString("${id}_token", "") == token) {
+                        config.edit().remove("${id}_token").apply()
+                        store.refreshWidgets(listOf(id))
+                    }
                     Reminders.reschedule(context)
                     if (action == "add") {
                         val app = context.applicationContext
@@ -75,7 +82,7 @@ class WidgetActionReceiver:BroadcastReceiver() {
                             Reminders.worker.execute {
                                 runCatching {
                                     if (AppWidgetManager.getInstance(app).getAppWidgetInfo(id) != null)
-                                        Widgets.render(app, Store.get(app).read(), id)
+                                        Store.get(app).refreshWidgets(listOf(id))
                                 }
                             }
                         }, WidgetActions.undoWindow + 30)
@@ -84,10 +91,11 @@ class WidgetActionReceiver:BroadcastReceiver() {
                         val words=Words(state.preferences.language)
                         Toast.makeText(context,words[if(action=="undo")"widget_undone"else"record_saved"],Toast.LENGTH_SHORT).show()
                     }
-                }
-            } catch (_:Exception) {
-                // The encrypted store is left intact if it cannot be read.
+                } else if (action == "undo") store.refreshWidgets(listOf(id))
+            } catch (error:Exception) {
+                android.util.Log.w("NasaqWidget", "Widget action failed", error)
             } finally { pending.finish() }
         }
     }
 }
+

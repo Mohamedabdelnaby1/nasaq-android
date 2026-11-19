@@ -7,6 +7,7 @@ internal val widgetModes = listOf("summary") + widgetParts + "day_summary"
 internal val widgetStyles = listOf("auto", "forest", "cream", "blue", "widget_rose", "widget_midnight")
 internal val widgetLayouts = listOf("widget_focus", "widget_tiles", "widget_lines")
 internal val widgetWaterVisuals = listOf("ring", "bottle", "widget_bars")
+internal val widgetActionTargets = listOf("auto") + widgetParts
 
 internal enum class WidgetBody { SINGLE, FOCUS, ROWS, TILES }
 
@@ -21,6 +22,12 @@ internal data class WidgetLayout(
     val compactAction: Boolean = false,
     val compactRtl: Boolean = false
 ) {
+    fun actionLabel(look: WidgetLook): String = when (footerKind) {
+        "water" -> if (look.quickWater) "widget_add_cup" else "widget_log_water"
+        "glucose" -> "add_reading"
+        else -> "details"
+    }
+
     fun cells(width: Float, height: Float): List<RectF> {
         val top = if (header) 44f else 0f
         val bottom = height - if (footer) 46f else 0f
@@ -65,7 +72,7 @@ internal data class WidgetLayout(
             val hasRoomForAll = fit(height) != null
             val canAddFooter = look.action && width >= 145
             val priorityFooter = canAddFooter && look.quickWater && "water" in parts && fit(height - 46) != null
-            val header = if (hasRoomForAll) width >= 145 && (look.title || parts.size > 1) &&
+            val header = if (hasRoomForAll) width >= 145 &&
                 fit(height - 44 - if (priorityFooter) 46 else 0) != null
             else width >= 110 && height >= 80 && parts.size > 1
             val bodyHeight = height - if (header) 44 else 0
@@ -77,8 +84,9 @@ internal data class WidgetLayout(
                 body == WidgetBody.FOCUS && rtl -> parts.take(1) + parts.drop(1).reversed()
                 else -> parts
             }
-            val footerKind = if (look.quickWater && "water" in displayed) "water" else parts.first()
-            val compactAction = !header && !footer && look.action && look.quickWater && parts == listOf("water")
+            val footerKind = look.actionTarget.takeIf { it in displayed }
+                ?: if (look.quickWater && "water" in displayed) "water" else parts.first()
+            val compactAction = !header && !footer && look.action && parts.singleOrNull() in listOf("water", "glucose")
             return WidgetLayout(body, header, header && parts.size > 1, footer, footerKind,
                 (footer || compactAction) && footerKind == "water" && look.quickWater && look.undoWater, displayed, compactAction, rtl)
         }

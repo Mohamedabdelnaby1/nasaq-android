@@ -78,15 +78,31 @@ class MainActivity:ComponentActivity() {
     }
     override fun onCreate(savedInstanceState:Bundle?) {
         super.onCreate(savedInstanceState);enableEdgeToEdge()
-        repository=Repository(applicationContext);requestedScreen=intent.getStringExtra("screen").orEmpty();requestedEntry=intent.getStringExtra("entry").orEmpty()
+        repository = Repository(applicationContext)
+        if (savedInstanceState == null) readDestination(intent) else {
+            requestedScreen = savedInstanceState.getString("requestedScreen").orEmpty()
+            requestedEntry = savedInstanceState.getString("requestedEntry").orEmpty()
+        }
         setContent {
             val p=repository.state.preferences
             LaunchedEffect(repository.ready,p.lock,p.secureScreen,p.theme) {if(repository.ready && repository.error!="load_error")applySecurity(p)}
             YawmiApp(repository,this)
         }
-        repository.refresh()
     }
-    override fun onNewIntent(intent:Intent) {super.onNewIntent(intent);setIntent(intent);requestedScreen=intent.getStringExtra("screen").orEmpty();requestedEntry=intent.getStringExtra("entry").orEmpty()}
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        readDestination(intent)
+    }
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("requestedScreen", requestedScreen)
+        outState.putString("requestedEntry", requestedEntry)
+    }
+    private fun readDestination(intent: Intent) {
+        requestedScreen = intent.getStringExtra("screen").orEmpty()
+        requestedEntry = intent.getStringExtra("entry").orEmpty()
+    }
     override fun onResume() {
         super.onResume()
         permissionRevision++
@@ -139,7 +155,7 @@ class MainActivity:ComponentActivity() {
             val refreshed = runCatching { Reminders.reschedule(this) }.isSuccess
             runOnUiThread {
                 permissionRevision++
-                if (refreshed) repository.refresh() else message("reminder_error")
+                if (!isDestroyed) { if (refreshed) repository.refresh() else message("reminder_error") }
             }
         }
     }
@@ -153,7 +169,7 @@ class MainActivity:ComponentActivity() {
     fun openSource(url:String) {if(url.startsWith("https://"))startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
     fun backup(mode:String,password:CharArray) {
         backupPassword?.fill('\u0000');backupPassword=password
-        if(mode=="create")backupCreate.launch("Yawmi-${java.time.LocalDate.now()}.yawmi")else backupOpen.launch(arrayOf("*/*"))
+        if(mode=="create")backupCreate.launch("Nasaq-${java.time.LocalDate.now()}.yawmi")else backupOpen.launch(arrayOf("*/*"))
     }
     fun export(s:State,days:Int,type:String) {
         if (type == "pdf") {
@@ -163,12 +179,13 @@ class MainActivity:ComponentActivity() {
     internal fun exportFile(s:State,days:Int,type:String, options: ReportOptions = ReportOptions()) {
         if(locked)return
         if(type=="csv") io.execute {try{val file=Reports.csv(this,s,days);runOnUiThread{
+            if (locked || isFinishing || isDestroyed) return@runOnUiThread
             val uri=androidx.core.content.FileProvider.getUriForFile(this,"$packageName.exports",file)
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM,uri)
-                .apply {clipData=android.content.ClipData.newRawUri("Yawmi report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
+                .apply {clipData=android.content.ClipData.newRawUri("Nasaq report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
         }}catch(e:Exception){runOnUiThread{message("backup_error")}}}
         else io.execute {try{val html=Reports.html(this,s,days,options);runOnUiThread{
-            if(isFinishing || locked)return@runOnUiThread
+            if (isFinishing || isDestroyed || locked) return@runOnUiThread
             reportView?.destroy();val view=WebView(this);reportView=view
             var printStarted = false
             view.settings.javaScriptEnabled=false;view.settings.allowFileAccess=false;view.settings.allowContentAccess=false
@@ -183,3 +200,4 @@ class MainActivity:ComponentActivity() {
         }}catch(e:Exception){runOnUiThread{message("backup_error")}}}
     }
 }
+

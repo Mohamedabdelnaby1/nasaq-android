@@ -18,7 +18,8 @@ object PhoneShortcuts {
         c.getSystemService(ShortcutManager::class.java).dynamicShortcuts=listOf("glucose","water","meal","symptom").map{kind->
             ShortcutInfo.Builder(c,"yawmi.$kind").setShortLabel(w[kind]).setLongLabel(w["add"]+" "+w[kind])
                 .setIcon(Icon.createWithResource(c,R.drawable.ic_launcher))
-                .setIntent(Intent(c,MainActivity::class.java).setAction(Intent.ACTION_VIEW).putExtra("entry",kind)).build()
+                .setIntent(WidgetDestination.intent(c, 0, kind, "add").setAction(Intent.ACTION_VIEW)
+                    .putExtra("entry", kind)).build()
         }
     }
 }
@@ -36,7 +37,10 @@ fun IntegrationPanel(repo: Repository, activity: MainActivity) {
         OutlineAction(onClick = { studio = widgetPresets.first { it.name == "preset_water_mini" }.look },
             modifier = Modifier.fillMaxWidth()) { Text(w["preset_water_mini"]) }
         ids.forEachIndexed { index, id ->
-            SettingsRow("settings", w.f("widget_manage_number", "number" to number((index + 1).toDouble(), w))) {
+            val look = Widgets.look(activity, id)
+            val label = when (look.mode) { "summary" -> "summary_widget"; "day_summary" -> "day_overview"; else -> look.mode }
+            SettingsRow("settings", w.f("widget_manage_number", "number" to number((index + 1).toDouble(), w)),
+                subtitle = w[label]) {
                 activity.startActivity(Widgets.configIntent(activity, id))
             }
         }
@@ -51,8 +55,7 @@ fun IntegrationPanel(repo: Repository, activity: MainActivity) {
         androidx.compose.ui.window.Dialog(onDismissRequest = { studio = null },
             properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
             WidgetStudio(repo.state, initial, { studio = null }, onSave = { look ->
-                if (!Widgets.pin(activity, look)) activity.message("widget_manual")
-                studio = null
+                if (Widgets.pin(activity, look)) studio = null else activity.message("widget_manual")
             }, pinning = true)
         }
     }

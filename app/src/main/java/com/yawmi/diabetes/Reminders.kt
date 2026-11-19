@@ -248,7 +248,7 @@ object Reminders {
     @Synchronized fun receive(c:Context,r:Reminder,operation:String) {
         if (operation == "show" && saved(c, "scheduled").none { it.id == r.id && it.due == r.due }) return
         if(r.kind=="maintenance") {
-            Widgets.updateAll(c, Store.get(c).read())
+            Store.get(c).refreshWidgets()
             reschedule(c)
             return
         }
@@ -320,14 +320,19 @@ class ReminderReceiver:BroadcastReceiver() {
 }
 class RescheduleReceiver:BroadcastReceiver() {
     override fun onReceive(context:Context,intent:Intent) {
+        if (intent.action !in setOf(Intent.ACTION_BOOT_COMPLETED, Intent.ACTION_TIME_CHANGED,
+                Intent.ACTION_TIMEZONE_CHANGED, Intent.ACTION_MY_PACKAGE_REPLACED,
+                AlarmManager.ACTION_SCHEDULE_EXACT_ALARM_PERMISSION_STATE_CHANGED)) return
         val pending = goAsync()
         Reminders.worker.execute {
             try {
                 val state = Store.get(context).read()
-                runCatching { Widgets.updateAll(context, state) }
+                runCatching { Store.get(context).refreshWidgets() }
                 Reminders.reschedule(context, state)
             } catch (_: Exception) {
             } finally { pending.finish() }
         }
     }
 }
+
+

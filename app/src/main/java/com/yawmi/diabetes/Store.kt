@@ -46,19 +46,26 @@ class Store private constructor(private val context: Context) {
         runCatching{Widgets.updateAll(context,state)}
         return state
     }
+    @Synchronized internal fun refreshWidgets(ids: Iterable<Int> = Widgets.ids(context)) {
+        Widgets.update(context, read(), ids)
+    }
+    @Synchronized internal fun renderWidget(id: Int) {
+        GraphicalWidgets.render(context, read(), id)
+    }
     @Synchronized fun update(change: (State)->State): State {
         val current = read()
         val next = change(current)
         return if (next == current) current else write(next.copy(revision = current.revision + 1))
     }
 
-    @Synchronized internal fun restore(backup: State, settings: Boolean, recovery: Boolean, expected: RestoreCounts): State {
+    @Synchronized internal fun restore(backup: State, settings: Boolean, recovery: Boolean,
+                                       expected: RestoreCounts, expectedRevision: Long): State {
         val current = try { read() } catch (error: Exception) {
             if (!recovery) throw error
             State()
         }
         val plan = prepareRestore(current, backup, settings)
-        if (plan.counts != expected) throw StaleRestorePreview()
+        if (plan.counts != expected || (!recovery && current.revision != expectedRevision)) throw StaleRestorePreview()
         return if (plan.state == current && !recovery) current else write(plan.state.copy(revision = current.revision + 1))
     }
 
@@ -79,7 +86,7 @@ class Repository(private val context:Context) {
     private val main=Handler(Looper.getMainLooper())
     private var pendingWrites=0
     fun refresh() { executor.execute {
-        try { val loaded=Store.get(context).read();runCatching{PhoneShortcuts.publish(context,loaded.preferences);Widgets.updateAll(context,loaded)}
+        try { val loaded=Store.get(context).read();runCatching{PhoneShortcuts.publish(context,loaded.preferences);Store.get(context).refreshWidgets()}
             runCatching { Reminders.reconcile(context) }
             main.post { state=loaded; ready=true; error=null } }
         catch(e:Exception) { main.post { error="load_error"; ready=true } }
@@ -89,11 +96,11 @@ class Repository(private val context:Context) {
         submit(onSuccess) { Store.get(context).update(block) }
     }
 
-    internal fun restore(backup: State, useSettings: Boolean, expected: RestoreCounts, onSuccess: () -> Unit) {
+    internal fun restore(backup: State, useSettings: Boolean, expected: RestoreCounts, revision: Long, onSuccess: () -> Unit) {
         if (!ready || busy) return
         val recovery = error == "load_error"
         submit({ onSuccess() }, failure = if (recovery) "load_error" else "backup_error") {
-            Store.get(context).restore(backup, useSettings, recovery, expected)
+            Store.get(context).restore(backup, useSettings, recovery, expected, revision)
         }
     }
 
@@ -123,3 +130,4 @@ class Repository(private val context:Context) {
     fun clearError() { if(error!="load_error") error=null }
     fun close() { executor.shutdown() }
 }
+

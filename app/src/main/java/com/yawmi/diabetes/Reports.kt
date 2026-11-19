@@ -31,7 +31,7 @@ object Reports {
         val dir=File(c.cacheDir,"exports").apply {mkdirs()}
         // Only this private export directory is exposed by FileProvider.
         dir.listFiles()?.filter {System.currentTimeMillis()-it.lastModified()>86_400_000}?.forEach {it.delete()}
-        return File(dir,"Yawmi-${LocalDate.now()}-${System.currentTimeMillis()}.csv").apply {
+        return File(dir,"Nasaq-${LocalDate.now()}-${System.currentTimeMillis()}.csv").apply {
             writeText("\uFEFF"+(listOf(headers)+rows).joinToString("\r\n"){row->row.joinToString(","){csvCell(it)}}+"\r\n",Charsets.UTF_8)
         }
     }
@@ -243,3 +243,4 @@ object Reports {
             </figcaption></figure>""".trimIndent()
     }
 }
+
