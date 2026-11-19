@@ -170,9 +170,13 @@ class MainActivity:ComponentActivity() {
         else io.execute {try{val html=Reports.html(this,s,days,options);runOnUiThread{
             if(isFinishing || locked)return@runOnUiThread
             reportView?.destroy();val view=WebView(this);reportView=view
+            var printStarted = false
             view.settings.javaScriptEnabled=false;view.settings.allowFileAccess=false;view.settings.allowContentAccess=false
             view.webViewClient=object:WebViewClient(){override fun onPageFinished(web:WebView,url:String){
-                getSystemService(android.print.PrintManager::class.java).print("Yawmi-${java.time.LocalDate.now()}",web.createPrintDocumentAdapter("Yawmi care report"),
+                if (printStarted || reportView !== web || locked || isFinishing || isDestroyed) return
+                printStarted = true
+                val title = "Nasaq-${java.time.LocalDate.now()}"
+                getSystemService(android.print.PrintManager::class.java).print(title,web.createPrintDocumentAdapter(title),
                     android.print.PrintAttributes.Builder().setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4).build())
             }}
             view.loadDataWithBaseURL("https://yawmi.local/report/",html,"text/html","UTF-8",null)

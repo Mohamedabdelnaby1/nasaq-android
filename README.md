@@ -5,7 +5,7 @@
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.12.0/Nasaq-v0.12.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-205449?style=for-the-badge" alt="تنزيل APK"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.13.0/Nasaq-v0.13.0.apk"><img src="https://img.shields.io/badge/Android-Download_APK-205449?style=for-the-badge" alt="تنزيل APK"></a>
   <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="كل الإصدارات"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
@@ -17,16 +17,16 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-1. [نزّل Nasaq-v0.12.0.apk مباشرة](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.12.0/Nasaq-v0.12.0.apk) من GitHub.
+1. [نزّل Nasaq-v0.13.0.apk مباشرة](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.13.0/Nasaq-v0.13.0.apk) من GitHub.
 2. ثبّت الملف أو افتحه كتحديث لو النسخة الحالية من إصدارات المشروع بنفس التوقيع.
 3. [أحدث إصدار](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/latest) فيه بصمة **SHA-256** للملف وكود الإصدار. الإصدارات القديمة متاحة في [الأرشيف](https://github.com/Mohamedabdelnaby1/nasaq-android/releases).
 
-### الجديد في 0.12.0
+### الجديد في 0.13.0
 
-- بطاقة السكر بتعرض متوسط آخر ٣٠ يوم افتراضيًا. السكر يعتمد على القراءات المسجّلة، والجرعات تفضل في سجل الدواء.
-- بطاقة المياه بتعرض إجمالي النهارده افتراضيًا. تقدر تختار فترة أطول، أو تعرض متوسط الأيام اللي سجلت فيها مياه.
-- من الإعدادات افتح «حساب وعرض السكر» أو «حساب وعرض المياه». اختار الفترة، والرقم اللي يظهر، والوحدة. اختيارات السكر تشمل سياق القراءة، وتقدر تشوف النتيجة في نفس الصفحة.
-- بطاقة اليوم والويدجت بيستخدموا الإعدادات نفسها. صفحة يوم من السجل بتلخّص اليوم اللي اخترته.
+- تقرير PDF بتصميم نَسَق الجديد، مع شعار وفترة واضحة في أول صفحة.
+- ملخص ملوّن للسكر والسوائل والجرعات، ورسم للقراءات بدليل ألوان ونطاق الهدف.
+- جداول مقروءة على مقاس A4 تدعم العربي والإنجليزي، وعناوين الأعمدة تتكرر في الصفحات التالية.
+- خيارات التصدير بتحدد الأقسام والاسم والملاحظات. إخفاء الملاحظات بيوسّع مساحة الأعمدة الظاهرة.
 
 <a id="screens"></a>
 ## الشاشات والحركة

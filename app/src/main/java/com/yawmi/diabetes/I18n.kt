@@ -441,6 +441,14 @@ systolic|الانقباضي|Systolic
 diastolic|الانبساطي|Diastolic
 kg|كجم|kg
 report|تقرير المتابعة|Care report
+report_profile|الملف|Profile
+report_logged_days|{count} من {days} أيام فيها تسجيل|{count} of {days} days with entries
+report_doses_taken|الجرعات المسجّلة كمأخوذة|Doses logged as taken
+report_doses_skipped|الجرعات المسجّلة كمتخطّاة: {count}|Doses logged as skipped: {count}
+report_within_target|القراءات ضمن النطاق|Readings in range
+report_in_target|قراءة ضمن النطاق|Reading in range
+report_outside_target|قراءة خارج النطاق|Reading outside range
+report_logged_only|الملخص مبني على تسجيلات الفترة.|Summary uses the entries recorded in this period.
 period|الفترة|Period
 count|العدد|Count
 reminders_pending|التذكيرات القادمة|Upcoming reminders

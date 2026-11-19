@@ -93,7 +93,7 @@ class StabilityReleaseTests {
         val message = "<example>\nline two"
         val included = Reports.buildHtml(State(preferences = Preferences(targetNote = "private-target")), 7,
             ReportOptions(message = message)) { "AAE=" }
-        assertTrue(included.contains("&lt;example&gt;<br/>line two"))
+        assertTrue(included.contains("<p class='user-note'>&lt;example&gt;\nline two</p>"))
         val hidden = Reports.buildHtml(State(preferences = Preferences(targetNote = "private-target")), 7,
             ReportOptions(notes = false, message = message)) { "AAE=" }
         assertFalse(hidden.contains("&lt;example&gt;"))

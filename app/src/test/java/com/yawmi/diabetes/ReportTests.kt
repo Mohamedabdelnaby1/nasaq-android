@@ -36,4 +36,30 @@ class ReportTests {
         assertTrue(html.contains("—"))
         assertFalse(html.contains("NaN"))
     }
+    @Test fun preparesAPaginatedJournalAndOmitsPrivateColumns() {
+        val now = System.currentTimeMillis()
+        val medicine = Medication(id = "example", name = "دواء تجريبي", dose = "حسب الخطة المسجّلة", times = listOf("08:00", "20:00"))
+        val state = sample("ar").copy(medications = listOf(medicine), entries = sample("ar").entries +
+            (1..115).map { index ->
+                val ago = (index % 7) * 3_600_000L
+                when (index % 4) {
+                    0 -> Entry(kind = "glucose", value = 72.0 + index, time = now - ago, unit = "mg/dL",
+                        context = if (index % 3 == 0) "fasting" else "after", note = "مراجعة تجريبية للسجل $index")
+                    1 -> Entry(kind = "water", value = 250.0, time = now - ago, unit = "mL",
+                        note = if (index == 1) "ملاحظة تجريبية طويلة لاختبار التفاف النص. ".repeat(38) else "")
+                    2 -> Entry(kind = "dose", time = now - ago, medicationId = medicine.id, status = "taken")
+                    else -> Entry(kind = "meal", time = now - ago, context = "breakfast", note = "مثال لسجل الوجبات")
+                }
+            })
+        fun font(weight: String) = Base64.getEncoder().encodeToString(File(root(), "tajawal_$weight.ttf").readBytes())
+        val report = Reports.buildHtml(state, 7, ReportOptions(message = "تقرير تجريبي للمراجعة.\nالبيانات هنا للعرض فقط."), ::font)
+        assertTrue(report.contains("tile sky"))
+        assertTrue(report.contains("table-header-group"))
+        assertTrue(report.contains("مراجعة تجريبية للسجل"))
+        val noNotes = Reports.buildHtml(state, 7, ReportOptions(showName = false, notes = false), ::font)
+        assertFalse(noNotes.contains("class='note'"))
+        assertFalse(noNotes.contains("مراجعة تجريبية"))
+        File(File("build/reports/yawmi").apply { mkdirs() }, "report-pages-ar.html").writeText(report)
+    }
+
 }
