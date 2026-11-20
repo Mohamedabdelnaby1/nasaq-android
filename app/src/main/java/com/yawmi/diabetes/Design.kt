@@ -59,8 +59,8 @@ fun AppChrome(
     val c = MaterialTheme.colorScheme
     val motion = LocalMotion.current && !p.reduceMotion
     val active = sectionGroup(tab)
-    val dock = Color(0xFF522533)
-    val accent = Color(0xFFFCD2B5)
+    val dock = Color(0xFF10283F)
+    val accent = Color(0xFFDDE8FF)
     Scaffold(containerColor = c.background, snackbarHost = {
         SnackbarHost(snackbar) { data ->
             Snackbar(containerColor = dock, contentColor = Color.White, shape = ControlShape,

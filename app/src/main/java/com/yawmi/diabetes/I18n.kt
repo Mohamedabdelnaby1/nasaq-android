@@ -724,7 +724,7 @@ entry_now|تسجيل الآن|Log now
 optional_short|إضافة تفاصيل|Add details
 welcome_kicker|يوم أهدأ. متابعة أوضح.|A calmer day. A clearer routine.
 welcome_headline|صحتك، خطوة بخطوة|Your health, one step at a time
-welcome_design_body|السكر والمياه والدواء في مساحة بسيطة، ترتبها بطريقتك.|Glucose, water and medicines in a simple space you can make your own.
+welcome_design_body|سجّل قراءات السكر، تابع دواك، واعرف شربت مية قد إيه.|Log your glucose, track your medication and see how much water you drank.
 setup_step|إعداد تجربتك|Set up your space
 notification_hub|مركز التذكيرات|Reminder centre
 notification_hub_body|اضبط روتينك مرة، وتابع تفاصيله بسهولة.|Set your routine, then keep every detail within reach.
@@ -781,4 +781,3 @@ sample_warning|نسخة تطوير تحتاج اختبارًا على هاتف �
     }
 }
 val LocalWords=staticCompositionLocalOf { Words() }
-
