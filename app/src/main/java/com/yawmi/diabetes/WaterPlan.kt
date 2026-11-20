@@ -36,7 +36,8 @@ fun litresToMl(raw:String):Int {
     require(litres in 0.0..10.0)
     return kotlin.math.round(litres*1000).toInt()
 }
-fun smartWaterSlots(p:Preferences,from:Long,until:Long,zone:ZoneId=ZoneId.systemDefault()):List<Reminder>{
+fun smartWaterSlots(p: Preferences, from: Long, until: Long, zone: ZoneId = ZoneId.systemDefault(),
+                    timingOffset: Int = p.waterOffset): List<Reminder> {
     if(p.waterGoal<=0)return emptyList()
     val slots=mutableListOf<Reminder>()
     val count=ceil(p.waterGoal.toDouble()/p.cup).toInt().coerceAtMost(1000)
@@ -46,7 +47,7 @@ fun smartWaterSlots(p:Preferences,from:Long,until:Long,zone:ZoneId=ZoneId.system
     while(!day.isAfter(endDay)){
         val awake=day.atTime(wake).atZone(zone)
         val end=(if(sleep.isAfter(wake))day else day.plusDays(1)).atTime(sleep).atZone(zone)
-        val start=awake.plusMinutes(p.waterOffset.toLong()).takeIf{it.isBefore(end)} ?: awake
+        val start=awake.plusMinutes(timingOffset.toLong()).takeIf{it.isBefore(end)} ?: awake
         val span=Duration.between(start,end).toMillis()
         val reminders=minOf(count,(span/1800000).toInt().coerceAtLeast(1))
         for(i in 0 until reminders){val due=start.toInstant().toEpochMilli()+span*i/reminders

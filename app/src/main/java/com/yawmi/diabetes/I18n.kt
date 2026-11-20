@@ -11,7 +11,7 @@ class Words(language: String = "system") {
     fun f(key:String,vararg values:Pair<String,String>):String=values.fold(get(key)) { text,pair -> text.replace("{${pair.first}}",pair.second) }
     companion object {
         private val translations="""
-app|نَسَق|Nasaq
+app|وَسْم|Wasm
 smart_water_reminders|توزيع تذكيرات المياه بين الاستيقاظ والنوم|Spread water reminders between waking and sleeping
 smart_water_hint|حسب هدفك وحجم الكوب. تقدر تختار الفاصل الثابت بدلًا منه.|Uses your goal and wake window, at most every 30 minutes. A fixed interval is optional.
 daily_litres|هدفي اليومي من المياه باللتر، اختياري|My daily water goal in litres, optional
@@ -53,7 +53,7 @@ csv_import|استيراد CSV|Import CSV
 csv_import_count|{added} جديدة · {duplicate} مكررة · {invalid} غير صالحة|{added} new · {duplicate} duplicates · {invalid} invalid
 csv_confirm|استورد السجلات الجديدة|Import new entries
 csv_import_done|تم استيراد السجلات|Entries imported
-csv_error|الملف غير صالح. استخدم أعمدة CSV الخاصة بنَسَق وتوقيت ISO.|Unsupported file. Use Nasaq CSV columns and ISO timestamps.
+csv_error|الملف غير صالح. استخدم أعمدة CSV الخاصة بوَسْم وتوقيت ISO.|Unsupported file. Use Wasm CSV columns and ISO timestamps.
 report_options|تخصيص التقرير|Customize report
 report_section_summary|ملخص الأرقام|Summary
 report_show_name|إظهار الاسم|Show name
@@ -157,7 +157,7 @@ forest|أخضر عميق|Deep forest
 cream|كريمي|Warm cream
 summary_widget|ويدجت مجمّع|Combined widget
 widget_pin|إضافة إلى الشاشة الرئيسية|Add to home screen
-widget_manual|اضغط مطولًا على الشاشة الرئيسية، ثم الويدجتس، واختر نَسَق.|Long press your home screen, open Widgets and choose Nasaq.
+widget_manual|اضغط مطولًا على الشاشة الرئيسية، ثم الويدجتس، واختر وَسْم.|Long press your home screen, open Widgets and choose Wasm.
 integrations|يومي متصل بهاتفك|Connected to your phone
 shortcuts|اختصارات التسجيل|Logging shortcuts
 shortcuts_body|اضغط مطولًا على أيقونة التطبيق لتسجيل السكر أو المياه أو الوجبة مباشرة.|Long press the app icon to jump straight to glucose, water or meal logging.
@@ -391,7 +391,7 @@ posted|محاولة إظهار التنبيه|Notification posting attempted
 blocked|التنبيه محجوب أو لا يوجد إذن|Notification blocked or permission missing
 snoozed|تم تأجيل التذكير|Reminder snoozed
 snooze|تأجيل التذكير|Snooze reminder
-reminder_title|لديك تذكير من نَسَق|You have a Nasaq reminder
+reminder_title|لديك تذكير من وَسْم|You have a Wasm reminder
 med_reminder|راجع جرعتك وسجلها إن تناولتها بالفعل|Review your dose and record it if already taken
 water_reminder|هل شربت سوائل؟ سجل ما شربته|Had any fluids? Record what you drank
 glucose_reminder|موعد قياس حسب خطتك المحفوظة|A glucose check from your saved plan
@@ -419,7 +419,7 @@ reminder_recent_issues|آخر التنبيهات اللي ما ظهرتش|Recent
 reminder_status|حالة التذكيرات|Reminder status
 reminder_next_scheduled|التالي · {kind} · {time}|Next scheduled · {kind} · {time}
 reminder_no_schedule|مافيش تنبيه مجدول حاليًا|No reminder is currently scheduled
-reminder_no_permission|إشعارات نَسَق مقفولة من إعدادات الهاتف.|Notifications for Nasaq are off in Android settings.
+reminder_no_permission|إشعارات وَسْم مقفولة من إعدادات الهاتف.|Notifications for Wasm are off in Android settings.
 reminder_channel_disabled|نوع الإشعار ده مقفول.|This notification category is turned off.
 reminder_approximate|أندرويد ممكن يأخّر التنبيه مع إيقاف إذن المواعيد الدقيقة.|Android may delay reminders when exact alarm access is off.
 reminder_latest_result|آخر محاولة · {status} · {time}|Last attempt · {status} · {time}
@@ -444,10 +444,10 @@ unlock|فتح التطبيق|Unlock app
 locked|بياناتك خلف قفل الجهاز|Your data is behind the device lock
 set_device_lock|فعّل قفلًا آمنًا للهاتف أولًا|Set a secure device screen lock first
 local_privacy|تُحفظ بياناتك مشفرة على هذا الجهاز. لا حساب ولا إعلانات ولا اتصال بالإنترنت. التصدير اختياري بقرارك.|Your data is stored encrypted on this device. No account, ads or internet connection. Exports are initiated by you.
-about|عن نَسَق|About Nasaq
+about|عن وَسْم|About Wasm
 medical_notice|أداة للتسجيل والتنظيم. ليست جهاز قياس أو تشخيصًا أو بديلًا للطبيب. لا تعدّل علاجك اعتمادًا عليها.|A logging and organisation tool, not a measuring device, diagnosis or replacement for clinical care. Do not change treatment based on it.
 sources|مصادر المعلومات الصحية|Health information sources
-welcome|أهلًا بك في نَسَق|Welcome to Nasaq
+welcome|أهلًا بك في وَسْم|Welcome to Wasm
 welcome_body|سجل السكر والدواء والوجبات والسوائل بسهولة، وخصص ما تحتاجه فقط.|Easily log glucose, medicines, meals and fluids. Personalise only what you need.
 start|ابدأ يومك|Get started
 onboard_hint|يمكنك تغيير كل اختياراتك لاحقًا من الإعدادات. هدف المياه اختياري، وتعليمات العلاج من الوصفة.|You can change these choices in Settings. A fluid goal is optional; treatment instructions come from your prescription.
@@ -570,13 +570,13 @@ corner_radius|استدارة الزوايا|Corner radius
 invalid_colour|راجع كود اللون، مثل ‎#185446، واختر قسمًا واحدًا على الأقل.|Check the colour code, such as #185446, and keep at least one section.
 reorder|إعادة ترتيب|Reorder
 move_down|تحريك لأسفل|Move down
-assistant_title|مساعد نَسَق|Nasaq assistant
+assistant_title|مساعد وَسْم|Wasm assistant
 assistant_subtitle|سجّل أو ابحث في سجلك بالكتابة أو بالصوت|Log an entry or search your journal by typing or speaking
 assistant_prompt|اكتب طلبك|Type your request
 assistant_examples|جرّب «شربت كوبايتين من ساعة» أو «اعرض قياسات الصيام الأسبوع ده».|Try “I drank two cups an hour ago” or “show fasting readings this week”.
 setup_quick_start|ابدأ من هنا|Quick start
 setup_configure|تخصيص الإعدادات|Customize setup
-setup_browse|افتح نَسَق|Open Nasaq
+setup_browse|افتح وَسْم|Open Wasm
 water_progress_goal|من هدف {goal}|of a {goal} goal
 reminder_test_channel|اختار نوع تنبيه الاختبار|Choose a test notification
 reminder_test_question|التنبيه ظهر على جهازك؟|Did the notification appear?
@@ -622,12 +622,24 @@ scan_failed|تعذّرت قراءة الصورة|Couldn't read the image
 scan_pick|اختر صورة|Choose photo
 scan_review|راجع اسم الدواء|Review medication name
 scan_review_note|اختَر النص المناسب وعدّل الاسم قبل الحفظ.|Choose the matching text and edit the name before saving.
-adaptive_water|اقتراح لتوقيت المياه|Suggested water timing
-apply_water_time|طبّق التوقيت المقترح|Apply suggested time
+learning_routine|روتين بيتعلّم من يومك|Learn from your routine
+learning_local|وَسْم بيتعلّم من مواعيد تسجيلاتك على الموبايل خلال آخر ٢١ يوم.|Wasm learns from your recent logging times on this device, using up to 21 days.
+learning_water_auto|ظبّط تذكيرات المية على روتيني|Adapt water reminders to my routine
+learning_water_auto_help|البداية تتحرك لحد ٩٠ دقيقة حسب نمطك. لو سجّلت مية آخر ٤٥ دقيقة، بنعدّي التنبيه القريب.|The first slot can move by up to 90 minutes. A nearby reminder is skipped after you log water within 45 minutes.
+learning_water_wait|هنستنى نمط متكرر في ٤ أيام على الأقل قبل تغيير البداية.|The first slot adapts after a recurring pattern appears on at least four days.
+learning_water_observed|أول تسجيل مية كان حوالين {time} في {count} أيام.|First water logs clustered around {time} on {count} days.
+learning_water_applied|أول خانة تنبيه في الخطة الحالية حوالين {time}.|The current plan starts around {time}.
+learning_water_enable|علشان تفعّل التكيّف، فعّل توزيع تذكيرات المية وحدد هدفك من الإعدادات.|To use adaptive timing, enable scheduled water reminders and set a water goal.
+learning_water_zone|تعلّم مواعيد المية متوقف مؤقتًا لحد ما تراجع تغيير المنطقة الزمنية.|Water timing learning is paused until you review the time-zone change.
+learning_water_restricted|تكيّف تذكيرات المية متوقف حسب إعداد تقييد السوائل في ملفك.|Adaptive water reminders are paused because your profile marks fluid intake as restricted.
+learning_reset_water|ابدأ تعلّم مواعيد المية من جديد|Reset water timing learning
+learning_glucose_observed|أول قراءة سكر سجّلتها كانت حوالين {time} في {count} أيام.|Your first glucose logs clustered around {time} on {count} days.
+learning_glucose_review|راجع مواعيد القياس اللي إنت محددها|Review the times you set
+learning_medication_note|توقيت الدوا والقياس بيتحدد من خطتك اللي سجلتها.|Medication and glucose schedules follow the plan you entered.
+water_reminder_covered|التنبيه اتخطّى بعد تسجيل المية أو الوصول للهدف|Skipped after a recent water log or reaching the goal
 battery_settings|إعدادات البطارية|Battery settings
 repair_reminders|أعد جدولة التذكيرات|Reschedule reminders
 reset_water_time|استرجع التوقيت المعتاد|Restore regular timing
-water_pattern|أول تسجيل للمياه غالبًا الساعة {time} في {count} أيام مسجّلة.|First water entry is often around {time}, based on {count} logged days.
 calendar_hint|اضغط على أي يوم لعرض تفاصيله.|Tap a day to see its details.
 doses_recorded|جرعات مسجّلة|Doses logged
 missing_data|أيام بلا تسجيلات|Days without records
@@ -684,7 +696,7 @@ plan_from_prescription|خطتك كما وصفها الطبيب|Your plan, as pre
 journal_subtitle|تفاصيل يومك، في مكان واحد|Your day, all in one place
 medicines_subtitle|جدول واضح وروتين أسهل|A clear schedule. An easier routine.
 insights_subtitle|صورة أوضح من تسجيلاتك|A clearer view of your records
-settings_subtitle|تجربة على مقاس يومك|Make Nasaq feel like you
+settings_subtitle|تجربة على مقاس يومك|Make Wasm feel like you
 care_overview|نظرة على روتينك|Your care at a glance
 glucose_overview|ملخص القياسات|Glucose overview
 reading_average|متوسط القراءات|Reading average

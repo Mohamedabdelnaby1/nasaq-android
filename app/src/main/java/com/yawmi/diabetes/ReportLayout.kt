@@ -10,15 +10,15 @@ h1{font-size:35pt;line-height:1.13;font-weight:700}
 h2{font-size:18pt;line-height:1.24}
 h3{font-size:12pt;line-height:1.25}
 bdi{unicode-bidi:isolate}
-.hero{position:relative;isolation:isolate;border-radius:22px 9px 22px 9px;background:#182f29;color:#f8f9ef;padding:18px 23px 15px;overflow:hidden;break-inside:avoid}
+.hero{position:relative;isolation:isolate;border-radius:22px 9px 22px 9px;background:#522533;color:#fff6e9;padding:18px 23px 15px;overflow:hidden;break-inside:avoid}
 .hero-art{position:absolute;width:48%;height:100%;inset-block-start:0;inset-inline-end:0;z-index:-1;opacity:.38}
-.brand{display:flex;align-items:center;gap:8px;font-size:13pt;font-weight:700;color:#e0f582;margin-bottom:7px}
+.brand{display:flex;align-items:center;gap:8px;font-size:13pt;font-weight:700;color:#fff2de;margin-bottom:7px}
 .logo{width:30px;height:30px;display:block}
-.hero-meta{display:flex;gap:9px 25px;flex-wrap:wrap;align-items:start;border-top:1px solid #567268;padding-top:8px;margin-top:11px}
+.hero-meta{display:flex;gap:9px 25px;flex-wrap:wrap;align-items:start;border-top:1px solid #af747c;padding-top:8px;margin-top:11px}
 .hero-meta>div{flex:1 1 42%;min-width:0;overflow-wrap:anywhere}
-.hero-meta span{display:block;color:#d1e5d9;font-size:9pt}
+.hero-meta span{display:block;color:#f2d7ca;font-size:9pt}
 .hero-meta strong{font-size:11pt;font-weight:700}
-.generated{font-size:8.5pt;color:#d1e5d9;margin-top:7px}
+.generated{font-size:8.5pt;color:#f2d7ca;margin-top:7px}
 .section-title{display:flex;align-items:center;gap:8px;margin:15px 0 7px;break-after:avoid;page-break-after:avoid}
 .mark{width:27px;height:27px;flex:none;display:grid;place-items:center;border-radius:8px 4px 8px 4px;background:#dbeab7;color:#355021}
 .mark svg{width:16px;height:16px;display:block}

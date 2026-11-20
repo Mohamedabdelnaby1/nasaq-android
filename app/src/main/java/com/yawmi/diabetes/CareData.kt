@@ -55,28 +55,3 @@ fun checkLayout(order:List<String>,hidden:Set<String>,sizes:Map<String,String>){
     require(order.size<=cards.size && order.distinct().size==order.size && order.all{it in cards})
     require(hidden.all{it in cards} && sizes.all{(key,size)->key in cards && size in setOf("small","standard","large")})
 }
-
-data class WaterSuggestion(val time:LocalTime,val respondingDays:Int)
-
-fun waterSuggestion(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId.systemDefault()):WaterSuggestion? {
-    val p=s.preferences
-    if(!p.waterEnabled || !p.waterSmart || p.waterGoal<=0)return null
-    val start=now-14*86_400_000L
-    val wake=LocalTime.parse(p.quietEnd)
-    val sleep=LocalTime.parse(p.quietStart)
-    fun elapsed(time:LocalTime)=Math.floorMod(time.toSecondOfDay()-wake.toSecondOfDay(),86_400)
-    val logs=s.entries.filter{it.kind=="water" && it.time in start..now}.sortedBy{it.time}
-    val responses=s.audit.filter{it.kind=="water" && it.status=="posted" && it.time in start..now}
-        .mapNotNull{event->logs.firstOrNull{it.time in event.time..(event.time+60*60_000L)}}
-        .distinctBy{it.id}
-        .map{Instant.ofEpochMilli(it.time).atZone(zone)}
-        .filter{it.dayOfWeek.value in p.waterDays && !com.yawmi.diabetes.core.Planner.quiet(it.toLocalTime(),sleep,wake)}
-        .groupBy{(elapsed(it.toLocalTime())/1800)*1800}
-    val best=responses.mapValues{(_,values)->values.map{it.toLocalDate()}.distinct().size}
-        .entries.sortedWith(compareByDescending<Map.Entry<Int,Int>>{it.value}.thenBy{it.key}).firstOrNull() ?: return null
-    val offsetMinutes=best.key/60
-    if(best.value<3 || offsetMinutes !in 30..240 || kotlin.math.abs(offsetMinutes-p.waterOffset)<30)return null
-    val time=wake.plusMinutes(offsetMinutes.toLong())
-    if(com.yawmi.diabetes.core.Planner.quiet(time,sleep,wake))return null
-    return WaterSuggestion(time,best.value)
-}

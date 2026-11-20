@@ -33,7 +33,8 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     var chooseTest by remember { mutableStateOf(false) }
     var editError by remember(edit) { mutableStateOf<String?>(null) }
     val lastTest = s.audit.lastOrNull { it.id == "test" }
-    val suggestion=remember(s.revision,s.preferences){waterSuggestion(s)}
+    val now = trackingTime()
+    val learning = remember(s, now) { routineLearning(s, now) }
     val allowed=remember(activity.permissionRevision){Reminders.permitted(activity)}
     val precise=remember(activity.permissionRevision){Reminders.exact(activity)}
     val scheduled = remember(activity.permissionRevision, s.revision) { Reminders.upcoming(activity) }
@@ -43,13 +44,11 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
         else if(e.reminder?.kind=="medication")openMedications(s.medications.find{it.id==e.reminder.medicationId})
         else edit=if(e.kind in setOf("wake","sleep"))"quiet"else e.kind
     },permission={activity.notificationPermission()},exact={activity.exactPermission()},test={chooseTest=true},medications={openMedications(null)},
-        suggestion=suggestion,onApply={
-            if(suggestion!=null)repo.preferences{
-                val wake=LocalTime.parse(it.quietEnd)
-                val offset=Math.floorMod(suggestion.time.toSecondOfDay()-wake.toSecondOfDay(),86400)/60
-                it.copy(waterOffset=offset.coerceIn(0,240))
-            }
-        },onReset={repo.preferences{it.copy(waterOffset=0)}},onRepair={activity.reschedule()},
+        learning = learning, onWaterLearning = { enabled ->
+            repo.preferences { it.copy(autoWaterTiming = enabled && !it.fluidRestricted) }
+        }, onResetLearning = {
+            repo.preferences { it.copy(waterLearningSince = System.currentTimeMillis()) }
+        }, onReset={repo.preferences{it.copy(waterOffset=0)}},onRepair={activity.reschedule()},
         onBattery={activity.batterySettings()},onCare={care=true}, scheduled = scheduled,
         mutedKind = muted?.kind, testResult = lastTest?.status ?: activity.reminderTestResult,
         testKind = lastTest?.kind, onTestSeen = if (lastTest?.status == "posted" && !repo.busy) { seen ->
@@ -59,7 +58,7 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
                     this[index] = lastTest.copy(status = if (seen) "test_seen" else "test_missing")
                 })
             }
-        } else null, onAcknowledgeZone = { repo.preferences { it.copy(lastZone = ZoneId.systemDefault().id) } })
+        } else null, onAcknowledgeZone = { repo.preferences { it.copy(lastZone = ZoneId.systemDefault().id, waterLearningSince = System.currentTimeMillis()) } })
     if (chooseTest) BrandedDialog(onDismissRequest = { chooseTest = false },
         title = { Text(w["reminder_test_channel"]) },
         text = {
@@ -95,9 +94,10 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
     }},confirmButton={TextAction(onClick={audit=false}){Text(w["close"])}})
 }
 
-@Composable fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
-    suggestion:WaterSuggestion?=null,onApply:()->Unit={},onReset:()->Unit={},onRepair:()->Unit={},onBattery:()->Unit={},onCare:()->Unit={}, scheduled: List<Reminder> = emptyList(), mutedKind: String? = null,
-    testResult: String? = null, testKind: String? = null, onTestSeen: ((Boolean) -> Unit)? = null, onAcknowledgeZone: () -> Unit = {}){
+@Composable internal fun ReminderHubContent(s:State,allowed:Boolean,precise:Boolean,edit:(String)->Unit,event:(RoutineEvent)->Unit,permission:()->Unit,exact:()->Unit,test:()->Unit,medications:()->Unit,
+    onReset:()->Unit={},onRepair:()->Unit={},onBattery:()->Unit={},onCare:()->Unit={}, scheduled: List<Reminder> = emptyList(), mutedKind: String? = null,
+    testResult: String? = null, testKind: String? = null, onTestSeen: ((Boolean) -> Unit)? = null, onAcknowledgeZone: () -> Unit = {},
+    learning: RoutineLearning? = null, onWaterLearning: (Boolean) -> Unit = {}, onResetLearning: () -> Unit = {}){
     val w=LocalWords.current;val c=MaterialTheme.colorScheme
     var now by remember{mutableLongStateOf(System.currentTimeMillis())}
     LaunchedEffect(Unit){while(true){kotlinx.coroutines.delay(60000);now=System.currentTimeMillis()}}
@@ -156,13 +156,39 @@ fun routineEvents(s:State,now:Long=System.currentTimeMillis(),zone:ZoneId=ZoneId
             SettingsRow("medication",w["medications"],w["per_medicine_policy"]){medications()}
             SettingsRow("care",w["care_tools"],w["care_tools_subtitle"],onClick=onCare)
         }
-        if(suggestion!=null || s.preferences.waterOffset>0)Panel(w["adaptive_water"]){
-            if(suggestion!=null){
-                Text(w.f("water_pattern","time" to clockText(suggestion.time, w),"days" to number(suggestion.respondingDays.toDouble(),w)))
-                TonalAction(onClick=onApply){Text(w["apply_water_time"])}
+        if (learning != null) {
+            val p = s.preferences
+            val wake = LocalTime.parse(p.quietEnd)
+            Panel(w["learning_routine"]) {
+                Text(w["learning_local"], style = MaterialTheme.typography.bodySmall)
+                if (p.fluidRestricted) {
+                    Text(w["learning_water_restricted"], style = MaterialTheme.typography.bodySmall)
+                } else if (p.lastZone != ZoneId.systemDefault().id) {
+                    Text(w["learning_water_zone"], style = MaterialTheme.typography.bodySmall)
+                } else if (p.waterEnabled && p.waterSmart && p.waterGoal > 0) {
+                    Toggle(w["learning_water_auto"], p.autoWaterTiming, w["learning_water_auto_help"], onWaterLearning)
+                    val water = learning.water
+                    if (water == null) Text(w["learning_water_wait"], style = MaterialTheme.typography.bodySmall)
+                    else {
+                        Text(w.f("learning_water_observed", "time" to clockText(water.timeAfter(wake), w),
+                            "count" to number(water.matchingDays.toDouble(), w)))
+                        if (learning.appliesWater) Text(w.f("learning_water_applied",
+                            "time" to clockText(wake.plusMinutes(learning.waterOffset.toLong()), w)))
+                        TextAction(onClick = onResetLearning) { Text(w["learning_reset_water"]) }
+                    }
+                } else Text(w["learning_water_enable"], style = MaterialTheme.typography.bodySmall)
+                if (p.waterOffset > 0) TextAction(onClick = onReset) { Text(w["reset_water_time"]) }
+                learning.glucose?.let { glucose ->
+                    HorizontalDivider()
+                    SettingsRow("glucose", w.f("learning_glucose_observed", "time" to clockText(glucose.timeAfter(wake), w),
+                        "count" to number(glucose.matchingDays.toDouble(), w)), w["learning_glucose_review"]) {
+                        edit("glucose")
+                    }
+                }
+                Text(w["learning_medication_note"], style = MaterialTheme.typography.labelSmall, color = c.onSurfaceVariant)
             }
-            if(s.preferences.waterOffset>0)TextAction(onClick=onReset){Text(w["reset_water_time"])}
         }
+
         SectionHeading(w["day_timeline"],w["sleep_card"]){edit("quiet")}
         Panel{
             Text(w["timeline_hint"],style=MaterialTheme.typography.labelSmall,color=c.onSurfaceVariant)

@@ -112,10 +112,10 @@ object Reminders {
             if(due in from until until && !isQuiet(due,p)) result+=Reminder("after_${meal.id}","glucose",due)
         }
         if(p.waterEnabled && p.waterSmart && p.waterGoal>0){
-            result+=smartWaterSlots(p,from,until,zone).filter {r->
-                val day=Instant.ofEpochMilli(r.due).atZone(zone).toLocalDate()
-                val total=s.entries.filter{it.kind=="water" && Instant.ofEpochMilli(it.time).atZone(zone).toLocalDate()==day}.sumOf{it.value}
-                total<p.waterGoal
+            val learning = if (p.autoWaterTiming && !p.fluidRestricted)
+                routineLearning(s, from, zone).waterOffset else p.waterOffset
+            result += smartWaterSlots(p, from, until, zone, learning).filterNot { reminder ->
+                smartWaterAlreadyCovered(s, reminder.due, zone)
             }
         }else if(p.waterEnabled) {
             val first=from-from.mod(p.waterEvery*60_000L)+p.waterEvery*60_000L
@@ -282,6 +282,13 @@ object Reminders {
             // Do not prompt for stale medication reminders after an extended delivery delay.
             if(now-r.due>2*3_600_000L) {
                 audit(c, r, "reminder_expired")
+                reschedule(c)
+                return
+            }
+            val water = state.preferences
+            if (r.kind == "water" && (!water.waterEnabled ||
+                    water.waterSmart && water.waterGoal > 0 && smartWaterAlreadyCovered(state, now))) {
+                audit(c, r, "water_reminder_covered")
                 reschedule(c)
                 return
             }

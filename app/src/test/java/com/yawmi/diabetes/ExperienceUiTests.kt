@@ -143,6 +143,34 @@ class ExperienceUiTests{
         compose.onNodeWithText(Words("en")["save_widget"]).assertIsDisplayed().performClick()
         compose.runOnIdle{assertEquals("water",result!!.mode);assertEquals("bottle",result!!.waterVisual);assertFalse(result!!.visible)}
     }
+    @Test fun adaptiveWaterRequiresOptInAndShowsWhyTheScheduleMoved() {
+        val zone = java.time.ZoneId.systemDefault()
+        val today = java.time.LocalDate.now(zone)
+        val words = Words("ar")
+        val now = today.atTime(12, 0).atZone(zone).toInstant().toEpochMilli()
+        val history = (1L..6L).flatMap { day ->
+            val time = today.minusDays(day).atTime(8, 0).atZone(zone).toInstant().toEpochMilli()
+            listOf(Entry(kind = "water", value = 250.0, unit = "mL", time = time),
+                Entry(kind = "glucose", value = 112.0, unit = "mg/dL", time = time))
+        }
+        var s by mutableStateOf(sample().copy(entries = history))
+        compose.setContent {
+            YawmiTheme(s.preferences) {
+                ReminderHubContent(s, true, true, {}, {}, {}, {}, {}, {},
+                    learning = routineLearning(s, now, zone), onWaterLearning = { selected ->
+                        s = s.copy(preferences = s.preferences.copy(autoWaterTiming = selected))
+                    })
+            }
+        }
+        val toggle = compose.onNode(hasText(words["learning_water_auto"]) and hasClickAction())
+        toggle.performScrollTo().assertIsOff().performClick().assertIsOn()
+        val explanation = words.f("learning_water_applied",
+            "time" to clockText(java.time.LocalTime.of(8, 0), words))
+        compose.onNodeWithText(explanation).performScrollTo().assertIsDisplayed()
+        capture("routine-learning-ar")
+    }
+
+
     @Test fun studioDarkArabic(){val s=sample("dark");compose.setContent{YawmiTheme(s.preferences){WidgetStudio(s,WidgetLook(visible=true),{}, {})}};capture("05-studio-dark")}
     @Test fun arrowReorderChangesTheLivePreview(){
         var s by mutableStateOf(sample(language="en"))

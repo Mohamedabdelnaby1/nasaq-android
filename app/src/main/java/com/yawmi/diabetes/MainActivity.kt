@@ -183,7 +183,7 @@ class MainActivity:ComponentActivity() {
     fun openSource(url:String) {if(url.startsWith("https://"))startActivity(Intent(Intent.ACTION_VIEW,Uri.parse(url)))}
     fun backup(mode:String,password:CharArray) {
         backupPassword?.fill('\u0000');backupPassword=password
-        if(mode=="create")backupCreate.launch("Nasaq-${java.time.LocalDate.now()}.yawmi")else backupOpen.launch(arrayOf("*/*"))
+        if(mode=="create")backupCreate.launch("Wasm-${java.time.LocalDate.now()}.yawmi")else backupOpen.launch(arrayOf("*/*"))
     }
     fun export(s:State,days:Int,type:String) {
         if (type == "pdf") {
@@ -197,7 +197,7 @@ class MainActivity:ComponentActivity() {
             if (locked || isFinishing || isDestroyed) return@runOnUiThread
             val uri=androidx.core.content.FileProvider.getUriForFile(this,"$packageName.exports",file)
             startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/csv").putExtra(Intent.EXTRA_STREAM,uri)
-                .apply {clipData=android.content.ClipData.newRawUri("Nasaq report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
+                .apply {clipData=android.content.ClipData.newRawUri("Wasm report",uri);addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)},Words(s.preferences.language)["export"]))
         }}catch(e:Exception){runOnUiThread{message("backup_error")}}}
         else io.execute {try{val html=Reports.html(this,s,days,options,reportAsOf);runOnUiThread{
             if (isFinishing || isDestroyed || locked) return@runOnUiThread
@@ -207,7 +207,7 @@ class MainActivity:ComponentActivity() {
             view.webViewClient=object:WebViewClient(){override fun onPageFinished(web:WebView,url:String){
                 if (printStarted || reportView !== web || locked || isFinishing || isDestroyed) return
                 printStarted = true
-                val title = "Nasaq-${java.time.LocalDate.now()}"
+                val title = "Wasm-${java.time.LocalDate.now()}"
                 getSystemService(android.print.PrintManager::class.java).print(title,web.createPrintDocumentAdapter(title),
                     android.print.PrintAttributes.Builder().setMediaSize(android.print.PrintAttributes.MediaSize.ISO_A4).build())
             }}

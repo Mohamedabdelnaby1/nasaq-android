@@ -1,11 +1,11 @@
-<p align="center"><img src="docs/media/cover.svg" alt="نَسَق لأندرويد" width="850"></p>
+<p align="center"><img src="docs/media/cover.svg" alt="وَسْم لأندرويد" width="850"></p>
 
-<h1 align="center">نَسَق</h1>
+<h1 align="center">وَسْم</h1>
 
 <p align="center">سجّل السكر والمياه والوجبات والجرعات، وارجع ليومك من مكان واحد.</p>
 
 <p align="center">
-  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.16.0/Nasaq-v0.16.0.apk"><img src="https://img.shields.io/badge/Android-0.16.0-205449?style=for-the-badge" alt="تنزيل نَسَق 0.16.0"></a>
+  <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.17.0/Wasm-v0.17.0.apk"><img src="https://img.shields.io/badge/Android-0.17.0-522533?style=for-the-badge" alt="تنزيل وَسْم 0.17.0"></a>
   <a href="https://github.com/Mohamedabdelnaby1/nasaq-android/releases"><img src="https://img.shields.io/badge/GitHub-Releases-334360?style=for-the-badge" alt="الإصدارات المنشورة على GitHub"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-397785?style=for-the-badge" alt="رخصة MIT"></a>
 </p>
@@ -17,9 +17,19 @@
 
 **أندرويد 8.0 فأحدث** · العربية والإنجليزية · البيانات محفوظة على الجهاز.
 
-[نزّل Nasaq-v0.16.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.16.0/Nasaq-v0.16.0.apk) وثبّته كتحديث فوق إصدارات نَسَق الموقّعة بنفس الشهادة.
+[نزّل Wasm-v0.17.0.apk](https://github.com/Mohamedabdelnaby1/nasaq-android/releases/download/v0.17.0/Wasm-v0.17.0.apk) وثبّته كتحديث فوق نَسَق 0.16.0 والإصدارات الموقّعة بنفس الشهادة. وَسْم هو الاسم الجديد لنَسَق.
 
 [الإصدارات المنشورة وبصمات SHA-256](https://github.com/Mohamedabdelnaby1/nasaq-android/releases)
+
+### التغييرات في 0.17.0
+
+- وَسْم هو الاسم الجديد للتطبيق بالعربي، وWasm بالإنجليزي.
+- شعار وأيقونة مكتوب فيهما وَسْم بالعربي، مع خط قراءات وقطرة ترمز لتسجيل السكر.
+- الاسم والشعار في التطبيق، والتذكيرات، والويدجت، وتقارير PDF، وصور المشروع.
+- يستخدم التحديث نفس هوية التثبيت وتوقيع الإصدار السابق، علشان السجل والإعدادات يفضلوا على نفس الجهاز.
+
+- من مركز التذكيرات تقدر تفعّل «روتين بيتعلّم من يومك». وَسْم يحلل مواعيد تسجيلاتك محليًا خلال آخر ٢١ يوم.
+- التكيّف يحرّك بداية تذكيرات المية في حدود ٩٠ دقيقة بعد ما يلاحظ نمطًا في ٤ أيام على الأقل، ويتخطّى التنبيه القريب لو كنت سجّلت مية. مواعيد الدوا والقياس بتتبع خطتك.
 
 ### التغييرات في 0.16.0
 
@@ -72,6 +82,8 @@
 
 [إعدادات السكر](docs/media/glucose-options.webp) · [إعدادات المياه](docs/media/water-options.webp) · [معاينة استوديو الويدجت](docs/media/widget-studio.webp) · [الخط الزمني](docs/media/timeline.webp) · [معاينة التنقل بين الشاشات](docs/media/navigation.webp) · [معاينة حركة امتلاء الكوبايات](docs/media/water-motion.webp)
 
+[شاشة الأدوية](docs/media/medicines.webp) · [السجل](docs/media/journal.webp) · [معاينة تقرير PDF](docs/media/report.webp) · [الروتين المتكيّف](docs/media/routine-learning.webp) · [الشعار العربي](docs/media/wasm-logo.svg) · [الأيقونة](docs/media/wasm-icon.svg)
+
 <a id="features"></a>
 ## المميزات
 
@@ -86,7 +98,7 @@
 
 ### استيراد CSV
 
-تقدر تبدأ بملف صادر من نَسَق. لو بتجهّز ملف بنفسك، الأعمدة المطلوبة هي `measured_at_iso` و`kind` و`value` أو `value_original`. السكر والمياه ليهم عمود وحدة `unit`.
+تقدر تبدأ بملف صادر من وَسْم. لو بتجهّز ملف بنفسك، الأعمدة المطلوبة هي `measured_at_iso` و`kind` و`value` أو `value_original`. السكر والمياه ليهم عمود وحدة `unit`.
 
 ```csv
 measured_at_iso,kind,value,unit
@@ -112,4 +124,3 @@ measured_at_iso,kind,value,unit
 ## الترخيص
 
 تطوير [محمد عبدالنبي](https://fb.com/mohamedabdelnaby190) · [رخصة MIT](LICENSE) · [ترخيص خط تجوال](app/src/main/assets/licenses/Tajawal-OFL.txt).
-

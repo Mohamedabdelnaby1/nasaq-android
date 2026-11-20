@@ -13,8 +13,8 @@ android {
         applicationId = "com.yawmi.diabetes"
         minSdk = 26
         targetSdk = 36
-        versionCode = 19
-        versionName = "0.16.0"
+        versionCode = 20
+        versionName = "0.17.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_1_8; targetCompatibility = JavaVersion.VERSION_1_8; isCoreLibraryDesugaringEnabled = true }
